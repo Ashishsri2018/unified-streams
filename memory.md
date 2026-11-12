@@ -168,8 +168,13 @@
   - Verified 1 series (*Breaking Bad* `tt0903747:1:1`): 41 playable streams returned across 15 providers (`Sylphera`, `Maelith`, `DesiFlix`, `Esvyl`, `Fendrix`, `Haylox`, `Ilvyrel`, `Movix`, `MultiMovies`, `NetMirror`, `Novus`, `Phraxis`, `Quinox`, `Svartok`, `VidRock`).
   - Verified 1 anime (*Attack on Titan* `tt2560140:1:1`): 23 playable streams returned across 7 providers (`Kurage`, `Movix`, `MultiMovies`, `NetMirror`, `PlayIMDb`, `ToonStream`, `VidRock`).
 
+- CI/CD Optimization for Documentation:
+  - Added `paths-ignore: ['**.md']` to `.github/workflows/ci.yml` for push and pull_request triggers.
+  - Enforced convention to always include `[skip ci]` in commit messages for documentation and project memory updates to avoid triggering unnecessary CI builds and deployments.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.
 - Standardized error handling: all stream requests return `{ "streams": [] }` on failure/empty.
 - Strict HTTP compatibility: `GET`, `HEAD`, `OPTIONS` supported explicitly; `HEAD` never invokes upstream provider fan-out.
+- Documentation commits must always contain `[skip ci]` to prevent redundant CI/CD builds.
