@@ -74,6 +74,16 @@
   - Updated Nuvio worker (`src/fleets/nuvio/worker.ts`) and Vega worker (`src/fleets/vega/worker.ts`) to return per-provider stats in `/internal/health`.
   - Added test coverage in `tests/features/app.test.ts` for `/status` HTML and `/health` aggregated provider reporting; all 35 Vitest tests and `npm run verify` pass cleanly.
 
+- Enforced Provider Policy & Duplicate Exclusions:
+  - Synced `config/provider-audit.csv` with full audit decisions (`disable_redundant`, `keep_disabled`, `disable_requested`, `keep_primary`).
+  - Injected fleet provider policy directly into `deriveFleetEnv()` in `src/core/env.ts`:
+    - SA7: `PROVIDERS` set to the 13 non-duplicate allowed providers (`dahmermovies`, `dahmermovies-tv`, `desiflix`, `einthusan`, `kurage`, `movix-vf`, `multimovies`, `playimdb`, `puretoons`, `redflix`, `toonstream`, `topcartoons`, `vidrock`). Redundant duplicate scrapers disabled.
+    - Nuvio: `DISABLED_SCRAPERS` set to the 18 redundant duplicates, regional BDIX, and Internet Archive scrapers. 31 unique/primary scrapers active.
+    - Vega: `DISABLED_PROVIDERS` set to `torrentio,internetArchive,youtube,katmovies,multi`.
+  - Updated `config/defaults.env` with canonical `SA7_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, and `VEGA_DISABLED_PROVIDERS`.
+  - Updated Vega worker (`src/fleets/vega/worker.ts`) to exclude `disabledProviders` from active registry list and health metrics.
+  - Verified with `npm run verify` and live supervisor test: all policy and duplicate exclusions active.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.

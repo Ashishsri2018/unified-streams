@@ -35,6 +35,9 @@ export const EnvSchema = z.object({
   PUBLIC_BASE_URL: z.string().optional(),
   TMDB_API_KEY: z.string().optional(),
   PROVIDER_SETTINGS_JSON: z.string().optional(),
+  SA7_PROVIDERS: z.string().optional(),
+  NUVIO_DISABLED_SCRAPERS: z.string().optional(),
+  VEGA_DISABLED_PROVIDERS: z.string().optional(),
   COOKIES_FILE: z.string().optional(),
   GITHUB_TOKEN: z.string().optional(),
   INTERNAL_TOKEN: z.string().optional(),
@@ -95,6 +98,22 @@ export function deriveFleetEnv(
   }
 
   const fleetDataDir = path.join(env.DATA_DIR, fleet);
+  const policyPath = path.resolve(process.cwd(), 'config', 'providers.json');
+  let sa7Allow = '';
+  let nuvioDeny = '';
+  let vegaDeny = '';
+
+  if (fs.existsSync(policyPath)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(policyPath, 'utf-8'));
+      if (raw.sa7?.ids) sa7Allow = raw.sa7.ids.join(',');
+      if (raw.nuvio?.ids) nuvioDeny = raw.nuvio.ids.join(',');
+      if (raw.vega?.ids) vegaDeny = raw.vega.ids.join(',');
+    } catch {
+      // ignore
+    }
+  }
+
   const outEnv: Record<string, string> = {
     NODE_ENV: 'production',
     HOST: '127.0.0.1',
@@ -113,11 +132,28 @@ export function deriveFleetEnv(
     PROVIDER_SETTINGS_JSON: fleetSettings,
   };
 
-  if (fleet === 'nuvio') {
+  if (fleet === 'sa7') {
+    const list = env.SA7_PROVIDERS || sa7Allow;
+    if (list) {
+      outEnv.PROVIDERS = list;
+      outEnv.SA7_PROVIDERS = list;
+    }
+  } else if (fleet === 'nuvio') {
+    const list = env.NUVIO_DISABLED_SCRAPERS || nuvioDeny;
+    if (list) {
+      outEnv.DISABLED_SCRAPERS = list;
+      outEnv.NUVIO_DISABLED_SCRAPERS = list;
+    }
     const distBundled = path.resolve(process.cwd(), 'dist/fleets/nuvio/snapshot');
     const srcBundled = path.resolve(process.cwd(), 'src/fleets/nuvio/snapshot');
     outEnv.NUVIO_BUNDLED_DIR = fs.existsSync(distBundled) ? distBundled : srcBundled;
     outEnv.NUVIO_CACHE_DIR = fleetDataDir;
+  } else if (fleet === 'vega') {
+    const list = env.VEGA_DISABLED_PROVIDERS || vegaDeny;
+    if (list) {
+      outEnv.DISABLED_PROVIDERS = list;
+      outEnv.VEGA_DISABLED_PROVIDERS = list;
+    }
   }
 
   return outEnv;

@@ -1,141 +1,141 @@
 component,id,name,types,hosts,duplicate_group,suggested_owner,current_status,currently_queried,test_candidate,suggested_final_action,test_movie_streams,test_series_streams,test_movie_ms,test_series_ms,test_errors,decision,notes
-nuvio,bdix-cf,Circle FTP.,movie|tv,"15.1.1.50,new.circleftp.net",,,env_disabled,no,yes,keep_disabled,,,,,,,region-specific BDIX FTP; currently disabled in Nuvio production
-nuvio,bdix-df,DhakaFlix FTP.,movie|tv,"172.16.50.12,172.16.50.14",,,env_disabled,no,yes,keep_disabled,,,,,,,region-specific BDIX FTP; currently disabled in Nuvio production
-nuvio,bdix-fh,FlixHub FTP.,movie|tv,flixhub.net,,,env_disabled,no,yes,keep_disabled,,,,,,,region-specific BDIX FTP; currently disabled in Nuvio production
-nuvio,brellor,Brellor.,movie|tv,archive.org,internetarchive,nuvio:brellor,env_disabled,no,yes,keep,,,,,,,same archive.org; vega copy is env-disabled; env-disabled in current Nuvio production; candidate to re-enable for archive coverage
+nuvio,bdix-cf,Circle FTP.,movie|tv,"15.1.1.50,new.circleftp.net",,,env_disabled,no,yes,keep_disabled,,,,,,keep_disabled,Regional BDIX; remains disabled.
+nuvio,bdix-df,DhakaFlix FTP.,movie|tv,"172.16.50.12,172.16.50.14",,,env_disabled,no,yes,keep_disabled,,,,,,keep_disabled,Regional BDIX; remains disabled.
+nuvio,bdix-fh,FlixHub FTP.,movie|tv,flixhub.net,,,env_disabled,no,yes,keep_disabled,,,,,,keep_disabled,Regional BDIX; remains disabled.
+nuvio,brellor,Brellor.,movie|tv,archive.org,internetarchive,nuvio:brellor,env_disabled,no,yes,keep,,,,,,disable_requested,Internet Archive; disabled by user request.
 nuvio,durnel,Durnel.,movie|tv,"cockpit.103.109.92.178.nip.io,ctgmovies.com",,,enabled,yes,yes,keep,,,,,,,
 nuvio,esvyl,Esvyl.,movie|tv,vidbolt.xyz,,,enabled,yes,yes,keep,,,,,,,
-nuvio,evyrith,Evyrith.,movie|tv,vidrock.net,vidrock,nuvio:evyrith,enabled,yes,yes,keep,,,,,,,same vidrock.net; test both
-nuvio,fastrion,Fastrion.,movie|tv,"api.eclq-404.workers.dev,embed.filmu.in",,,enabled,yes,yes,keep,,,,,,,
+nuvio,evyrith,Evyrith.,movie|tv,vidrock.net,vidrock,nuvio:evyrith,enabled,yes,yes,keep,,,,,,disable_redundant,Duplicate of sa7:vidrock; disabled to reduce load.
+nuvio,fastrion,Fastrion.,movie|tv,"api.eclq-404.workers.dev,embed.filmu.in",,,enabled,yes,yes,keep,,,,,,disable_redundant,Duplicate of SA7 MultiMovies; disabled to reduce load.
 nuvio,fendrix,Fendrix.,movie|tv,"api.shegu.st,api.shegu.xyz,cinejoy.pk",,,enabled,yes,yes,keep,,,,,,,
 nuvio,fjoral,Fjoral.,movie|tv,"bollywood.eu.org,tga-hd.api.hashhackers.com",,,enabled,yes,yes,keep,,,,,,,
-nuvio,fyron,Fyron.,movie|tv,kisskh.ovh,kisskh,vega:kissKh,enabled,yes,yes,decide_by_stats,,,,,,,same KissKH brand/mirrors
-nuvio,gravix,Gravix.,movie|tv,"player.abyssplayer.com,playhydrax.com,short.icu,watchanimeworld.one",animeworld,vega:animeworld,enabled,yes,yes,decide_by_stats,,,,,,,same watchanimeworld.one site
+nuvio,fyron,Fyron.,movie|tv,kisskh.ovh,kisskh,vega:kissKh,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:kissKh; disabled to reduce load.
+nuvio,gravix,Gravix.,movie|tv,"player.abyssplayer.com,playhydrax.com,short.icu,watchanimeworld.one",animeworld,vega:animeworld,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:animeworld; disabled to reduce load.
 nuvio,haylox,Haylox.,movie|tv,vidlink.pro,,,enabled,yes,yes,keep,,,,,,,
-nuvio,hexion,Hexion.,movie|tv,"4khdhub.one,pixeldrain.com",4khdhub,vega:4khdhub,enabled,yes,yes,decide_by_stats,,,,,,,same 4khdhub site
+nuvio,hexion,Hexion.,movie|tv,"4khdhub.one,pixeldrain.com",4khdhub,vega:4khdhub,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:4khdhub; disabled to reduce load.
 nuvio,ilvyrel,Ilvyrel.,movie|tv,"archive.toonworld4all.me,pixeldrain.com,toonworld4all.me",,,enabled,yes,yes,keep,,,,,,,
-nuvio,jhaeros,Jhaeros.,movie,pc7mud.movielinkbd.at,movielinkbd,vega:movielinkdb,enabled,yes,yes,decide_by_stats,,,,,,,same MovieLinkBD brand/mirrors
+nuvio,jhaeros,Jhaeros.,movie,pc7mud.movielinkbd.at,movielinkbd,vega:movielinkdb,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:movielinkdb; disabled to reduce load.
 nuvio,jyniq,Jyniq.,movie,"commons.wikimedia.org,en.wikipedia.org",,,enabled,yes,yes,keep,,,,,,,
-nuvio,karnis,Karnis.,movie|tv,api.hlowb.com,castle,vega:castle,enabled,yes,yes,decide_by_stats,,,,,,,same hlowb/Castle API
+nuvio,karnis,Karnis.,movie|tv,api.hlowb.com,castle,vega:castle,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:castle; disabled to reduce load.
 nuvio,kethrax,Kethrax.,movie|tv,vixsrc.to,,,enabled,yes,yes,keep,,,,,,,
 nuvio,kryxalia,Kryxalia.,movie,"abhilinks.site,new4.movieshunt.website,vcloud.fit",,,enabled,yes,yes,keep,,,,,,,
-nuvio,lenyr,Lenyr.,movie|tv,"animap.id,anizone.to",anizone,nuvio:lenyr,enabled,yes,yes,keep,,,,,,,same anizone.to site
+nuvio,lenyr,Lenyr.,movie|tv,"animap.id,anizone.to",anizone,nuvio:lenyr,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for anizone duplicate group.
 nuvio,lyrin,Lyrin.,movie|tv,"banglaplex.biz,pixeldrain.com",,,enabled,yes,yes,keep,,,,,,,
 nuvio,maelith,Maelith.,movie|tv,mapple.fun,,,enabled,yes,yes,keep,,,,,,,
-nuvio,mavonyx,Mavonyx.,movie|tv,"api3.aoneroom.com,apig.inmoviebox.com,h5-api.aoneroom.com,themoviebox.xyz",moviebox,vega:movieBoxWeb,enabled,yes,yes,decide_by_stats,,,,,,,MovieBox brand; app API vs official web; test both
+nuvio,mavonyx,Mavonyx.,movie|tv,"api3.aoneroom.com,apig.inmoviebox.com,h5-api.aoneroom.com,themoviebox.xyz",moviebox,vega:movieBoxWeb,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:movieBoxWeb; disabled to reduce load.
 nuvio,novus,Novus.,movie|tv,dulo.mov,,,enabled,yes,yes,keep,,,,,,,
 nuvio,nyxora,Nyxora.,movie|tv,vidfast.vc,,,enabled,yes,yes,keep,,,,,,,
 nuvio,onyxia,Onyxia.,movie|tv,"ani.pm,embed.settlar.io,themoviedb.org",,,enabled,yes,yes,keep,,,,,,,
 nuvio,ozeris,Ozeris.,movie|tv,anv.to,,,enabled,yes,yes,keep,,,,,,,
 nuvio,phraxis,Phraxis.,movie|tv,"jerso441ceg.com,links.watchkar.com",,,enabled,yes,yes,keep,,,,,,,
-nuvio,praxiel,Praxiel.,movie|tv,"flixcloud.cc,reanime.to",reanime,nuvio:praxiel,enabled,yes,yes,keep,,,,,,,same reanime.to/flixcloud.cc
-nuvio,pynvix,Pynvix.,movie|tv,"febbox.com,id-mapping-api-showbox-proxy.hf.space",showbox,vega:showbox,enabled,yes,yes,decide_by_stats,,,,,,,same ShowBox/Febbox backend
-nuvio,qorva,Qorva.,movie|tv,"gdflix.dev,links.kmhd.me,new.katdrama.my,new.katmoviehd.top,new.pikahd.co,pixeldrain.com,streamtape.com",katmovies,nuvio:qorva,enabled,yes,yes,keep,,,,,,,qorva covers KatMovieHD/KatDrama/Pikahd; test reliability
+nuvio,praxiel,Praxiel.,movie|tv,"flixcloud.cc,reanime.to",reanime,nuvio:praxiel,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for reanime duplicate group.
+nuvio,pynvix,Pynvix.,movie|tv,"febbox.com,id-mapping-api-showbox-proxy.hf.space",showbox,vega:showbox,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:showbox; disabled to reduce load.
+nuvio,qorva,Qorva.,movie|tv,"gdflix.dev,links.kmhd.me,new.katdrama.my,new.katmoviehd.top,new.pikahd.co,pixeldrain.com,streamtape.com",katmovies,nuvio:qorva,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for katmovies duplicate group.
 nuvio,quinox,Quinox.,movie|tv,"blue-bush-5977.streamed-7.workers.dev,flat-sky-cf20.streamed-850.workers.dev,long-night-d802.streamed-5.workers.dev,rapid-heart-03c8.streamed-4.workers.dev,super-flower-9c85.streamed-2.workers.dev,vidnest.fun,vidrift-cf.streamed-8.workers.dev",,,enabled,yes,yes,keep,,,,,,,
-nuvio,qyrvaen,Qyrvaen.,movie|tv,"hubcloud.ist,new8.hdhub4u.cl,search.pingora.fyi",hdhub4u,vega:hdhub4u,enabled,yes,yes,decide_by_stats,,,,,,,same HDHub4u site + pingora search
+nuvio,qyrvaen,Qyrvaen.,movie|tv,"hubcloud.ist,new8.hdhub4u.cl,search.pingora.fyi",hdhub4u,vega:hdhub4u,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:hdhub4u; disabled to reduce load.
 nuvio,rylvane,Rylvane.,movie|tv,"embed.wcostream.com,wcoflix.tv",,,enabled,yes,yes,keep,,,,,,,
 nuvio,rynara,Rynara,movie|tv,vidy.st,,,enabled,yes,yes,keep,,,,,,,
 nuvio,solunix,Solunix.,movie|tv,api.hicine.sbs,,,enabled,yes,yes,keep,,,,,,,
-nuvio,soryn,Soryn.,movie|tv,"net27.cc,videodownloader.site",,,enabled,yes,yes,keep,,,,,,,
+nuvio,soryn,Soryn.,movie|tv,"net27.cc,videodownloader.site",,,enabled,yes,yes,keep,,,,,,disable_redundant,Duplicate of Vega NetMirror family; disabled to reduce load.
 nuvio,svartok,Svartok.,movie|tv,,,,enabled,yes,yes,keep,,,,,,,no direct host in provider file
 nuvio,sylphera,Sylphera.,movie|tv,dexter.pw,,,enabled,yes,yes,keep,,,,,,,
 nuvio,tyvrel,Tyvrel.,movie|tv,nxsha.space,,,enabled,yes,yes,keep,,,,,,,
-nuvio,vornix,Vornix.,movie|tv,"new1.moviesdrive.cyou,pixeldrain.dev",moviesdrive,vega:drive,enabled,yes,yes,decide_by_stats,,,,,,,same MoviesDrive family
+nuvio,vornix,Vornix.,movie|tv,"new1.moviesdrive.cyou,pixeldrain.dev",moviesdrive,vega:drive,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:drive; disabled to reduce load.
 nuvio,vyranel,Vyranel.,movie|tv,"animecube.live,geo.dailymotion.com,rumble.com",,,enabled,yes,yes,keep,,,,,,,
 nuvio,waelum,Waelum.,movie|tv,bingebang.st,,,enabled,yes,yes,keep,,,,,,,
 nuvio,wrenok,Wrenok.,movie|tv,"api.purstream.ad,purstream.ad",,,enabled,yes,yes,keep,,,,,,,
 nuvio,xandril,Xandril.,movie|tv,anichan.to,,,enabled,yes,yes,keep,,,,,,,
-nuvio,xylos,Xylos.,movie|tv|series,"anikage.cc,og.bakayaro.live",anikage,nuvio:xylos,enabled,yes,yes,keep,,,,,,,same anikage.cc site
-nuvio,zevran,Zevran.,movie|tv|series,"nextgencloudfabric.com,streamdata.vaplayer.ru",playimdb,sa7:playimdb,enabled,yes,yes,decide_by_stats,,,,,,,same VAplayer/nextgencloudfabric backend; test both
-nuvio,zyrvael,Zyrvael.,movie|tv,anikoto.cz,anikoto,vega:anikoto,enabled,yes,yes,decide_by_stats,,,,,,,"same Anikoto brand, different mirror domains"
-sa7,4khdhub,4KHDHub,movie|tv,4khdhub.one,4khdhub,vega:4khdhub,enabled,yes,yes,decide_by_stats,,,,,,,same 4khdhub site
-sa7,anikage,AniKage,movie|tv,"anikage.cc,og.bakayaro.live,worker.zendax.me",anikage,nuvio:xylos,enabled,yes,yes,decide_by_stats,,,,,,,same anikage.cc site
-sa7,animesalt,AnimeSalt,anime|movie|tv,"animesalt.cx,player.abyssplayer.com,playhydrax.com,short.icu",animesalt,vega:animesalt,enabled,yes,yes,decide_by_stats,,,,,,,same AnimeSalt brand/mirror
-sa7,animeworld,AnimeWorld,anime|movie|tv,"player.abyssplayer.com,playhydrax.com,short.icu,watchanimeworld.one",animeworld,vega:animeworld,enabled,yes,yes,decide_by_stats,,,,,,,same watchanimeworld.one site
-sa7,anizen,AniZen,anime|movie|tv,"anikoto.net,anizen-api.vgdz6n57j7.workers.dev",anikoto,vega:anikoto,enabled,yes,yes,decide_by_stats,,,,,,,"same Anikoto brand, different mirror domains"
-sa7,anizone,AniZone,anime|movie|tv,"anizone.to,seiryuu.vid-cdn.xyz",anizone,nuvio:lenyr,enabled,yes,yes,decide_by_stats,,,,,,,same anizone.to site
-sa7,castle,Castle,movie|tv,api.hlowb.com,castle,vega:castle,enabled,yes,yes,decide_by_stats,,,,,,,same hlowb/Castle API
+nuvio,xylos,Xylos.,movie|tv|series,"anikage.cc,og.bakayaro.live",anikage,nuvio:xylos,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for anikage duplicate group.
+nuvio,zevran,Zevran.,movie|tv|series,"nextgencloudfabric.com,streamdata.vaplayer.ru",playimdb,sa7:playimdb,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of sa7:playimdb; disabled to reduce load.
+nuvio,zyrvael,Zyrvael.,movie|tv,anikoto.cz,anikoto,vega:anikoto,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:anikoto; disabled to reduce load.
+sa7,4khdhub,4KHDHub,movie|tv,4khdhub.one,4khdhub,vega:4khdhub,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:4khdhub; disabled to reduce load.
+sa7,anikage,AniKage,movie|tv,"anikage.cc,og.bakayaro.live,worker.zendax.me",anikage,nuvio:xylos,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of nuvio:xylos; disabled to reduce load.
+sa7,animesalt,AnimeSalt,anime|movie|tv,"animesalt.cx,player.abyssplayer.com,playhydrax.com,short.icu",animesalt,vega:animesalt,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:animesalt; disabled to reduce load.
+sa7,animeworld,AnimeWorld,anime|movie|tv,"player.abyssplayer.com,playhydrax.com,short.icu,watchanimeworld.one",animeworld,vega:animeworld,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:animeworld; disabled to reduce load.
+sa7,anizen,AniZen,anime|movie|tv,"anikoto.net,anizen-api.vgdz6n57j7.workers.dev",anikoto,vega:anikoto,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:anikoto; disabled to reduce load.
+sa7,anizone,AniZone,anime|movie|tv,"anizone.to,seiryuu.vid-cdn.xyz",anizone,nuvio:lenyr,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of nuvio:lenyr; disabled to reduce load.
+sa7,castle,Castle,movie|tv,api.hlowb.com,castle,vega:castle,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:castle; disabled to reduce load.
 sa7,dahmermovies,Dahmermovies,movie,st.111477.xyz,,,enabled,yes,yes,keep,,,,,,,
 sa7,dahmermovies-tv,Dahmermovies-TV,tv,st.111477.xyz,,,enabled,yes,yes,keep,,,,,,,
 sa7,desiflix,DesiFlix,movie|tv,manifest.desitvhub.eu.org,,,enabled,yes,yes,keep,,,,,,,
 sa7,einthusan,Einthusan,movie,"cdn2.einthusan.io,einthusan.asaddon.com,einthusan.tv",,,enabled,yes,yes,keep,,,,,,,
-sa7,hdhub4u,HDHub4u,movie|tv,"new7.hdhub4u.cl,search.pingora.fyi",hdhub4u,vega:hdhub4u,enabled,yes,yes,decide_by_stats,,,,,,,same HDHub4u site + pingora search
+sa7,hdhub4u,HDHub4u,movie|tv,"new7.hdhub4u.cl,search.pingora.fyi",hdhub4u,vega:hdhub4u,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:hdhub4u; disabled to reduce load.
 sa7,kurage,Kurage,anime|movie|tv,kurage.live,,,enabled,yes,yes,keep,,,,,,,
-sa7,moviebox,MovieBox,movie|tv,"api3.aoneroom.com,api4.aoneroom.com,api4sg.aoneroom.com,api5.aoneroom.com,api6.aoneroom.com,apig.inmoviebox.com,moviebox.ph",moviebox,vega:movieBoxWeb,enabled,yes,yes,decide_by_stats,,,,,,,MovieBox brand; app API vs official web; test both
-sa7,moviesdrive,MoviesDrive,movie|tv,new1.moviesdrive.cyou,moviesdrive,vega:drive,enabled,yes,yes,decide_by_stats,,,,,,,same MoviesDrive family
-sa7,moviesmod,MoviesMod,movie|tv,"en.thenaukriadda.in,moviesmod.meme",moviesmod,vega:mod,enabled,yes,yes,decide_by_stats,,,,,,,same MoviesMod site
+sa7,moviebox,MovieBox,movie|tv,"api3.aoneroom.com,api4.aoneroom.com,api4sg.aoneroom.com,api5.aoneroom.com,api6.aoneroom.com,apig.inmoviebox.com,moviebox.ph",moviebox,vega:movieBoxWeb,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:movieBoxWeb; disabled to reduce load.
+sa7,moviesdrive,MoviesDrive,movie|tv,new1.moviesdrive.cyou,moviesdrive,vega:drive,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:drive; disabled to reduce load.
+sa7,moviesmod,MoviesMod,movie|tv,"en.thenaukriadda.in,moviesmod.meme",moviesmod,vega:mod,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:mod; disabled to reduce load.
 sa7,movix-vf,Movix VF,movie|tv,"api.movix.,movix.",,,enabled,yes,yes,keep,,,,,,,
-sa7,multimovies,MultiMovies,movie|tv,m1.multimovies.courses,multimovies,sa7:multimovies,enabled,yes,yes,keep,,,,,,,vega multi is manifest-disabled
-sa7,netmirror,NetMirror,movie|tv,"mobidetect.art,mobidetect.cc,mobidetect.click,mobidetect.vip,mobidetect.xyz,mobiledetect.app,mobiledetects.com,net52.cc,tv.imgcdn.kim",netmirror,vega:netflixMirror,enabled,yes,yes,decide_by_stats,,,,,,,net52.cc backend; vega has separate Netflix/Prime/Disney providers
-sa7,playimdb,PlayIMDb,movie|tv,"nextgencloudfabric.com,streamdata.vaplayer.ru",playimdb,sa7:playimdb,enabled,yes,yes,keep,,,,,,,same VAplayer/nextgencloudfabric backend; test both
+sa7,multimovies,MultiMovies,movie|tv,m1.multimovies.courses,multimovies,sa7:multimovies,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for multimovies duplicate group.
+sa7,netmirror,NetMirror,movie|tv,"mobidetect.art,mobidetect.cc,mobidetect.click,mobidetect.vip,mobidetect.xyz,mobiledetect.app,mobiledetects.com,net52.cc,tv.imgcdn.kim",netmirror,vega:netflixMirror,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of Vega NetMirror family; disabled to reduce load.
+sa7,playimdb,PlayIMDb,movie|tv,"nextgencloudfabric.com,streamdata.vaplayer.ru",playimdb,sa7:playimdb,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for playimdb duplicate group.
 sa7,puretoons,PureToons,movie|tv,"puretoons.in,toonstream.us",,,enabled,yes,yes,keep,,,,,,,
-sa7,reanime,Reanime,anime|movie|tv,"flixcloud.cc,reanime.cz,reanime.to,reanime.wtf",reanime,nuvio:praxiel,enabled,yes,yes,decide_by_stats,,,,,,,same reanime.to/flixcloud.cc
+sa7,reanime,Reanime,anime|movie|tv,"flixcloud.cc,reanime.cz,reanime.to,reanime.wtf",reanime,nuvio:praxiel,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of nuvio:praxiel; disabled to reduce load.
 sa7,redflix,RedFlix,movie|tv,redflix.biz,,,enabled,yes,yes,keep,,,,,,,
 sa7,toonstream,ToonStream,movie|tv,"rubystm.com,toonstream.us",,,enabled,yes,yes,keep,,,,,,,
 sa7,topcartoons,TopCartoons,anime|tv,,,,enabled,yes,yes,keep,,,,,,,no direct host in provider file (metadata/getBaseUrl-based)
-sa7,torrentio,Torrentio,movie|tv,,torrentio,none,hardcoded_disabled,no,no,keep_disabled,,,,,,,torrents intentionally disabled; no direct host in provider file (metadata/getBaseUrl-based)
-sa7,vegamovies,VegaMovies,movie|tv,"fast-dl.one,new1.vegamovies.lease,pixeldrain.com",vegamovies,vega:vega,enabled,yes,yes,decide_by_stats,,,,,,,same VegaMovies brand
-sa7,vidrock,VidRock,movie|tv,vidrock.net,vidrock,nuvio:evyrith,enabled,yes,yes,decide_by_stats,,,,,,,same vidrock.net; test both
+sa7,torrentio,Torrentio,movie|tv,,torrentio,none,hardcoded_disabled,no,no,keep_disabled,,,,,,keep_disabled,Torrent providers disabled by policy.
+sa7,vegamovies,VegaMovies,movie|tv,"fast-dl.one,new1.vegamovies.lease,pixeldrain.com",vegamovies,vega:vega,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of vega:vega; disabled to reduce load.
+sa7,vidrock,VidRock,movie|tv,vidrock.net,vidrock,nuvio:evyrith,enabled,yes,yes,decide_by_stats,,,,,,keep_primary,Primary owner for vidrock duplicate group.
 vega,1cinevood,Cinewood,global,"cinevood.rocks,new1.cinevood.cv",,,enabled,yes,yes,keep,,,,,,,
 vega,1flex,1Flex,global,"1flex.org,api.viduki.net,core.vidzee.wtf,db.1flex.org,player.vidzee.wtf,viduki.net",,,enabled,yes,yes,keep,,,,,,,
-vega,4khdhub,4khdHub,global,,4khdhub,vega:4khdhub,enabled,yes,yes,keep,,,,,,,same 4khdhub site; hosts resolved via urls.json/getBaseUrl; not literal in provider folder
+vega,4khdhub,4khdHub,global,,4khdhub,vega:4khdhub,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for 4khdhub duplicate group.
 vega,a111477,A.111477,english,"a.111477.xyz,a111477.1proxy.workers.dev",,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,anikoto,Anikoto,anime,"anikototv.to,fetch.1proxy.workers.dev,vibeplayer.site",anikoto,vega:anikoto,enabled,yes,yes,keep,,,,,,,"same Anikoto brand, different mirror domains"
-vega,animesalt,AnimeSalt,anime,animesalt.in,animesalt,vega:animesalt,enabled,yes,yes,keep,,,,,,,same AnimeSalt brand/mirror
+vega,anikoto,Anikoto,anime,"anikototv.to,fetch.1proxy.workers.dev,vibeplayer.site",anikoto,vega:anikoto,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for anikoto duplicate group.
+vega,animesalt,AnimeSalt,anime,animesalt.in,animesalt,vega:animesalt,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for animesalt duplicate group.
 vega,animesub,AnimeSub+,anime,,,,enabled,yes,yes,keep,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,animetsu,Animetsu,english,"animetsu.net,swiftstream.top",,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,animeworld,AnimeWorld,anime,watchanimeworld.one,animeworld,vega:animeworld,enabled,yes,yes,keep,,,,,,,same watchanimeworld.one site
+vega,animeworld,AnimeWorld,anime,watchanimeworld.one,animeworld,vega:animeworld,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for animeworld duplicate group.
 vega,autoEmbed,MultiStream,global,"db.wecollege.net,movy.sx",,,enabled,yes,yes,keep,,,,,,,
-vega,castle,Castle TV,global,"api.hlowb.com,img1.fhxod.com",castle,vega:castle,enabled,yes,yes,keep,,,,,,,same hlowb/Castle API
+vega,castle,Castle TV,global,"api.hlowb.com,img1.fhxod.com",castle,vega:castle,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for castle duplicate group.
 vega,cinefreak,CineFreak,global,"cinefreak.net,new5.cinecloud.site",,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,cinemaLuxe,CinemaLuxe,global,"cm-decrypt.8man.workers.dev,hubcloud",,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,disneyMirror,DisneyMirror,global,net52.cc,netmirror,vega:netflixMirror,enabled,yes,yes,decide_by_stats,,,,,,,net52.cc backend; vega has separate Netflix/Prime/Disney providers
+vega,disneyMirror,DisneyMirror,global,net52.cc,netmirror,vega:netflixMirror,enabled,yes,yes,decide_by_stats,,,,,,keep_primary,Vega NetMirror family; Netflix/Prime/Disney remain distinct services.
 vega,dooflix,Dooflix,india,molop.art,,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,dramacool,DramaCool,global,"asianc.id,vidbasic.top",,,enabled,yes,yes,keep,,,,,,,
-vega,drive,MoviesDrive,global,hubcloud.foo,moviesdrive,vega:drive,enabled,yes,yes,keep,,,,,,,same MoviesDrive family
+vega,drive,MoviesDrive,global,hubcloud.foo,moviesdrive,vega:drive,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for moviesdrive duplicate group.
 vega,eonMovies,EonMovies,global,"dotflix.pobmovie0301.workers.dev,pixeldrain.com",,,enabled,yes,yes,keep,,,,,,,
 vega,everything,Everything,global,"downloadeverythingfromeverywhere.com,slave.downloadeverythingfromeverywhere.com",,,enabled,yes,yes,keep,,,,,,,
 vega,filmyfly,FilmyFly,global,,,,manifest_disabled,no,no,keep_disabled,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,flixhq,FlixHQ,english,,,,manifest_disabled,no,no,keep_disabled,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,gokuHD,GokuHD,global,search.pingora.fyi,,,enabled,yes,yes,keep,,,,,,,
 vega,guardahd,GuardaHD,italy,"guardahd.stream,mostraguarda.stream",,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,hdhub4u,HdHub4u,global,search.pingora.fyi,hdhub4u,vega:hdhub4u,enabled,yes,yes,keep,,,,,,,same HDHub4u site + pingora search
+vega,hdhub4u,HdHub4u,global,search.pingora.fyi,hdhub4u,vega:hdhub4u,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for hdhub4u duplicate group.
 vega,hiAnime,HiAnime,english,megacloud.club,,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,internetArchive,Internet Archive,global,,internetarchive,nuvio:brellor,env_disabled,no,yes,decide_by_stats,,,,,,,same archive.org; vega copy is env-disabled; env-disabled in Vega production; duplicate of nuvio:brellor
+vega,internetArchive,Internet Archive,global,,internetarchive,nuvio:brellor,env_disabled,no,yes,decide_by_stats,,,,,,disable_requested,Internet Archive; disabled by user request.
 vega,Joya9tv,Joya9tv,india,,,,manifest_disabled,no,no,keep_disabled,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,kartoons,Kartoons,anime,"api.kartoons.to,kartoons.to",,,enabled,yes,yes,keep,,,,,,,
 vega,katMovieFix,KatMovieFix,global,,,,manifest_disabled,no,no,keep_disabled,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
-vega,katmovies,KatMoviesHd,global,"gd.kmhd.eu,hubcloud.cx,links.kmhd.me,new.gdflix.cfd",katmovies,nuvio:qorva,enabled,yes,yes,decide_by_stats,,,,,,,qorva covers KatMovieHD/KatDrama/Pikahd; test reliability
+vega,katmovies,KatMoviesHd,global,"gd.kmhd.eu,hubcloud.cx,links.kmhd.me,new.gdflix.cfd",katmovies,nuvio:qorva,enabled,yes,yes,decide_by_stats,,,,,,disable_redundant,Duplicate of nuvio:qorva; disabled to reduce load.
 vega,kickAssAnime,KickAssAnime,anime,"fetch.1proxy.workers.dev,kaa.lt",,,enabled,yes,yes,keep,,,,,,,
-vega,kissKh,KissKh,english,kisskh.is,kisskh,vega:kissKh,enabled,yes,yes,keep,,,,,,,same KissKH brand/mirrors
+vega,kissKh,KissKh,english,kisskh.is,kisskh,vega:kissKh,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for kisskh duplicate group.
 vega,kmMovies,KmMovies,global,,,,enabled,yes,yes,keep,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,luxMovies,RogMovies,india,,,,enabled,yes,yes,keep,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,mkvDrama,MKVDrama,global,"mkvdrama.net,pixeldrain.com,worker.zendax.me",,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,mod,MoviesMod,global,"en.thenaukriadda.in,moviesmod.ai.in",moviesmod,vega:mod,enabled,yes,yes,keep,,,,,,,same MoviesMod site
+vega,mod,MoviesMod,global,"en.thenaukriadda.in,moviesmod.ai.in",moviesmod,vega:mod,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for moviesmod duplicate group.
 vega,movieBox,MovieBox App,global,worker.zendax.me,,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,movieBoxWeb,MovieBox Web,global,officialmoviebox.com,moviebox,vega:movieBoxWeb,enabled,yes,yes,keep,,,,,,,MovieBox brand; app API vs official web; test both
-vega,movielinkdb,MovieLinkBD,india,ex5wfv.movielinkbd.li,movielinkbd,vega:movielinkdb,enabled,yes,yes,keep,,,,,,,same MovieLinkBD brand/mirrors
+vega,movieBoxWeb,MovieBox Web,global,officialmoviebox.com,moviebox,vega:movieBoxWeb,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for moviebox duplicate group.
+vega,movielinkdb,MovieLinkBD,india,ex5wfv.movielinkbd.li,movielinkbd,vega:movielinkdb,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for movielinkbd duplicate group.
 vega,movies4u,Movies4U,global,"fastdl.zip,movies4u.vg",,,enabled,yes,yes,keep,,,,,,,
 vega,moviesApi,MoviesApi,english,ext.8man.me,,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,moviezwap,MoviezWap,india,,,,enabled,yes,yes,keep,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
-vega,multi,MultiMovies,global,"embed.filmu.in,multimovies.garden,vidout.pages.dev",multimovies,sa7:multimovies,manifest_disabled,no,no,decide_by_stats,,,,,,,vega multi is manifest-disabled
+vega,multi,MultiMovies,global,"embed.filmu.in,multimovies.garden,vidout.pages.dev",multimovies,sa7:multimovies,manifest_disabled,no,no,decide_by_stats,,,,,,disable_redundant,Already manifest-disabled; duplicate of SA7 MultiMovies.
 vega,mxplayer,MX Player,india,"d3sgzbosmwirao.cloudfront.net,mxplayer.in,qqcdnpictest.mxplay.com",,,enabled,yes,yes,keep,,,,,,,
-vega,netflixMirror,NetflixMirror,global,net52.cc,netmirror,vega:netflixMirror,enabled,yes,yes,keep,,,,,,,net52.cc backend; vega has separate Netflix/Prime/Disney providers
+vega,netflixMirror,NetflixMirror,global,net52.cc,netmirror,vega:netflixMirror,enabled,yes,yes,keep,,,,,,keep_primary,Vega NetMirror family; Netflix/Prime/Disney remain distinct services.
 vega,ogomovies,Ogomovies,india,"cdn.bewab.co,ogomovies.mobi",,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,primeMirror,PrimeMirror,global,net52.cc,netmirror,vega:netflixMirror,enabled,yes,yes,decide_by_stats,,,,,,,net52.cc backend; vega has separate Netflix/Prime/Disney providers
+vega,primeMirror,PrimeMirror,global,net52.cc,netmirror,vega:netflixMirror,enabled,yes,yes,decide_by_stats,,,,,,keep_primary,Vega NetMirror family; Netflix/Prime/Disney remain distinct services.
 vega,primewire,Primewire,english,,,,manifest_disabled,no,no,keep_disabled,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,protonMovies,ProtonMovies,global,"adoto.net,m3.protonmovies.top,new19.gdtot.dad,vikingfile.com",,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,ridoMovies,RidoMovies,english,,,,manifest_disabled,no,no,keep_disabled,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,ringz,Ringz,global,privatereporz.pages.dev,,,manifest_disabled,no,no,keep_disabled,,,,,,,
-vega,showbox,ShowBox,english,"feb.8man.workers.dev,febbox.com",showbox,vega:showbox,enabled,yes,yes,keep,,,,,,,same ShowBox/Febbox backend
+vega,showbox,ShowBox,english,"feb.8man.workers.dev,febbox.com",showbox,vega:showbox,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for showbox duplicate group.
 vega,skyMovieHD,SkyMovieHD,global,vgmlinks.click,,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,tokyoInsider,TokyoInsider,english,tokyoinsider.com,,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,topmovies,TopMovies,india,"en.thenaukriadda.in,moviesleech.club",,,enabled,yes,yes,keep,,,,,,,
-vega,torrentio,Torrentio,global,,torrentio,none,env_disabled,no,yes,keep_disabled,,,,,,,torrents intentionally disabled; hosts resolved via urls.json/getBaseUrl; not literal in provider folder
+vega,torrentio,Torrentio,global,,torrentio,none,env_disabled,no,yes,keep_disabled,,,,,,keep_disabled,Torrent providers disabled by policy.
 vega,uhd,UHDMovies,global,"en.thenaukriadda.in,uhdmovies.my",,,enabled,yes,yes,keep,,,,,,,
 vega,uniquestream,AnimeStream,english,anime.uniquestream.net,,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,vadapav,VadaPav,global,,,,manifest_disabled,no,no,keep_disabled,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
-vega,vega,VMovies,global,,vegamovies,vega:vega,enabled,yes,yes,keep,,,,,,,same VegaMovies brand; hosts resolved via urls.json/getBaseUrl; not literal in provider folder
+vega,vega,VMovies,global,,vegamovies,vega:vega,enabled,yes,yes,keep,,,,,,keep_primary,Primary owner for vegamovies duplicate group.
 vega,world4u,World4uFree,global,"mediafire.com,photolinx.space",,,enabled,yes,yes,keep,,,,,,,
-vega,youtube,YouTube,global,youtube.com,,,env_disabled,no,yes,keep_disabled,,,,,,,unique but currently env-disabled in Vega production
+vega,youtube,YouTube,global,youtube.com,,,env_disabled,no,yes,keep_disabled,,,,,,disable_requested,YouTube; disabled by user request.
 vega,zeefliz,Zeefliz,global,,,,enabled,yes,yes,keep,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder

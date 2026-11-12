@@ -95,4 +95,4 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 - **Manifest URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json`
 - **Configure URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/configure`
 - **Health Endpoint**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/health`
-- **Active Fleets & Providers**: 89 total (SA7: 19, Nuvio: 30, Vega: 40)
+- **Active Fleets & Providers**: Canonical duplicate-excluded provider fleet enforced via `config/providers.json` and `config/provider-audit.csv` (SA7: 12-13, Nuvio: 31, Vega: 36-40) with redundant duplicate scrapers, torrent scrapers, and Internet Archive excluded.

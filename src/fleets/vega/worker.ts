@@ -82,7 +82,12 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
     (pipelineMetrics?.providerStats || []).map((s) => [s.id, s]),
   );
 
-  const stats = registryProviders.map((b) => {
+  const disabled = new Set((config.disabledProviders || []).map((p) => p.toLowerCase()));
+  const activeProviders = registryProviders.filter(
+    (b) => !disabled.has(b.entry.value.toLowerCase()),
+  );
+
+  const stats = activeProviders.map((b) => {
     const id = b.entry.value;
     const stat = reportedStats.get(id);
     return {
@@ -114,7 +119,7 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
       refreshing: false,
       lastError: snapshotState?.lastError || null,
     },
-    providers: { total: registryProviders.length || 40, circuits: { open: 0, halfOpen: 0 }, stats },
+    providers: { total: activeProviders.length, circuits: { open: 0, halfOpen: 0 }, stats },
     metrics: {
       requests: pipelineMetrics?.requests ?? 0,
       successes: 0,
