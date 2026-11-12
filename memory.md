@@ -53,6 +53,10 @@
   - Created new Beamup application `unified-streams-docker` on `a.baby-beamup.club:a38b6dd4fcd1/unified-streams-docker`.
   - Successfully built, deployed, and validated container via `beamup-lint` and dual port-listening and uptime health checks.
   - Sourced and applied environment variables: `PUBLIC_BASE_URL=https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club` and `TMDB_API_KEY=5ef03c622bd413b220ad0b574f157e73`.
+  - GitHub Actions CI/CD Release Pipeline run 43199499151 passed 100%:
+    - `Verify (Policy, Icon, Lint, Typecheck, Test, Build)`: succeeded in 14s.
+    - `Docker Build & Smoke Test`: succeeded in 31s.
+    - `Deploy to Beamup`: pushed and deployed successfully in 2m1s.
   - Verified live deployment:
     - `GET https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json` returns valid Stremio manifest with dynamic `idPrefixes: ["tt", "tmdb:"]` and correct logo URL.
     - `GET https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/health` returns HTTP 200 `status: "ok"` with 89 active providers (19 SA7, 30 Nuvio, 40 Vega).
