@@ -93,7 +93,22 @@
   - Diagnosed zero stream return on real movie requests (`tt1375666` Inception):
     1. In `src/fleets/sa7/worker.js`, `handleStream` called `collectStreams({ type, id, config })` passing a single object instead of positional parameters `(contentId, type, season, episode, config)`. Fixed by parsing content ID via `parseContentId(rawId)` and passing correct positional arguments. Local execution confirmed SA7 resolves 29 streams across providers (`castle`, `dahmermovies`, `multimovies`, `movix-vf`, `vegamovies`, `vidrock`, `moviebox`, `netmirror`).
     2. In `src/core/env.ts`, `deriveFleetEnv()` omitted `TMDB_API_KEY`, `CINEMETA_URL`, and `TMDB_URL` from the derived fleet environment. Added `TMDB_URL` to `EnvSchema` and forwarded all three upstream variables to workers so Vega and Nuvio can resolve TMDB metadata.
-  - Committed and pushed commit `ee865fd` triggering GitHub Actions release run `43208383453`.
+  - Committed and pushed commit `ee865fd` and `a781767` deploying live to Beamup.
+  - Live verification succeeded on `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`:
+    - `GET /stream/movie/tt1375666.json` returned 18 real playable streams.
+    - `GET /stream/movie/tt0137523.json` returned 22 real playable streams.
+    - Cache verification: subsequent requests return `cf-cache-status: HIT` with 180s TTL and sub-50ms latency.
+  - Manifest specification clarification: Confirmed and clarified why `catalogs: []` is mandatory under the Stremio v3 protocol (preventing Stremio clients from issuing broken discover/catalog queries or rendering blank discover carousels).
+
+- Fixed Vega Provider Call Tracking & Telemetry Reporting:
+  - Diagnosed why Vega providers showed 0 calls on `/status`:
+    1. In `src/fleets/vega/pipeline/streamHandler.ts`, `ProviderStat` only tracked `avgLatencyMs` and `failures`, and `getMetrics()` hardcoded `calls: null, ok: null, empty: null, timeouts: null`.
+    2. In `src/fleets/vega/worker.ts`, provider registry entries used mixed case (e.g. `Showbox`, `FlixHQ`) while `reportedStats` used lowercase keys, causing map lookups to fail and fall back to `0`.
+  - Updated `ProviderStat` in `streamHandler.ts` to track `calls`, `ok`, `empty`, `errors`, `timeouts`, `skipped`, `avgLatencyMs`, `failures`, `lastMs`, and `lastError`.
+  - Updated `recordProviderResult` to increment call counters and record error/timeout/empty/ok outcomes on every provider execution.
+  - Updated `getMetrics()` to return real computed `calls`, `ok`, `empty`, `errors`, `timeouts`, and `successRate`.
+  - Updated `src/fleets/vega/worker.ts` to normalize provider IDs with `.toLowerCase()` when looking up metrics.
+  - Verified locally with `npm run verify` passing 100% (policy check, icon check, ESLint, TypeScript, and all 35/35 Vitest tests).
 
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.

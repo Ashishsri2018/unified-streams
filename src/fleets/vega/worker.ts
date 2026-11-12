@@ -79,7 +79,7 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
 
   const pipelineMetrics = pipeline?.getMetrics();
   const reportedStats = new Map(
-    (pipelineMetrics?.providerStats || []).map((s) => [s.id, s]),
+    (pipelineMetrics?.providerStats || []).map((s) => [s.id.toLowerCase(), s]),
   );
 
   const disabled = new Set((config.disabledProviders || []).map((p) => p.toLowerCase()));
@@ -89,7 +89,7 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
 
   const stats = activeProviders.map((b) => {
     const id = b.entry.value;
-    const stat = reportedStats.get(id);
+    const stat = reportedStats.get(id.toLowerCase());
     return {
       id,
       state: (stat?.state || 'closed') as 'closed' | 'open' | 'half-open',

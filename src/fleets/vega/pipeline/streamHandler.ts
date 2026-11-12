@@ -94,8 +94,16 @@ interface BreakerState {
 }
 
 interface ProviderStat {
+  calls: number;
+  ok: number;
+  empty: number;
+  errors: number;
+  timeouts: number;
+  skipped: number;
   avgLatencyMs: number;
   failures: number;
+  lastMs: number | null;
+  lastError: string | null;
 }
 
 interface InFlightRequest {
@@ -341,20 +349,23 @@ export class StreamPipeline implements StreamHandlerApi {
       .map((id) => {
         const stat = this.providerStats.get(id);
         const state = breakerByProvider.get(id) ?? "closed";
+        const calls = stat?.calls ?? 0;
+        const ok = stat?.ok ?? 0;
+        const successRate = calls > 0 ? Math.round((ok / calls) * 1000) / 1000 : null;
         return {
           id,
           state,
-          calls: null,
-          ok: null,
-          empty: null,
-          errors: stat ? stat.failures : null,
-          timeouts: null,
-          skipped: null,
-          successRate: null,
+          calls,
+          ok,
+          empty: stat?.empty ?? 0,
+          errors: stat ? (stat.errors || stat.failures) : 0,
+          timeouts: stat?.timeouts ?? 0,
+          skipped: stat?.skipped ?? 0,
+          successRate,
           avgMs: stat ? stat.avgLatencyMs : null,
-          lastMs: null,
+          lastMs: stat ? stat.lastMs : null,
           maxMs: null,
-          lastError: null,
+          lastError: stat ? stat.lastError : null,
           lastSuccessAt: null,
         };
       });
@@ -821,12 +832,41 @@ export class StreamPipeline implements StreamHandlerApi {
     providerValue: string,
     durationMs: number,
     collected: boolean,
+    error?: unknown,
   ): void {
     const key = providerValue.toLowerCase();
-    const stat = this.providerStats.get(key) ?? { avgLatencyMs: durationMs, failures: 0 };
+    const stat: ProviderStat = this.providerStats.get(key) ?? {
+      calls: 0,
+      ok: 0,
+      empty: 0,
+      errors: 0,
+      timeouts: 0,
+      skipped: 0,
+      avgLatencyMs: durationMs,
+      failures: 0,
+      lastMs: null,
+      lastError: null,
+    };
+    stat.calls += 1;
+    stat.lastMs = durationMs;
     stat.avgLatencyMs =
       stat.avgLatencyMs > 0 ? Math.round(stat.avgLatencyMs * 0.7 + durationMs * 0.3) : durationMs;
-    if (collected) stat.failures = 0;
+    if (error) {
+      stat.failures += 1;
+      if (error instanceof TimeoutError) {
+        stat.timeouts += 1;
+        stat.lastError = 'timeout';
+      } else {
+        stat.errors += 1;
+        stat.lastError = error instanceof Error ? error.message : 'error';
+      }
+    } else if (collected) {
+      stat.ok += 1;
+      stat.failures = 0;
+    } else {
+      stat.empty += 1;
+      stat.ok += 1;
+    }
     this.providerStats.set(key, stat);
   }
 
@@ -835,6 +875,7 @@ export class StreamPipeline implements StreamHandlerApi {
     const startedAt = Date.now();
     let collected = false;
     let tracked = true;
+    let runError: unknown = undefined;
     try {
       if (!providerValue || ctx.stopped) {
         tracked = false;
@@ -894,9 +935,12 @@ export class StreamPipeline implements StreamHandlerApi {
       ctx.collected.push(...mapped);
       ctx.lastProgressAt = Date.now();
       collected = true;
+    } catch (err) {
+      runError = err;
+      this.recordFailure(providerValue, ctx);
     } finally {
       if (tracked && providerValue) {
-        this.recordProviderResult(providerValue, Date.now() - startedAt, collected);
+        this.recordProviderResult(providerValue, Date.now() - startedAt, collected, runError);
       }
     }
   }
@@ -1299,9 +1343,17 @@ export class StreamPipeline implements StreamHandlerApi {
     if (ctx.generation !== this.generation) return;
     this.metrics.providerFailures += 1;
     const providerKey = providerValue.toLowerCase();
-    const stat = this.providerStats.get(providerKey) ?? {
+    const stat: ProviderStat = this.providerStats.get(providerKey) ?? {
+      calls: 0,
+      ok: 0,
+      empty: 0,
+      errors: 0,
+      timeouts: 0,
+      skipped: 0,
       avgLatencyMs: DEFAULT_PROVIDER_SCORE,
       failures: 0,
+      lastMs: null,
+      lastError: null,
     };
     stat.failures += 1;
     this.providerStats.set(providerKey, stat);
