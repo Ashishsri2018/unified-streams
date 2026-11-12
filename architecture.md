@@ -86,3 +86,12 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 - All errors fail open to `{ "streams": [] }` with HTTP 200, never HTTP 5xx.
 - No `any` type in TypeScript; strict typing enforced throughout.
 - Single responsibility rule: any function or component exceeding 150 lines is refactored into smaller helper functions.
+
+## 4. Live Deployment
+- **Repository**: `https://github.com/Ashishsri2018/unified-streams`
+- **Beamup Remote**: `dokku@a.baby-beamup.club:a38b6dd4fcd1/unified-streams-docker`
+- **Public Base URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`
+- **Manifest URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json`
+- **Configure URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/configure`
+- **Health Endpoint**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/health`
+- **Active Fleets & Providers**: 89 total (SA7: 19, Nuvio: 30, Vega: 40)

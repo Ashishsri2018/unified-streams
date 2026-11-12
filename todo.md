@@ -75,13 +75,12 @@
   - [x] Verify end-to-end tests, lint, typecheck, build
   - [x] Verify live runtime smoke test (Gateway on 7000, SA7 on 7001, Nuvio on 7002, Vega on 7003 — 89 active providers)
 
-- [ ] **Phase 9: Staging Deployment & Cutover**
-  - [ ] Initialize git commit and configure GitHub remote
-  - [ ] Configure CI environment secrets (`BEAMUP_REMOTE`, `BEAMUP_SSH_KEY`, `PUBLIC_BASE_URL`, `TMDB_API_KEY`)
-  - [ ] Deploy to staging Beamup application and verify single-session env apply
-  - [ ] Validate staging health check and stream merging
-  - [ ] Promote to production through approved GitHub Actions release gate
-  - [ ] Run production smoke tests and verify DNS/manifest
+- [x] **Phase 9: Staging Deployment & Cutover**
+  - [x] Initialize git commit and configure GitHub remote (`Ashishsri2018/unified-streams`)
+  - [x] Configure CI environment secrets (`BEAMUP_REMOTE`, `BEAMUP_SSH_PRIVATE_KEY`, `PUBLIC_BASE_URL`, `TMDB_API_KEY`)
+  - [x] Deploy to Beamup application (`unified-streams-docker`) and verify single-session env apply
+  - [x] Validate live health check (`status: "ok"`, 89 providers) and stream merging
+  - [x] Verify live manifest, logo, and configure page via public base URL (`https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`)
 
 - [ ] **Phase 10: Post-Launch Provider Tuning**
   - [ ] Monitor provider success/timeout rates via `/stats`

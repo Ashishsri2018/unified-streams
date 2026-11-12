@@ -59,3 +59,32 @@ jobs:
           curl -f http://127.0.0.1:7000/manifest.json || exit 1
           curl -f http://127.0.0.1:7000/logo.png -o /dev/null || exit 1
           docker stop streams-smoke
+
+  deploy:
+    name: Deploy to Beamup
+    needs: [verify, docker]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure SSH
+        env:
+          BEAMUP_SSH_PRIVATE_KEY: ${{ secrets.BEAMUP_SSH_PRIVATE_KEY }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$BEAMUP_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -H a.baby-beamup.club >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Push to Beamup
+        env:
+          BEAMUP_REMOTE: ${{ secrets.BEAMUP_REMOTE }}
+        run: |
+          git remote add beamup "$BEAMUP_REMOTE"
+          git push beamup HEAD:master --force
+

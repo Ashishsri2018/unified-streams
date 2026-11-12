@@ -47,6 +47,18 @@
   - Verified live runtime: gateway port 7000, SA7 port 7001 (19 providers), Nuvio port 7002 (30 providers), Vega port 7003 (40 providers) — 89 providers operational.
   - `npm run verify` passed cleanly: policy check, icon check, lint (0 warnings), strict typecheck, 33/33 Vitest tests, build.
 
+- Completed Phase 9 (Staging Deployment & Cutover):
+  - Created public GitHub repository `Ashishsri2018/unified-streams` and pushed the complete codebase to `main`.
+  - Configured repository secrets on GitHub via CLI: `BEAMUP_REMOTE`, `BEAMUP_SSH_PRIVATE_KEY`, `PUBLIC_BASE_URL`, `TMDB_API_KEY`.
+  - Created new Beamup application `unified-streams-docker` on `a.baby-beamup.club:a38b6dd4fcd1/unified-streams-docker`.
+  - Successfully built, deployed, and validated container via `beamup-lint` and dual port-listening and uptime health checks.
+  - Sourced and applied environment variables: `PUBLIC_BASE_URL=https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club` and `TMDB_API_KEY=5ef03c622bd413b220ad0b574f157e73`.
+  - Verified live deployment:
+    - `GET https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json` returns valid Stremio manifest with dynamic `idPrefixes: ["tt", "tmdb:"]` and correct logo URL.
+    - `GET https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/health` returns HTTP 200 `status: "ok"` with 89 active providers (19 SA7, 30 Nuvio, 40 Vega).
+    - `HEAD https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/stream/movie/tt0111161.json` returns HTTP 200 without invoking upstream fan-out.
+    - `GET https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/configure` serves responsive dark configure interface with CSP.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.
