@@ -193,6 +193,11 @@
     4. Updated `src/fleets/sa7/lib/breaker.js` to increment `state.ok` on successful empty executions while tracking `state.responded` for internal scoring, aligning SA7's `ok` and `successRate` metrics with Nuvio and Vega.
     5. Tested `puretoons` on cartoon/anime (*Naruto*), confirming 12 streams extracted. Tested `dahmermovies-tv` on series (*Breaking Bad*), confirming 3 streams extracted. Tested `dahmermovies` on movies (*Inception*), confirming 3 streams extracted.
 
+- Concurrency Settings Tuning:
+  - Configured `SEARCH_CONCURRENCY=30` and `SCRAPER_CONCURRENCY=30` across `config/defaults.env`, `.env.example`, `src/core/env.ts` (`EnvSchema` and `deriveFleetEnv`), `src/fleets/nuvio/config.ts`, and `src/fleets/vega/config.ts`.
+  - Added unit test in `tests/features/core.test.ts` to ensure default and custom values for `SEARCH_CONCURRENCY` and `SCRAPER_CONCURRENCY` are correctly parsed and forwarded to fleet child environments.
+  - Audited SA7 scraper concurrency: SA7 fires all enabled providers concurrently using `Promise.all` bounded by per-provider timeout (`Math.min(providerTimeoutMs, deadline - now())`) and circuit breaker status, without a bounded semaphore pool.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.

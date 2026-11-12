@@ -19,6 +19,8 @@ export const EnvSchema = z.object({
   GLOBAL_DEADLINE_MS: z.coerce.number().int().min(1000).default(12000),
   MAX_STREAMS_PER_PROVIDER: z.coerce.number().int().min(1).default(100),
   MAX_STREAMS: z.coerce.number().int().min(1).default(1000),
+  SEARCH_CONCURRENCY: z.coerce.number().int().min(1).default(30),
+  SCRAPER_CONCURRENCY: z.coerce.number().int().min(1).default(30),
   CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().min(1).default(3),
   CIRCUIT_COOLDOWN_MS: z.coerce.number().int().min(1000).default(300000),
   UPDATE_ON_START: z.preprocess((val) => val === 'true' || val === true || val === '1', z.boolean()).default(true),
@@ -166,6 +168,7 @@ export function deriveFleetEnv(
     const srcBundled = path.resolve(process.cwd(), 'src/fleets/nuvio/snapshot');
     outEnv.NUVIO_BUNDLED_DIR = fs.existsSync(distBundled) ? distBundled : srcBundled;
     outEnv.NUVIO_CACHE_DIR = fleetDataDir;
+    outEnv.SCRAPER_CONCURRENCY = String(env.SCRAPER_CONCURRENCY);
 
     let scraperSettings: Record<string, Record<string, unknown>> = {};
     if (env.SCRAPER_SETTINGS_JSON) {
@@ -215,6 +218,7 @@ export function deriveFleetEnv(
       outEnv.DISABLED_PROVIDERS = list;
       outEnv.VEGA_DISABLED_PROVIDERS = list;
     }
+    outEnv.SEARCH_CONCURRENCY = String(env.SEARCH_CONCURRENCY);
 
     let vegaSettings: { skipTimings?: boolean; kv?: Record<string, unknown> } = {};
     try {

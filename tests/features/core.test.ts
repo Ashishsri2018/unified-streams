@@ -88,4 +88,31 @@ describe('provider policy and concurrency', () => {
     const parsed2 = JSON.parse(nuvioEnv2.SCRAPER_SETTINGS_JSON);
     expect(parsed2.fjoral.cinemaTvToken).toBe('test_jwt_session_bearer');
   });
+
+  it('parses and forwards SEARCH_CONCURRENCY and SCRAPER_CONCURRENCY with default 30', () => {
+    // Default values
+    const defaultAppEnv = loadAppEnv({});
+    expect(defaultAppEnv.SEARCH_CONCURRENCY).toBe(30);
+    expect(defaultAppEnv.SCRAPER_CONCURRENCY).toBe(30);
+
+    const vegaDefaultEnv = deriveFleetEnv(defaultAppEnv, 'vega', 7003);
+    expect(vegaDefaultEnv.SEARCH_CONCURRENCY).toBe('30');
+
+    const nuvioDefaultEnv = deriveFleetEnv(defaultAppEnv, 'nuvio', 7002);
+    expect(nuvioDefaultEnv.SCRAPER_CONCURRENCY).toBe('30');
+
+    // Custom values
+    const customAppEnv = loadAppEnv({
+      SEARCH_CONCURRENCY: '25',
+      SCRAPER_CONCURRENCY: '15',
+    });
+    expect(customAppEnv.SEARCH_CONCURRENCY).toBe(25);
+    expect(customAppEnv.SCRAPER_CONCURRENCY).toBe(15);
+
+    const vegaCustomEnv = deriveFleetEnv(customAppEnv, 'vega', 7003);
+    expect(vegaCustomEnv.SEARCH_CONCURRENCY).toBe('25');
+
+    const nuvioCustomEnv = deriveFleetEnv(customAppEnv, 'nuvio', 7002);
+    expect(nuvioCustomEnv.SCRAPER_CONCURRENCY).toBe('15');
+  });
 });

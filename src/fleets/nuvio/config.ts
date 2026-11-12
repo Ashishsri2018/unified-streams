@@ -75,7 +75,7 @@ const schema = z.object({
   NUVIO_CACHE_DIR: optionalString,
   NUVIO_BUNDLED_DIR: optionalString,
   NUVIO_CONCURRENCY: envInt(8, 1, 32),
-  SCRAPER_CONCURRENCY: envInt(12, 1, 60),
+  SCRAPER_CONCURRENCY: envInt(30, 1, 60),
   SCRAPER_TIMEOUT_MS: envInt(12000, 1000, 120000),
   GLOBAL_DEADLINE_MS: envInt(20000, 2000, 300000),
   HTTP_TIMEOUT_MS: envInt(15000, 1000, 120000),
