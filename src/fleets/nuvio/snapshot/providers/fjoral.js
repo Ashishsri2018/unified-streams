@@ -17,8 +17,16 @@ const AUDIO = [
 ];
 
 function resolveApiToken() {
-    const token = SCRAPER_SETTINGS && SCRAPER_SETTINGS.cinemaTvToken;
-    return token ? String(token).trim() : "";
+    let token = SCRAPER_SETTINGS && SCRAPER_SETTINGS.cinemaTvToken;
+    if (!token) return "";
+    token = String(token).trim();
+    if (token.startsWith("gc_session=")) {
+        token = token.slice("gc_session=".length).trim();
+    }
+    if (token.toLowerCase().startsWith("bearer ")) {
+        token = token.slice(7).trim();
+    }
+    return token;
 }
 
 async function httpGetJson(url, options) {

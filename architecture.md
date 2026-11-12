@@ -88,11 +88,18 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 - No `any` type in TypeScript; strict typing enforced throughout.
 - Single responsibility rule: any function or component exceeding 150 lines is refactored into smaller helper functions.
 
-## 4. Live Deployment
+## 4. Live Deployment & Credentials
 - **Repository**: `https://github.com/Ashishsri2018/unified-streams`
 - **Beamup Remote**: `dokku@a.baby-beamup.club:a38b6dd4fcd1/unified-streams-docker`
 - **Public Base URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`
 - **Manifest URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json`
 - **Configure URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/configure`
 - **Health Endpoint**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/health`
+- **Status Dashboard**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/status`
 - **Active Fleets & Providers**: Canonical duplicate-excluded provider fleet enforced via `config/providers.json` and `config/provider-audit.csv` (SA7: 12-13, Nuvio: 31, Vega: 36-40) with redundant duplicate scrapers, torrent scrapers, and Internet Archive excluded.
+- **Provider Credentials Pipeline**:
+  - `FEBBOX_UI_COOKIE`: Ingested by gateway from environment / GitHub Actions secrets, formatted as `ui=<token>`, and passed to Vega worker via `PROVIDER_SETTINGS_JSON.kv.febboxCookie` for authenticated Showbox streams.
+  - `GRAMCINEMA_TOKEN`: Ingested by gateway from environment / GitHub Actions secrets, stripped of `gc_session=` or `Bearer ` prefixes, and forwarded to Nuvio worker via `SCRAPER_SETTINGS_JSON.fjoral.cinemaTvToken` for authenticated GramCinema (`bollywood.eu.org`) streams.
+  - CI/CD Deployment Sync: GitHub Actions CI syncs Dokku environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `PUBLIC_BASE_URL`) directly before deploying code to Beamup.
+- **Provider Observability**:
+  - Both Vega and Nuvio track per-provider outcomes and populate `lastError` (including network timeouts, HTTP errors, and failure stages) so the `/status` dashboard provides real-time diagnostics for failing or degraded scrapers.

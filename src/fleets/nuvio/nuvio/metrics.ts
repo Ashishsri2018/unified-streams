@@ -6,6 +6,7 @@ export interface ProviderOutcome {
   streams: number;
   latencyMs: number;
   error?: ProviderError;
+  lastError?: string;
 }
 
 export interface ProviderStats {
@@ -19,6 +20,7 @@ export interface ProviderStats {
   successRate: number | null;
   p50Ms: number | null;
   p95Ms: number | null;
+  lastError?: string | null;
 }
 
 export type ProviderStatsReport = Record<string, ProviderStats>;
@@ -32,6 +34,7 @@ interface ProviderState {
   timeouts: number;
   skipped: number;
   latencies: number[];
+  lastError: string | null;
 }
 
 const DEFAULT_CAPACITY = 100;
@@ -69,8 +72,10 @@ export class ProviderMetrics {
       else state.empty += 1;
     } else if (outcome.error === "timeout") {
       state.timeouts += 1;
+      state.lastError = outcome.lastError || "timeout";
     } else {
       state.errors += 1;
+      state.lastError = outcome.lastError || "error";
     }
 
     state.latencies.push(outcome.latencyMs);
@@ -93,6 +98,7 @@ export class ProviderMetrics {
         successRate: Math.round((state.ok / state.calls) * 1000) / 1000,
         p50Ms: percentile(state.latencies, 50),
         p95Ms: percentile(state.latencies, 95),
+        lastError: state.lastError,
       };
     }
     return report;
@@ -110,6 +116,7 @@ export class ProviderMetrics {
         timeouts: 0,
         skipped: 0,
         latencies: [],
+        lastError: null,
       };
       this.providers.set(id, state);
     }

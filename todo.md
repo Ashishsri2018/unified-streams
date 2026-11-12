@@ -83,6 +83,11 @@
   - [x] Verify live manifest, logo, and configure page via public base URL (`https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`)
 
 - [ ] **Phase 10: Post-Launch Provider Tuning**
+  - [x] Audit Status Page Provider Errors & Timeouts (diagnosed causes for Vega errors and Nuvio timeouts)
+  - [x] Configure ShowBox FebBox authentication cookie (`FEBBOX_UI_COOKIE`) in GitHub Secrets, Dokku env, and Vega KV store
+  - [x] Configure GramCinema session token (`GRAMCINEMA_TOKEN`) in GitHub Secrets, Dokku env, and Nuvio scraper settings
+  - [x] Enhance provider `lastError` propagation and observability across Vega and Nuvio
+  - [x] Update GitHub Actions CI deploy job to sync Dokku secrets on every deployment
   - [ ] Monitor provider success/timeout rates via `/stats`
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs

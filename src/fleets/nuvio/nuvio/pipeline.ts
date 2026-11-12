@@ -155,15 +155,18 @@ async function collectStreams(options: {
             streams: 0,
             latencyMs,
             error: "non_array",
+            lastError: "returned non-array",
           });
         }
       } catch (error) {
+        const isTimeout = error instanceof TimeoutError;
         stats.push({
           id: scraper.entry.id,
           ok: false,
           streams: 0,
           latencyMs: Date.now() - startedAt,
-          error: error instanceof TimeoutError ? "timeout" : "error",
+          error: isTimeout ? "timeout" : "error",
+          lastError: isTimeout ? "timeout" : errorMessage(error),
         });
         logger.debug("nuvio_scraper_failed", {
           scraper: scraper.entry.id,

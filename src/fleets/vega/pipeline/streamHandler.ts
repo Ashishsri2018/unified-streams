@@ -852,7 +852,6 @@ export class StreamPipeline implements StreamHandlerApi {
     stat.avgLatencyMs =
       stat.avgLatencyMs > 0 ? Math.round(stat.avgLatencyMs * 0.7 + durationMs * 0.3) : durationMs;
     if (error) {
-      stat.failures += 1;
       if (error instanceof TimeoutError) {
         stat.timeouts += 1;
         stat.lastError = 'timeout';
@@ -865,7 +864,9 @@ export class StreamPipeline implements StreamHandlerApi {
       stat.failures = 0;
     } else {
       stat.empty += 1;
-      stat.ok += 1;
+      if (stat.failures === 0) {
+        stat.ok += 1;
+      }
     }
     this.providerStats.set(key, stat);
   }
@@ -900,14 +901,14 @@ export class StreamPipeline implements StreamHandlerApi {
       const mapping = await this.resolveCandidate(bundle, ranked, ctx);
       if (ctx.stopped) return;
       if (!mapping.candidate) {
-        if (mapping.failed) this.recordFailure(providerValue, ctx);
+        if (mapping.failed) this.recordFailure(providerValue, ctx, undefined, 'mapping failed');
         return;
       }
 
       const links = await this.resolveLinks(bundle, mapping.candidate, ctx);
       if (ctx.stopped) return;
       if (links.failed && links.links.length === 0) {
-        this.recordFailure(providerValue, ctx);
+        this.recordFailure(providerValue, ctx, undefined, 'links resolution failed');
         return;
       }
       if (links.links.length === 0) return;
@@ -915,7 +916,7 @@ export class StreamPipeline implements StreamHandlerApi {
       const streams = await this.fetchStreams(bundle, links.links, ctx);
       if (ctx.stopped) return;
       if (streams.attempted > 0 && streams.streams.length === 0) {
-        this.recordFailure(providerValue, ctx);
+        this.recordFailure(providerValue, ctx, undefined, 'no streams found');
         this.logger.warn("pipeline.provider_no_streams", {
           provider: providerValue,
           stage: "stream",
@@ -937,7 +938,7 @@ export class StreamPipeline implements StreamHandlerApi {
       collected = true;
     } catch (err) {
       runError = err;
-      this.recordFailure(providerValue, ctx);
+      this.recordFailure(providerValue, ctx, err);
     } finally {
       if (tracked && providerValue) {
         this.recordProviderResult(providerValue, Date.now() - startedAt, collected, runError);
@@ -963,7 +964,7 @@ export class StreamPipeline implements StreamHandlerApi {
 
       const remaining = deadlineAt - Date.now();
       if (remaining <= 0) {
-        this.recordFailure(providerValue, ctx);
+        this.recordFailure(providerValue, ctx, undefined, 'search timeout');
         return [];
       }
 
@@ -997,7 +998,7 @@ export class StreamPipeline implements StreamHandlerApi {
         if (posts.length > 0) return posts;
       } catch (error) {
         if (!ctx.stopped && Date.now() < ctx.deadlineAt) {
-          this.recordFailure(providerValue, ctx);
+          this.recordFailure(providerValue, ctx, error);
           this.logger.warn("pipeline.provider_failed", {
             provider: providerValue,
             stage: "search",
@@ -1338,7 +1339,12 @@ export class StreamPipeline implements StreamHandlerApi {
     return false;
   }
 
-  private recordFailure(providerValue: string, ctx: InternalContext): void {
+  private recordFailure(
+    providerValue: string,
+    ctx: InternalContext,
+    error?: unknown,
+    reason?: string,
+  ): void {
     if (ctx.stopped || Date.now() >= ctx.deadlineAt) return;
     if (ctx.generation !== this.generation) return;
     this.metrics.providerFailures += 1;
@@ -1356,6 +1362,18 @@ export class StreamPipeline implements StreamHandlerApi {
       lastError: null,
     };
     stat.failures += 1;
+    if (error) {
+      if (error instanceof TimeoutError) {
+        stat.timeouts += 1;
+        stat.lastError = 'timeout';
+      } else {
+        stat.errors += 1;
+        stat.lastError = error instanceof Error ? error.message : String(error);
+      }
+    } else if (reason) {
+      stat.errors += 1;
+      stat.lastError = reason;
+    }
     this.providerStats.set(providerKey, stat);
     const now = Date.now();
     const state = this.breakers.get(providerValue) ?? { failures: [], openUntil: 0 };

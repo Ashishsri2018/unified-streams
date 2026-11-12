@@ -36,6 +36,9 @@ export const EnvSchema = z.object({
   PUBLIC_BASE_URL: z.string().optional(),
   TMDB_API_KEY: z.string().optional(),
   PROVIDER_SETTINGS_JSON: z.string().optional(),
+  SCRAPER_SETTINGS_JSON: z.string().optional(),
+  FEBBOX_UI_COOKIE: z.string().optional(),
+  GRAMCINEMA_TOKEN: z.string().optional(),
   SA7_PROVIDERS: z.string().optional(),
   NUVIO_DISABLED_SCRAPERS: z.string().optional(),
   VEGA_DISABLED_PROVIDERS: z.string().optional(),
@@ -90,8 +93,12 @@ export function deriveFleetEnv(
   if (env.PROVIDER_SETTINGS_JSON) {
     try {
       const parsed = JSON.parse(env.PROVIDER_SETTINGS_JSON) as Record<string, unknown>;
-      if (parsed && typeof parsed === 'object' && parsed[fleet]) {
-        fleetSettings = JSON.stringify(parsed[fleet]);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed[fleet]) {
+          fleetSettings = JSON.stringify(parsed[fleet]);
+        } else if (fleet === 'vega' && (parsed.kv || parsed.skipTimings !== undefined)) {
+          fleetSettings = JSON.stringify(parsed);
+        }
       }
     } catch {
       fleetSettings = '{}';
@@ -159,11 +166,73 @@ export function deriveFleetEnv(
     const srcBundled = path.resolve(process.cwd(), 'src/fleets/nuvio/snapshot');
     outEnv.NUVIO_BUNDLED_DIR = fs.existsSync(distBundled) ? distBundled : srcBundled;
     outEnv.NUVIO_CACHE_DIR = fleetDataDir;
+
+    let scraperSettings: Record<string, Record<string, unknown>> = {};
+    if (env.SCRAPER_SETTINGS_JSON) {
+      try {
+        const parsed = JSON.parse(env.SCRAPER_SETTINGS_JSON);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          scraperSettings = parsed as Record<string, Record<string, unknown>>;
+        }
+      } catch {
+        scraperSettings = {};
+      }
+    }
+    if (env.PROVIDER_SETTINGS_JSON) {
+      try {
+        const parsed = JSON.parse(env.PROVIDER_SETTINGS_JSON) as Record<string, unknown>;
+        if (parsed && typeof parsed === 'object' && parsed.nuvio && typeof parsed.nuvio === 'object') {
+          scraperSettings = { ...(parsed.nuvio as Record<string, Record<string, unknown>>), ...scraperSettings };
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (env.GRAMCINEMA_TOKEN) {
+      let rawToken = env.GRAMCINEMA_TOKEN.trim();
+      if (rawToken.startsWith('gc_session=')) {
+        rawToken = rawToken.slice('gc_session='.length).trim();
+      }
+      if (rawToken.toLowerCase().startsWith('bearer ')) {
+        rawToken = rawToken.slice(7).trim();
+      }
+      if (rawToken) {
+        scraperSettings.fjoral = {
+          ...(scraperSettings.fjoral || {}),
+          cinemaTvToken: rawToken,
+        };
+      }
+    }
+    if (Object.keys(scraperSettings).length > 0) {
+      outEnv.SCRAPER_SETTINGS_JSON = JSON.stringify(scraperSettings);
+    }
   } else if (fleet === 'vega') {
     const list = env.VEGA_DISABLED_PROVIDERS || vegaDeny;
     if (list) {
       outEnv.DISABLED_PROVIDERS = list;
       outEnv.VEGA_DISABLED_PROVIDERS = list;
+    }
+
+    let vegaSettings: { skipTimings?: boolean; kv?: Record<string, unknown> } = {};
+    try {
+      vegaSettings = JSON.parse(fleetSettings);
+      if (!vegaSettings || typeof vegaSettings !== 'object' || Array.isArray(vegaSettings)) {
+        vegaSettings = {};
+      }
+    } catch {
+      vegaSettings = {};
+    }
+    if (!vegaSettings.kv || typeof vegaSettings.kv !== 'object' || Array.isArray(vegaSettings.kv)) {
+      vegaSettings.kv = {};
+    }
+    if (env.FEBBOX_UI_COOKIE) {
+      const cookie = env.FEBBOX_UI_COOKIE.trim();
+      if (cookie) {
+        vegaSettings.kv.febboxCookie = cookie.startsWith('ui=') ? cookie : `ui=${cookie}`;
+      }
+    }
+    if (Object.keys(vegaSettings.kv).length > 0 || vegaSettings.skipTimings !== undefined) {
+      outEnv.PROVIDER_SETTINGS_JSON = JSON.stringify(vegaSettings);
     }
   }
 

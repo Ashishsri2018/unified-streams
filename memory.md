@@ -128,6 +128,36 @@
     - Updated `config/provider-audit.csv` with detailed failure causes and duplicate replacements.
     - Verified with `npm run verify` (100% pass across policy check, icon check, lint, typecheck, 35/35 Vitest tests, and build).
 
+- Diagnosed Status Page Provider Errors & Timeouts:
+  - Audited live status metrics from `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/health`:
+    - Vega: `everything` (4 errors), `showbox` (3 errors), `eonMovies` (3 errors), `animesub` (2 errors), `1flex` (1 error), `zeefliz` (1 error).
+    - Nuvio: `quinox` (6 timeouts), `maelith` (3 timeouts), `qorva` (2 timeouts), `novus` (1 timeout), `xandril` (1 timeout).
+    - SA7: 0 errors, 0 timeouts (100% clean across all 13 active providers).
+  - Identified root causes:
+    - Vega `everything`: Upstream API `slave.downloadeverythingfromeverywhere.com` returns 403 Forbidden with Cloudflare Turnstile CAPTCHA requiring interactive WebView solving.
+    - Vega `showbox`: Origin `showbox.media` (`40.160.33.57:443`) drops TCP connection on TLS handshake (`ECONNRESET`).
+    - Vega `eonMovies`: Origin `new4.eonmovies.click` updated HTML layout; scraper selector `.image-container` returns 0 results.
+    - Vega `animesub`: P2P torrent scraper with DuckDNS endpoint `animesub.duckdns.org` (`193.70.84.6`) generating magnet links and experiencing high packet loss.
+    - Vega `zeefliz` & `1flex`: Slow origins (6-8s response times) behind LiteSpeed/Cloudflare causing occasional timeout spikes.
+    - Nuvio `quinox`: Chained roundtrips to 6 workers.dev proxies + AES/SHA256 client crypto average ~9.5s, frequently exceeding the 10s backend deadline (`BACKEND_TIMEOUT_MS=10000`).
+    - Nuvio `maelith`: Connects sequentially across 6 server mirrors (`Zeus`, `Aphrodite`, `Hephaestus`, `Prometheus`, `Poseidon`, `Atlas`), averaging 11.3s and breaching the 10s deadline.
+    - Nuvio `novus`, `qorva`, `xandril`: Fast healthy scrapers (>85-90% success rate); occasional timeouts caused by transient upstream delays.
+  - Identified telemetry discrepancy:
+    - In `src/fleets/vega/pipeline/streamHandler.ts`, `recordFailure()` incremented `stat.failures` (which `/status` displays as `Errors`), but never persisted the caught error message to `stat.lastError`. Additionally, empty resolutions incremented `stat.ok`.
+
+- Showbox & GramCinema Authentication Pipeline & Telemetry Fixes:
+  - Configured GitHub Secrets `FEBBOX_UI_COOKIE` (Showbox FebBox cookie) and `GRAMCINEMA_TOKEN` (GramCinema `gc_session` token).
+  - Configured Dokku environment synchronization in `.github/workflows/ci.yml` so every push automatically propagates `TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, and `PUBLIC_BASE_URL` to Beamup without manual intervention.
+  - Updated `src/core/env.ts`:
+    - Added `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, and `SCRAPER_SETTINGS_JSON` to `EnvSchema`.
+    - In `deriveFleetEnv()`, automatically parsed and injected `febboxCookie` (with `ui=` normalization) into Vega's `PROVIDER_SETTINGS_JSON.kv`.
+    - In `deriveFleetEnv()`, automatically parsed and injected `cinemaTvToken` (with `gc_session=` and `Bearer ` stripping) into Nuvio's `SCRAPER_SETTINGS_JSON.fjoral`.
+  - Updated `src/fleets/nuvio/snapshot/providers/fjoral.js` `resolveApiToken()` to sanitize tokens from both scraper settings and env.
+  - Updated `scripts/apply-env.mjs` allowed keys to include `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, and `SCRAPER_SETTINGS_JSON`.
+  - Fixed `lastError` propagation in Vega (`streamHandler.ts` records actual error message and reason without false positive `stat.ok` increments) and Nuvio (`metrics.ts` and `worker.ts` preserve `lastError` for timeouts and provider failures).
+  - Added unit test coverage in `tests/features/core.test.ts` for Vega and Nuvio environment derivation (all 37 Vitest tests passing).
+  - Verified local build, policy check, icon check, and linter cleanly (`npm run verify`).
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.

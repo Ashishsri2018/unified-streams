@@ -88,7 +88,7 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
       skipped: stat?.skipped ?? 0,
       successRate: stat?.successRate ?? null,
       avgMs: stat?.p50Ms ?? null,
-      lastError: null,
+      lastError: stat?.lastError ?? null,
       lastSuccessAt: null,
     };
   });

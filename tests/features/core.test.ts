@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ProviderPolicy } from '../../src/core/policy.js';
 import { CircuitBreaker, clampTimeout } from '../../src/core/concurrency.js';
+import { deriveFleetEnv, loadAppEnv } from '../../src/core/env.js';
 
 describe('provider policy and concurrency', () => {
   it('enforces allow and deny modes in provider policy', () => {
@@ -48,5 +49,43 @@ describe('provider policy and concurrency', () => {
 
     const res2 = clampTimeout(250, 10000, 200);
     expect(res2.shouldSkip).toBe(true);
+  });
+
+  it('derives vega env with febboxCookie from FEBBOX_UI_COOKIE', () => {
+    const appEnv = loadAppEnv({
+      FEBBOX_UI_COOKIE: 'ui=test_jwt_cookie_token_123',
+    });
+    const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
+    expect(vegaEnv.PROVIDER_SETTINGS_JSON).toBeDefined();
+    const parsed = JSON.parse(vegaEnv.PROVIDER_SETTINGS_JSON);
+    expect(parsed.kv).toBeDefined();
+    expect(parsed.kv.febboxCookie).toBe('ui=test_jwt_cookie_token_123');
+
+    // Also handles token without leading ui=
+    const appEnv2 = loadAppEnv({
+      FEBBOX_UI_COOKIE: 'raw_jwt_cookie_token_456',
+    });
+    const vegaEnv2 = deriveFleetEnv(appEnv2, 'vega', 7003);
+    const parsed2 = JSON.parse(vegaEnv2.PROVIDER_SETTINGS_JSON);
+    expect(parsed2.kv.febboxCookie).toBe('ui=raw_jwt_cookie_token_456');
+  });
+
+  it('derives nuvio env with cinemaTvToken from GRAMCINEMA_TOKEN', () => {
+    const appEnv = loadAppEnv({
+      GRAMCINEMA_TOKEN: 'gc_session=test_jwt_session_789',
+    });
+    const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
+    expect(nuvioEnv.SCRAPER_SETTINGS_JSON).toBeDefined();
+    const parsed = JSON.parse(nuvioEnv.SCRAPER_SETTINGS_JSON);
+    expect(parsed.fjoral).toBeDefined();
+    expect(parsed.fjoral.cinemaTvToken).toBe('test_jwt_session_789');
+
+    // Also handles Bearer prefix
+    const appEnv2 = loadAppEnv({
+      GRAMCINEMA_TOKEN: 'Bearer test_jwt_session_bearer',
+    });
+    const nuvioEnv2 = deriveFleetEnv(appEnv2, 'nuvio', 7002);
+    const parsed2 = JSON.parse(nuvioEnv2.SCRAPER_SETTINGS_JSON);
+    expect(parsed2.fjoral.cinemaTvToken).toBe('test_jwt_session_bearer');
   });
 });
