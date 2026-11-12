@@ -1,0 +1,61 @@
+name: CI / Release Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify (Policy, Icon, Lint, Typecheck, Test, Build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run verification suite
+        run: npm run verify
+
+  docker:
+    name: Docker Build & Smoke Test
+    needs: [verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: unified-streams:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Container Smoke Test
+        run: |
+          docker run -d --name streams-smoke -p 7000:7000 unified-streams:test
+          sleep 5
+          docker logs streams-smoke
+          curl -f http://127.0.0.1:7000/ || exit 1
+          curl -f http://127.0.0.1:7000/manifest.json || exit 1
+          curl -f http://127.0.0.1:7000/logo.png -o /dev/null || exit 1
+          docker stop streams-smoke

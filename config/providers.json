@@ -1,0 +1,53 @@
+{
+  "sa7": {
+    "mode": "allow",
+    "ids": [
+      "dahmermovies",
+      "dahmermovies-tv",
+      "desiflix",
+      "einthusan",
+      "kurage",
+      "movix-vf",
+      "multimovies",
+      "playimdb",
+      "puretoons",
+      "redflix",
+      "toonstream",
+      "topcartoons",
+      "vidrock"
+    ]
+  },
+  "nuvio": {
+    "mode": "deny",
+    "ids": [
+      "bdix-cf",
+      "bdix-df",
+      "bdix-fh",
+      "brellor",
+      "evyrith",
+      "fastrion",
+      "fyron",
+      "gravix",
+      "hexion",
+      "jhaeros",
+      "karnis",
+      "mavonyx",
+      "pynvix",
+      "qyrvaen",
+      "soryn",
+      "vornix",
+      "zevran",
+      "zyrvael"
+    ]
+  },
+  "vega": {
+    "mode": "deny",
+    "ids": [
+      "torrentio",
+      "internetArchive",
+      "youtube",
+      "katmovies",
+      "multi"
+    ]
+  }
+}
