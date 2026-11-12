@@ -198,6 +198,9 @@ export function deriveFleetEnv(
       }
       if (rawToken) {
         scraperSettings.fjoral = {
+          enable720p: true,
+          enable1080p: true,
+          enable2160p: true,
           ...(scraperSettings.fjoral || {}),
           cinemaTvToken: rawToken,
         };

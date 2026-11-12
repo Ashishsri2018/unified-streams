@@ -99,7 +99,8 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 - **Active Fleets & Providers**: Canonical duplicate-excluded provider fleet enforced via `config/providers.json` and `config/provider-audit.csv` (SA7: 12-13, Nuvio: 31, Vega: 36-40) with redundant duplicate scrapers, torrent scrapers, and Internet Archive excluded.
 - **Provider Credentials Pipeline**:
   - `FEBBOX_UI_COOKIE`: Ingested by gateway from environment / GitHub Actions secrets, formatted as `ui=<token>`, and passed to Vega worker via `PROVIDER_SETTINGS_JSON.kv.febboxCookie` for authenticated Showbox streams.
-  - `GRAMCINEMA_TOKEN`: Ingested by gateway from environment / GitHub Actions secrets, stripped of `gc_session=` or `Bearer ` prefixes, and forwarded to Nuvio worker via `SCRAPER_SETTINGS_JSON.fjoral.cinemaTvToken` for authenticated GramCinema (`bollywood.eu.org`) streams.
+  - `GRAMCINEMA_TOKEN`: Ingested by gateway from environment / GitHub Actions secrets, stripped of `gc_session=` or `Bearer ` prefixes, and forwarded to Nuvio worker via `SCRAPER_SETTINGS_JSON.fjoral.cinemaTvToken` for authenticated GramCinema (`bollywood.eu.org`) streams. `fjoral` resolution settings default `enable720p`, `enable1080p`, and `enable2160p` to true.
   - CI/CD Deployment Sync: GitHub Actions CI syncs Dokku environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `PUBLIC_BASE_URL`) directly before deploying code to Beamup.
-- **Provider Observability**:
+- **Provider Observability & Upstream Constraints**:
   - Both Vega and Nuvio track per-provider outcomes and populate `lastError` (including network timeouts, HTTP errors, and failure stages) so the `/status` dashboard provides real-time diagnostics for failing or degraded scrapers.
+  - Showbox two-tier architecture: Showbox requires Tier 1 metadata discovery on `showbox.media` before utilizing the FebBox direct stream cookie in Tier 2. When `showbox.media` resets connections from datacenter IPs, discovery fails gracefully without crashing.

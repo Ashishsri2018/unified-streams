@@ -88,6 +88,8 @@
   - [x] Configure GramCinema session token (`GRAMCINEMA_TOKEN`) in GitHub Secrets, Dokku env, and Nuvio scraper settings
   - [x] Enhance provider `lastError` propagation and observability across Vega and Nuvio
   - [x] Update GitHub Actions CI deploy job to sync Dokku secrets on every deployment
+  - [x] Verify Fjoral (GramCinema) upstream token authentication, 720p filter default, and direct CDN link generation
+  - [x] Verify Showbox FebBox cookie validity and document upstream `showbox.media` TLS reset constraint
   - [ ] Monitor provider success/timeout rates via `/stats`
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs

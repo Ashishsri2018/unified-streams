@@ -136,7 +136,7 @@ function resolveResolutionSettings() {
     return {
         enable2160p: s.enable2160p !== false,
         enable1080p: s.enable1080p !== false,
-        enable720p: s.enable720p === true,
+        enable720p: s.enable720p !== false,
     };
 }
 

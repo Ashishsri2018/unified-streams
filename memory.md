@@ -172,6 +172,19 @@
   - Added `paths-ignore: ['**.md']` to `.github/workflows/ci.yml` for push and pull_request triggers.
   - Enforced convention to always include `[skip ci]` in commit messages for documentation and project memory updates to avoid triggering unnecessary CI builds and deployments.
 
+- Showbox & Fjoral Functionality & Status Page Verification:
+  - Audited live status dashboard and `/health` metrics across all 70 active providers (SA7: 13, Nuvio: 29, Vega: 28):
+    - Overall status: `OK`, 100% fleet health, zero process restarts.
+  - Fjoral (`GramCinema`):
+    - Confirmed `calls: 7, ok: 7, errors: 0, timeouts: 0, rate: 1.0, lastError: None`.
+    - Tested upstream API directly: Authenticates via `GRAMCINEMA_TOKEN` with `tga-hd.api.hashhackers.com`, finds 100 media records for Bollywood titles (e.g. *3 Idiots*), and generates authenticated CDN download links via `/genLink`.
+    - Fixed 720p resolution filtering in `src/fleets/nuvio/snapshot/providers/fjoral.js` (`enable720p: s.enable720p !== false`) and `src/core/env.ts` (`enable720p: true`).
+  - Showbox:
+    - Confirmed FebBox `ui` cookie is valid and accepted by `https://www.febbox.com/console/video_quality_list` without login prompts.
+    - Diagnosed that Showbox's Tier 1 discovery origin `www.showbox.media` (`40.160.33.57:443`) actively drops TCP connections with `ECONNRESET` on cloud/datacenter IP ranges during TLS handshake. Because search cannot resolve the showbox episode ID (`epId`), it reports `no streams found` before calling FebBox.
+  - Status page provider error breakdown:
+    - Documented all 12 providers exhibiting non-zero errors or timeouts (Nuvio: `maelith`, `quinox` timeouts due to multi-hop proxy chains; Vega: `showbox`, `vega`, `autoEmbed`, `gokuHD`, `eonMovies`, `movies4u`, `kmMovies`, `hdhub4u`, `anikoto`, `animesub`, `1flex`). All fail gracefully to empty results without crashing the gateway.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.
