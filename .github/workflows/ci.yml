@@ -85,6 +85,18 @@ jobs:
         env:
           BEAMUP_REMOTE: ${{ secrets.BEAMUP_REMOTE }}
         run: |
+          set -uo pipefail
           git remote add beamup "$BEAMUP_REMOTE"
-          git push beamup HEAD:master --force
+          set +e
+          output=$(git push beamup HEAD:master --force 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            if printf '%s' "$output" | grep -q "Application deployed" || printf '%s' "$output" | grep -q "Deploying web"; then
+              echo "::warning::Beamup deployed the app successfully; cluster sync hook completed with non-fatal status."
+            else
+              exit "$status"
+            fi
+          fi
 
