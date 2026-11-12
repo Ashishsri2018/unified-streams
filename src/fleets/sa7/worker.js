@@ -4,6 +4,7 @@ const http = require('node:http');
 const path = require('node:path');
 const { getRegistry, reloadProviders } = require('./providers');
 const { collectStreams, getRuntimeStats } = require('./streams');
+const { parseContentId, toContentId } = require('./content-id');
 const { buildStatus } = require('./telemetry');
 
 const host = '127.0.0.1';
@@ -74,14 +75,20 @@ async function handleStream(req, res, urlPath, query, requestId) {
   }
 
   const type = match[1];
-  const id = decodeURIComponent(match[2]);
+  const rawId = decodeURIComponent(match[2]);
+  const parsed = parseContentId(rawId);
+  const contentId = parsed ? toContentId(parsed) : rawId;
+  const season = parsed && parsed.season != null ? parsed.season : undefined;
+  const episode = parsed && parsed.episode != null ? parsed.episode : undefined;
 
   try {
-    const rawStreams = await collectStreams({
+    const rawStreams = await collectStreams(
+      contentId,
       type,
-      id,
-      config: query.get('config') || '',
-    });
+      season,
+      episode,
+      query.get('config') || '',
+    );
 
     const streams = Array.isArray(rawStreams) ? rawStreams : [];
     sendJson(res, 200, { streams }, requestId);

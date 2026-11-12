@@ -25,6 +25,7 @@ export const EnvSchema = z.object({
   UPDATE_INTERVAL_MIN_HOURS: z.coerce.number().int().min(1).default(20),
   UPDATE_INTERVAL_MAX_HOURS: z.coerce.number().int().min(1).default(24),
   CINEMETA_URL: z.string().url().default('https://v3-cinemeta.strem.io'),
+  TMDB_URL: z.string().url().default('https://api.themoviedb.org/3'),
   MAL_ENABLED: z.preprocess((val) => val === 'true' || val === true || val === '1', z.boolean()).default(false),
   JIKAN_URL: z.string().url().default('https://api.jikan.moe/v4'),
   JIKAN_MAX_RPS: z.coerce.number().int().min(1).default(3),
@@ -131,6 +132,16 @@ export function deriveFleetEnv(
     INTERNAL_TOKEN: env.INTERNAL_TOKEN || '',
     PROVIDER_SETTINGS_JSON: fleetSettings,
   };
+
+  if (env.TMDB_API_KEY) {
+    outEnv.TMDB_API_KEY = env.TMDB_API_KEY;
+  }
+  if (env.CINEMETA_URL) {
+    outEnv.CINEMETA_URL = env.CINEMETA_URL;
+  }
+  if (env.TMDB_URL) {
+    outEnv.TMDB_URL = env.TMDB_URL;
+  }
 
   if (fleet === 'sa7') {
     const list = env.SA7_PROVIDERS || sa7Allow;
