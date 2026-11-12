@@ -158,6 +158,11 @@
   - Added unit test coverage in `tests/features/core.test.ts` for Vega and Nuvio environment derivation (all 37 Vitest tests passing).
   - Verified local build, policy check, icon check, and linter cleanly (`npm run verify`).
 
+- Audited Replacement Candidates for `everything`, `eonMovies`, and `animesub`:
+  - Checked `config/provider-audit.csv` across all fleets (`sa7`, `nuvio`, `vega`) and duplicate groups.
+  - Confirmed `everything`, `eonMovies`, and `animesub` have no duplicate groups, shared host mirrors, or designated replacement owners in `config/provider-audit.csv`.
+  - In accordance with instructions, left all three as is without modifying `config/providers.json`.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.
