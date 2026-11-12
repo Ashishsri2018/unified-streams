@@ -21,6 +21,7 @@ function createBreaker({ threshold = 3, cooldownMs = 300000, now = Date.now } = 
         openedAt: null,
         calls: 0,
         ok: 0,
+        responded: 0,
         empty: 0,
         errors: 0,
         timeouts: 0,
@@ -102,8 +103,9 @@ function createBreaker({ threshold = 3, cooldownMs = 300000, now = Date.now } = 
     if (latency > state.maxMs) state.maxMs = latency;
 
     if (outcome === 'ok' || outcome === 'empty') {
+      state.ok += 1;
       if (outcome === 'ok') {
-        state.ok += 1;
+        state.responded += 1;
         state.lastSuccessAt = time;
       } else {
         state.empty += 1;
@@ -132,7 +134,7 @@ function createBreaker({ threshold = 3, cooldownMs = 300000, now = Date.now } = 
   function score(id) {
     const state = providers.get(id);
     if (!state) return 0.5;
-    return (state.ok + 1) / (state.calls + 2);
+    return (state.responded + 1) / (state.calls + 2);
   }
 
   function snapshot() {
@@ -142,6 +144,7 @@ function createBreaker({ threshold = 3, cooldownMs = 300000, now = Date.now } = 
       state: effectiveState(state, time),
       calls: state.calls,
       ok: state.ok,
+      responded: state.responded,
       empty: state.empty,
       errors: state.errors,
       timeouts: state.timeouts,

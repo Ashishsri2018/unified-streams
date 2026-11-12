@@ -185,6 +185,14 @@
   - Status page provider error breakdown:
     - Documented all 12 providers exhibiting non-zero errors or timeouts (Nuvio: `maelith`, `quinox` timeouts due to multi-hop proxy chains; Vega: `showbox`, `vega`, `autoEmbed`, `gokuHD`, `eonMovies`, `movies4u`, `kmMovies`, `hdhub4u`, `anikoto`, `animesub`, `1flex`). All fail gracefully to empty results without crashing the gateway.
 
+- Diagnosed & Fixed 0% Success Rate Providers:
+  - Audited 4 providers showing 0% success rate on `/status` (`[sa7] dahmermovies`, `[sa7] dahmermovies-tv`, `[sa7] puretoons`, `[sa7] redflix`):
+    1. Identified that in SA7's `breaker.js`, `ok` was only incremented when `streams.length > 0`, whereas in Nuvio and Vega, `ok` counts all non-failing executions (`calls - errors - timeouts`). Consequently, providers executing with 0 errors and 0 timeouts on titles outside their catalog (e.g. asking a cartoon site `puretoons` for *Inception* or a TV series provider `dahmermovies-tv` for movies) reported `ok: 0` and `successRate: 0%`.
+    2. Diagnosed that `redflix` and `topcartoons` were failing or skipped due to missing vendored dependency `cheerio-without-node-native`.
+    3. Added Module resolution hook in `src/fleets/sa7/providers.js` and `src/fleets/sa7/worker.js` mapping `cheerio-without-node-native` to standard `cheerio`. Confirmed `redflix` immediately extracts 12 streams for Inception and `topcartoons` loads into registry.
+    4. Updated `src/fleets/sa7/lib/breaker.js` to increment `state.ok` on successful empty executions while tracking `state.responded` for internal scoring, aligning SA7's `ok` and `successRate` metrics with Nuvio and Vega.
+    5. Tested `puretoons` on cartoon/anime (*Naruto*), confirming 12 streams extracted. Tested `dahmermovies-tv` on series (*Breaking Bad*), confirming 3 streams extracted. Tested `dahmermovies` on movies (*Inception*), confirming 3 streams extracted.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.

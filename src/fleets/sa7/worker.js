@@ -1,5 +1,17 @@
 'use strict';
 
+const Module = require('node:module');
+if (!Module._cheerioHooked) {
+  Module._cheerioHooked = true;
+  const origResolve = Module._resolveFilename;
+  Module._resolveFilename = function (request, parent, isMain, options) {
+    if (request === 'cheerio-without-node-native') {
+      return origResolve.call(this, 'cheerio', parent, isMain, options);
+    }
+    return origResolve.call(this, request, parent, isMain, options);
+  };
+}
+
 const http = require('node:http');
 const path = require('node:path');
 const { getRegistry, reloadProviders } = require('./providers');

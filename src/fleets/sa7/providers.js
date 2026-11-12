@@ -1,6 +1,18 @@
 const fs = require('fs');
 const path = require('path');
+const Module = require('module');
 const config = require('./config');
+
+if (!Module._cheerioHooked) {
+  Module._cheerioHooked = true;
+  const origResolve = Module._resolveFilename;
+  Module._resolveFilename = function (request, parent, isMain, options) {
+    if (request === 'cheerio-without-node-native') {
+      return origResolve.call(this, 'cheerio', parent, isMain, options);
+    }
+    return origResolve.call(this, request, parent, isMain, options);
+  };
+}
 
 let registry = null;
 
