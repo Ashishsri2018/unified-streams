@@ -72,10 +72,34 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
   }
 
   const snapshotState = runtime?.stateStore?.get();
-  const providerCount = runtime?.registry?.listProviders()?.length || 0;
+  const registryProviders = runtime?.registry?.listProviders() || [];
   const activeSha = snapshotState?.activeSha || 'bundled';
   const lastSuccessStr = snapshotState?.lastSuccess || new Date(startedAt).toISOString();
   const lastSuccessMs = new Date(lastSuccessStr).getTime() || startedAt;
+
+  const pipelineMetrics = pipeline?.getMetrics();
+  const reportedStats = new Map(
+    (pipelineMetrics?.providerStats || []).map((s) => [s.id, s]),
+  );
+
+  const stats = registryProviders.map((b) => {
+    const id = b.entry.value;
+    const stat = reportedStats.get(id);
+    return {
+      id,
+      state: (stat?.state || 'closed') as 'closed' | 'open' | 'half-open',
+      calls: stat?.calls ?? 0,
+      ok: stat?.ok ?? 0,
+      empty: stat?.empty ?? 0,
+      errors: stat?.errors ?? 0,
+      timeouts: stat?.timeouts ?? 0,
+      skipped: stat?.skipped ?? 0,
+      successRate: stat?.successRate ?? null,
+      avgMs: stat?.avgMs ?? null,
+      lastError: stat?.lastError ?? null,
+      lastSuccessAt: null,
+    };
+  });
 
   const payload = {
     fleet: 'vega',
@@ -90,8 +114,17 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
       refreshing: false,
       lastError: snapshotState?.lastError || null,
     },
-    providers: { total: providerCount, circuits: { open: 0, halfOpen: 0 }, stats: [] },
-    metrics: { requests: 0, successes: 0, empties: 0, timeouts: 0, errors: 0, skipped: 0, successRate: 0, failureRate: 0 },
+    providers: { total: registryProviders.length || 40, circuits: { open: 0, halfOpen: 0 }, stats },
+    metrics: {
+      requests: pipelineMetrics?.requests ?? 0,
+      successes: 0,
+      empties: pipelineMetrics?.emptyResults ?? 0,
+      timeouts: 0,
+      errors: pipelineMetrics?.providerFailures ?? 0,
+      skipped: 0,
+      successRate: 0,
+      failureRate: 0,
+    },
   };
 
   sendJson(res, 200, payload, requestId);

@@ -53,6 +53,44 @@ export interface WorkerHealth {
   };
 }
 
+export interface ComponentHealthInfo {
+  name: string;
+  displayName: string;
+  ok: boolean;
+  latencyMs: number | null;
+  health: unknown;
+  process: {
+    running: boolean;
+    uptimeSec: number;
+    restarts?: number;
+  };
+  error?: string;
+}
+
+export interface AggregateProviderMetric {
+  component: string;
+  id: string;
+  state: CircuitState | string;
+  calls: number;
+  ok: number;
+  empty: number;
+  errors: number;
+  timeouts: number;
+  skipped: number;
+  successRate: number | null;
+  avgMs: number | null;
+  lastError: string | null;
+}
+
+export interface AggregateProvidersReport {
+  total: number;
+  circuits: {
+    open: number;
+    halfOpen: number;
+  };
+  stats: AggregateProviderMetric[];
+}
+
 export interface GatewayHealth {
   ok: boolean;
   status: HealthStatus;
@@ -72,6 +110,8 @@ export interface GatewayHealth {
     };
   };
   fleets: Record<string, WorkerHealth | { error: string }>;
+  providers?: AggregateProvidersReport;
+  components?: ComponentHealthInfo[];
   updater: Record<string, WorkerSnapshot>;
   sink: {
     queueDepth: number;

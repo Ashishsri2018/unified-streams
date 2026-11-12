@@ -70,7 +70,8 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `stream.ts`: Stream resolution orchestrator.
   - `filters.ts`: Canonical stream filtering (resolution, size, subtitles).
   - `merge.ts`: URL classification, deduplication, and sorting.
-  - `health.ts` & `stats.ts` & `status.ts`: Observability endpoints.
+  - `health.ts` & `stats.ts`: Observability endpoints with aggregated provider metrics across fleets.
+  - `status.ts` & `statusHtml.ts`: Dark-mode real-time status dashboard with per-provider metrics table, filter search, fleet cards, and 15s auto-refresh.
 - `src/fleets/`: Worker implementations:
   - `sa7/`: SA7 scraper engine running in isolated CommonJS context.
   - `nuvio/`: Nuvio scraper engine running in ES context.

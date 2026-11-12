@@ -70,6 +70,29 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
     return res.end();
   }
 
+  const snapshot = snapshots.getSnapshot();
+  const providerStats = pipeline.getProviderStats();
+  const scraperIds = snapshot ? snapshot.scrapers.map((s) => s.entry.id) : [];
+  const allIds = Array.from(new Set([...scraperIds, ...Object.keys(providerStats)])).sort();
+
+  const stats = allIds.map((id) => {
+    const stat = providerStats[id];
+    return {
+      id,
+      state: 'closed' as const,
+      calls: stat?.calls ?? 0,
+      ok: stat?.ok ?? 0,
+      empty: stat?.empty ?? 0,
+      errors: stat?.errors ?? 0,
+      timeouts: stat?.timeouts ?? 0,
+      skipped: stat?.skipped ?? 0,
+      successRate: stat?.successRate ?? null,
+      avgMs: stat?.p50Ms ?? null,
+      lastError: null,
+      lastSuccessAt: null,
+    };
+  });
+
   const payload = {
     fleet: 'nuvio',
     ok: true,
@@ -77,22 +100,24 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
     startedAt: new Date(startedAt).toISOString(),
     uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
     snapshot: {
-      sha: config.pinnedSha || 'bundled',
-      fetchedAt: new Date(startedAt).toISOString(),
-      ageMs: Date.now() - startedAt,
+      sha: snapshot?.sha || config.pinnedSha || 'bundled',
+      fetchedAt: snapshot ? new Date(snapshot.fetchedAt).toISOString() : new Date(startedAt).toISOString(),
+      ageMs: snapshot ? Date.now() - snapshot.fetchedAt : Date.now() - startedAt,
       refreshing: false,
       lastError: null,
     },
     providers: {
-      total: 30,
+      total: allIds.length || 30,
       circuits: { open: 0, halfOpen: 0 },
-      stats: [],
+      stats,
     },
     metrics: { requests: 0, successes: 0, empties: 0, timeouts: 0, errors: 0, skipped: 0, successRate: 0, failureRate: 0 },
   };
 
   sendJson(res, 200, payload, requestId);
 }
+
+void snapshots.ensure();
 
 const server = http.createServer((req, res) => {
   const requestId = (req.headers['x-request-id'] as string) || '';

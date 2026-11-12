@@ -46,7 +46,7 @@
   - [x] `src/addon/configure.ts` (Accessible, responsive configure page with resolution/size/subtitle controls)
   - [x] `src/addon/stream.ts` (Public stream handler with coalescing, deadline, filtering, caching)
   - [x] `src/addon/health.ts` & `src/addon/stats.ts` (Aggregated health & stats endpoints)
-  - [x] `src/addon/status.ts` (Status dashboard)
+  - [x] `src/addon/status.ts` & `src/addon/statusHtml.ts` (Rich dark-mode status dashboard with per-provider metrics table, filter search, fleet cards, and 15s auto-refresh)
   - [x] `src/addon/logo.ts` (Asset serving with correct MIME types and cache headers)
   - [x] `src/addon/app.ts` (Express gateway app with explicit GET, HEAD, OPTIONS for all routes)
   - [x] Root `/` endpoint returning service discovery JSON

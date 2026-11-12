@@ -9,7 +9,30 @@ describe('gateway HTTP endpoints and contract', () => {
   const mockWorker = {
     fleet: 'sa7' as const,
     baseUrl: 'http://127.0.0.1:7001',
-    getHealth: vi.fn().mockResolvedValue({ fleet: 'sa7', ok: true, status: 'ok' }),
+    getHealth: vi.fn().mockResolvedValue({
+      fleet: 'sa7',
+      ok: true,
+      status: 'ok',
+      providers: {
+        total: 10,
+        circuits: { open: 0, halfOpen: 0 },
+        stats: [
+          {
+            id: 'test-prov',
+            state: 'closed',
+            calls: 5,
+            ok: 4,
+            empty: 1,
+            errors: 0,
+            timeouts: 0,
+            skipped: 0,
+            successRate: 1,
+            avgMs: 120,
+            lastError: null,
+          },
+        ],
+      },
+    }),
     fetchStream: vi.fn().mockResolvedValue({ streams: [{ title: 'Direct', url: 'https://test/1.mp4' }], outcome: 'ok' }),
     reload: vi.fn().mockResolvedValue(true),
   } as unknown as WorkerClient;
@@ -73,6 +96,35 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.headers['content-type']).toContain('text/html');
     expect(res.headers['x-frame-options']).toBe('DENY');
     expect(res.text).toContain('Unified Streams');
+  });
+
+  it('GET and HEAD /status render rich status page with table and security headers', async () => {
+    const resGet = await request(app).get('/status');
+    expect(resGet.status).toBe(200);
+    expect(resGet.headers['content-type']).toContain('text/html');
+    expect(resGet.headers['x-frame-options']).toBe('DENY');
+    expect(resGet.text).toContain('Unified Streams status');
+    expect(resGet.text).toContain('provider-rows');
+    expect(resGet.text).toContain('provider-search');
+    expect(resGet.text).toContain('Fleets');
+    expect(resGet.text).toContain('Providers');
+
+    const resHead = await request(app).head('/status');
+    expect(resHead.status).toBe(200);
+    expect(resHead.text).toBeFalsy();
+  });
+
+  it('GET /health aggregates providers and components across all fleets', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.providers.total).toBe(30);
+    expect(Array.isArray(res.body.providers.stats)).toBe(true);
+    expect(res.body.providers.stats.length).toBe(3);
+    expect(res.body.providers.stats[0]).toHaveProperty('component');
+    expect(res.body.providers.stats[0]).toHaveProperty('id', 'test-prov');
+    expect(Array.isArray(res.body.components)).toBe(true);
+    expect(res.body.components.length).toBe(3);
   });
 
   it('OPTIONS returns 204 with allow headers', async () => {

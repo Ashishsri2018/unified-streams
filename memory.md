@@ -63,6 +63,17 @@
     - `HEAD https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/stream/movie/tt0111161.json` returns HTTP 200 without invoking upstream fan-out.
     - `GET https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/configure` serves responsive dark configure interface with CSP.
 
+- Enhanced Status Dashboard & Aggregated Provider Observability:
+  - Upgraded `/status` to the sleek dark-mode dashboard from the previous addon with live `/health` client-side auto-refresh (15s), brand header, and summary cards.
+  - Implemented modular `src/addon/statusHtml.ts` (<150 LOC per function) rendering:
+    - 4 Top Metrics Cards: Fleets, Providers, Cache hits, Requests.
+    - Fleets component cards: SA7, Nuvio, Vega with process uptime, latency, provider totals, and snapshot SHA.
+    - Full interactive Providers table with: `Fleet | Provider | State | Calls | OK | Empty | Errors | Timeouts | Success | Avg ms | Last error`.
+    - Instant provider search filter input (`#provider-search`) allowing quick filtering across all 89+ provider circuits.
+  - Enhanced `src/addon/health.ts` and `src/core/telemetry.ts` with `aggregateFleetProviders()` returning `providers: { total, circuits, stats }` and `components` at the top level of `/health` and `/stats`.
+  - Updated Nuvio worker (`src/fleets/nuvio/worker.ts`) and Vega worker (`src/fleets/vega/worker.ts`) to return per-provider stats in `/internal/health`.
+  - Added test coverage in `tests/features/app.test.ts` for `/status` HTML and `/health` aggregated provider reporting; all 35 Vitest tests and `npm run verify` pass cleanly.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.
