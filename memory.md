@@ -163,6 +163,11 @@
   - Confirmed `everything`, `eonMovies`, and `animesub` have no duplicate groups, shared host mirrors, or designated replacement owners in `config/provider-audit.csv`.
   - In accordance with instructions, left all three as is without modifying `config/providers.json`.
 
+- Live URL Stream Resolution Verification:
+  - Verified 1 movie (*Inception* `tt1375666`): 20 playable streams returned across 6 providers (`PlayIMDb`, `DesiFlix`, `Movix`, `MultiMovies`, `NetMirror`, `VidRock`).
+  - Verified 1 series (*Breaking Bad* `tt0903747:1:1`): 41 playable streams returned across 15 providers (`Sylphera`, `Maelith`, `DesiFlix`, `Esvyl`, `Fendrix`, `Haylox`, `Ilvyrel`, `Movix`, `MultiMovies`, `NetMirror`, `Novus`, `Phraxis`, `Quinox`, `Svartok`, `VidRock`).
+  - Verified 1 anime (*Attack on Titan* `tt2560140:1:1`): 23 playable streams returned across 7 providers (`Kurage`, `Movix`, `MultiMovies`, `NetMirror`, `PlayIMDb`, `ToonStream`, `VidRock`).
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.
