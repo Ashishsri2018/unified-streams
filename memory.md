@@ -83,6 +83,11 @@
   - Updated `config/defaults.env` with canonical `SA7_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, and `VEGA_DISABLED_PROVIDERS`.
   - Updated Vega worker (`src/fleets/vega/worker.ts`) to exclude `disabledProviders` from active registry list and health metrics.
   - Verified with `npm run verify` and live supervisor test: all policy and duplicate exclusions active.
+  - Deployed to Beamup via GitHub Actions run 43205464748 (`main` commit `334ec2a`).
+  - Live deployment verified on `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`:
+    - `/health` reports `status: "ok"`, 79 active non-duplicate providers (SA7: 12, Nuvio: 31, Vega: 36).
+    - `/status` serves the dark-mode dashboard with per-provider metrics table, dynamic search filter, fleet status cards, and 15s auto-refresh.
+    - Cache verification: empty stream results increment `emptySkips` and are never cached (`streams: []` with 200 OK).
 
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
