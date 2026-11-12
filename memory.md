@@ -110,6 +110,24 @@
   - Updated `src/fleets/vega/worker.ts` to normalize provider IDs with `.toLowerCase()` when looking up metrics.
   - Verified locally with `npm run verify` passing 100% (policy check, icon check, ESLint, TypeScript, and all 35/35 Vitest tests).
 
+- Provider Failure Audit & Duplicate Fleet Replacement:
+  - Audited 10 failing/timed-out providers:
+    - Vega NetMirror family (`netflixMirror`, `primeMirror`, `disneyMirror`): Remote domain `net52.cc` drops TCP connections / times out.
+    - Vega `topmovies`: Upstream domain `moviesleech.club` dead (DNS NXDOMAIN).
+    - Vega `1cinevood`: Upstream domain `one.cinevood.business` dead (DNS NXDOMAIN).
+    - Vega `uhd`: Upstream origin `uhdmovies.beauty` connection timed out.
+    - Vega `kartoons`: Scraper requires interactive Cloudstream device session authentication.
+    - Vega `world4u`: Remote search endpoint returns HTTP 404.
+    - Nuvio `durnel`: Upstream backend `cockpit.103.109.92.178.nip.io` and `ctgmovies.com` connection timed out.
+    - Nuvio `rynara`: Upstream API `api.wecollege.net` and `vidy.st` connection timed out.
+  - Cross-fleet duplicate audit & replacement:
+    - Identified that `sa7:netmirror` is an active, healthy duplicate of the failing Vega NetMirror family using dynamic discovery domains.
+    - Tested `sa7:netmirror` and confirmed it successfully resolves 2-3 playable streams for Inception and Fight Club.
+    - Enabled `sa7:netmirror` as the primary NetMirror provider in `SA7_PROVIDERS` and `config/providers.json`.
+    - Disabled the dead providers (`durnel`, `rynara` in Nuvio; `1cinevood`, `topmovies`, `uhd`, `kartoons`, `world4u`, `netflixMirror`, `primeMirror`, `disneyMirror` in Vega).
+    - Updated `config/provider-audit.csv` with detailed failure causes and duplicate replacements.
+    - Verified with `npm run verify` (100% pass across policy check, icon check, lint, typecheck, 35/35 Vitest tests, and build).
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.

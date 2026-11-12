@@ -9,6 +9,7 @@
       "kurage",
       "movix-vf",
       "multimovies",
+      "netmirror",
       "playimdb",
       "puretoons",
       "redflix",
@@ -24,6 +25,7 @@
       "bdix-df",
       "bdix-fh",
       "brellor",
+      "durnel",
       "evyrith",
       "fastrion",
       "fyron",
@@ -34,6 +36,7 @@
       "mavonyx",
       "pynvix",
       "qyrvaen",
+      "rynara",
       "soryn",
       "vornix",
       "zevran",
@@ -47,7 +50,15 @@
       "internetArchive",
       "youtube",
       "katmovies",
-      "multi"
+      "multi",
+      "1cinevood",
+      "topmovies",
+      "uhd",
+      "kartoons",
+      "world4u",
+      "netflixMirror",
+      "primeMirror",
+      "disneyMirror"
     ]
   }
 }
