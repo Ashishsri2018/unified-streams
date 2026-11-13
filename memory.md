@@ -206,6 +206,11 @@
   - Live verification showed Beamup's Cloudflare zone rewrites stream cache headers to `max-age=14400`. Per user direction, Cloudflare is for log storage only: stream responses now send `cache-control: no-store` with no CDN cache headers, while 180s/30s TTLs remain internal to the gateway cache.
   - Local full-stack validation: SA7/Nuvio/Vega all return partial results at ~9.1s; merged requests return streams (e.g. 45 for *The Dark Knight*) with `max-age=30` and immediate cache hits.
 
+- Timeout Budget Tuning (14s Gateway, 13s Backend Abort, 12s Worker Budget):
+  - Updated `GLOBAL_DEADLINE_MS` to `14000` (14s total request deadline) and `BACKEND_TIMEOUT_MS` to `13000` (13s gateway worker abort).
+  - Derived fleet worker budget (`workerDeadlineMs`) is now `12000` (12s) with `WORKER_DEADLINE_MARGIN_MS = 1000`, ensuring workers return partial results at ~12s before the gateway aborts at 13s and before Beamup's ~14s proxy cutoff.
+  - Updated `src/core/env.ts`, `config/defaults.env`, `.env.example`, `BUILD_PLAN.md`, `CHANGELOG.md`, and feature test expectations in `tests/features/core.test.ts`.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.
