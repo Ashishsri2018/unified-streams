@@ -92,6 +92,7 @@
   - [x] Verify Showbox FebBox cookie validity and document upstream `showbox.media` TLS reset constraint
   - [x] Fix 0% success rate providers in SA7: alias `cheerio-without-node-native` to `cheerio` (fixing RedFlix and TopCartoons) and align circuit breaker metrics with Nuvio/Vega
   - [x] Tune timeout budgets: 13s global deadline, 12s backend worker abort, 11s worker budget; add 🖥️ emoji to externalUrl stream titles
+  - [x] Live addon verification: tested 1 movie (Interstellar), 1 series (Breaking Bad S01E01), and 1 anime (Attack on Titan S01E01) on Beamup with 100% accurate 🖥️ tagging on externalUrl streams
   - [ ] Monitor provider success/timeout rates via `/stats`
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs

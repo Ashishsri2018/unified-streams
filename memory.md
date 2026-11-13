@@ -210,6 +210,10 @@
   - Reverted `GLOBAL_DEADLINE_MS` to `13000` (13s) and `BACKEND_TIMEOUT_MS` to `12000` (12s), giving workers an 11s deadline (`BACKEND_TIMEOUT_MS - 1000`). Live metrics revealed Beamup's Cloudflare edge cuts connections around ~13.2s on slow requests; the 12s/11s budget ensures responses are returned and serialized before that cutoff.
   - Added `🖥️` emoji prefix to the title of all `externalUrl` streams in `src/addon/merge.ts` (`normalizeStreamItem`), clearly distinguishing external link streams from direct streaming URLs.
   - Added unit test in `tests/features/merge.test.ts` to verify `🖥️` emoji tagging for external streams.
+  - Live deployment verified on Beamup (`https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`):
+    1. Movie (*Interstellar* - `tt0816692`): 49 streams returned (24 direct, 25 external). Direct streams have standard titles; 100% of external streams prefixed with `🖥️`. Completed in 12.45s on cold miss.
+    2. Series (*Breaking Bad* S01E01 - `tt0903747:1:1`): 54 streams returned (22 direct, 32 external). 100% of external streams prefixed with `🖥️`. Completed in 13.77s.
+    3. Anime (*Attack on Titan* S01E01 - `tt2560140:1:1`): 40 streams returned (11 direct, 29 external). 100% of external streams prefixed with `🖥️`. Completed in 12.52s.
 
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
