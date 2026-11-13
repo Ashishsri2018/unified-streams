@@ -405,9 +405,9 @@ Never add a media proxy route. Playback URLs must stay direct or use `externalUr
 - Exclude `HEAD` requests from the cache and from cache statistics.
 - Cache `GET` empty results as a miss, not a stored empty entry.
 - Report hits, misses, coalesced, sets, evictions, expired, partial sets, empty skips, size, max entries, and TTL.
-- Complete stream response header: `cache-control: no-store` plus `cloudflare-cdn-cache-control: public, max-age=180`.
-- Partial stream response header: `cache-control: no-store` plus `cloudflare-cdn-cache-control: public, max-age=30`.
-- Beamup's Cloudflare zone enforces a 4h Browser Cache TTL that overrides lower origin `max-age`, even with `private`. `no-store` prevents the 4h browser override; `cloudflare-cdn-cache-control` keeps edge caching at the intended TTL.
+- Stream response headers: `cache-control: no-store` for complete and partial results.
+- Do not send `Cloudflare-CDN-Cache-Control` or other CDN cache headers. Cloudflare is used for log delivery only, not caching.
+- Keep the 180s/30s TTLs in the gateway cache; they are internal and are not exposed to Cloudflare or browsers.
 - Worker stream caches must be disabled with `STREAM_CACHE_TTL_MS=0`.
 
 ### HTTP methods and `HEAD`
@@ -420,7 +420,7 @@ Rules:
 - Reuse response-header helpers so `GET` and `HEAD` cannot drift.
 - Never send a response body for `HEAD`.
 - Never call workers or upstream providers for `HEAD /stream/...`.
-- Return `200` with `content-type: application/json`, `cache-control: no-store`, and matching `cloudflare-cdn-cache-control` for valid stream `HEAD` requests.
+- Return `200` with `content-type: application/json` and `cache-control: no-store` for valid stream `HEAD` requests.
 - Use `x-cache: bypass` on stream `HEAD` responses to make the no-cache-lookup behavior explicit.
 - Return `200` for a stream `HEAD` request even when the equivalent GET could return empty streams. `HEAD` is an endpoint capability check, not a content check.
 - Return `404` for unknown `HEAD` routes with no body.

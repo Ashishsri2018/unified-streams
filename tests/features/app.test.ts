@@ -89,21 +89,21 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(resHead.text).toBeFalsy();
     expect(resHead.headers['x-cache']).toBe('bypass');
     expect(resHead.headers['cache-control']).toBe('no-store');
-    expect(resHead.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=180');
+    expect(resHead.headers['cloudflare-cdn-cache-control']).toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
 
     fetchMock.mockClear();
   });
 
-  it('GET /stream returns stream cache headers that resist Cloudflare TTL overrides', async () => {
+  it('GET /stream disables Cloudflare and browser caching', async () => {
     const res = await request(app).get('/stream/movie/tt0111161.json');
     expect(res.status).toBe(200);
     expect(res.body.streams.length).toBeGreaterThan(0);
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(res.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=180');
+    expect(res.headers['cloudflare-cdn-cache-control']).toBeUndefined();
   });
 
-  it('GET /stream uses the partial cache TTL when a worker times out', async () => {
+  it('GET /stream merges results when a worker times out', async () => {
     const okWorker = {
       ...mockWorker,
       fetchStream: vi.fn().mockResolvedValue({
@@ -132,7 +132,7 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.status).toBe(200);
     expect(res.body.streams.length).toBeGreaterThan(0);
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(res.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=30');
+    expect(res.headers['cloudflare-cdn-cache-control']).toBeUndefined();
   });
 
   it('GET /configure returns HTML with security headers', async () => {

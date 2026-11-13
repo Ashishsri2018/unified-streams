@@ -17,13 +17,10 @@ export interface StreamHandlerContext {
   workerTimeoutMs: number;
 }
 
-// Beamup's Cloudflare zone enforces a 4h Browser Cache TTL and raises any
-// lower origin max-age, even when `private` is present. `no-store` survives
-// that override, while Cloudflare-CDN-Cache-Control keeps edge caching at the
-// intended TTL so browsers revalidate instead of holding streams for 4 hours.
-function setStreamCacheHeaders(res: Response, maxAge: number): void {
+// Stream responses must not be cached by Cloudflare or browsers. Cloudflare is
+// used for log delivery only; caching stays in the gateway.
+function setStreamCacheHeaders(res: Response): void {
   res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Cloudflare-CDN-Cache-Control', `public, max-age=${maxAge}`);
 }
 
 export async function handleStreamRoute(
@@ -56,7 +53,7 @@ export async function handleStreamRoute(
 
   // Handle HEAD requests without provider fan-out
   if (req.method === 'HEAD') {
-    setStreamCacheHeaders(res, 180);
+    setStreamCacheHeaders(res);
     res.setHeader('X-Cache', 'bypass');
     res.status(200).end();
     return;
@@ -69,7 +66,7 @@ export async function handleStreamRoute(
   const cacheKey = `${rawConfig}:${rawType}:${rawId}:${ctx.policyVersion}:${ctx.addonVersion}`;
 
   try {
-    const { value, isPartial, hit } = await ctx.cache.coalesce(cacheKey, async () => {
+    const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {
       const selectedFleets = userConfig.backends.filter((b) => ctx.workers[b]);
       const workerTimeoutMs = Math.min(ctx.workerTimeoutMs, ctx.globalDeadlineMs);
       const fleetPromises = selectedFleets.map(async (fleetName) => {
@@ -90,8 +87,7 @@ export async function handleStreamRoute(
       };
     });
 
-    const maxAge = isPartial ? 30 : 180;
-    setStreamCacheHeaders(res, maxAge);
+    setStreamCacheHeaders(res);
     res.setHeader('X-Cache', hit ? 'hit' : 'miss');
 
     res.status(200).json(value);

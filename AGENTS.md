@@ -60,7 +60,7 @@ Follow the Stremio addon protocol.
 - Deduplicate by normalized URL or info hash.
 - Sort direct streams before external links, then by quality and container.
 - Cap results at `MAX_STREAMS`.
-- Set `cache-control: public, max-age=180` for complete responses and `max-age=30` for partial responses.
+- Set `cache-control: no-store` on stream responses. Cloudflare is used for log delivery only, not caching; keep 180s/30s TTLs in the gateway cache.
 - Never cache empty stream results.
 - Propagate a stable request id to workers.
 

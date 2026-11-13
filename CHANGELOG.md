@@ -8,9 +8,9 @@ All notable changes to this project will be documented in this file.
 - SA7 now receives the derived `ADDON_DEADLINE_MS` (and matching stream-cap/circuit env names) instead of falling back to its 25s default.
 - Nuvio bounds TMDB resolution and snapshot loading by the request deadline.
 - Worker stream handlers abort in-flight provider work when the gateway disconnects.
-- Gateway cache coalescing preserves the partial flag so partial responses emit `max-age=30`.
+- Gateway cache coalescing preserves the partial flag so partial results use the 30s gateway TTL.
 - Responses arriving at the derived worker deadline are treated as partial even when a worker returns HTTP 200.
-- Stream responses send `cache-control: no-store` with `cloudflare-cdn-cache-control: public, max-age=180/30`, because Beamup's Cloudflare zone rewrites lower `max-age` values (even `private`) to 4h on the browser but honors the CDN TTL for edge caching.
+- Stream responses send `cache-control: no-store`; Cloudflare is used for log delivery only and no CDN cache headers are sent. The 180s/30s TTLs remain internal to the gateway cache.
 
 ## [1.0.0] - 2026-11-12
 ### Added
