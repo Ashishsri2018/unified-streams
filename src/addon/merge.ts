@@ -1,5 +1,5 @@
 import { StremioStream, StreamFilterConfig, filterStream, inferResolution } from './filters.js';
-import { isBlockerUrl, isExternalUrl, canonicalizeStreamKey } from './classifier.js';
+import { isBlockerUrl, isArchiveUrl, isExternalUrl, canonicalizeStreamKey } from './classifier.js';
 
 export interface FleetStreamsInput {
   fleet: string;
@@ -22,7 +22,15 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     bingeGroup,
   };
 
-  const isExternal = Boolean(stream.externalUrl || (primaryUrl && isExternalUrl(primaryUrl)));
+  const isArchive = Boolean(primaryUrl && isArchiveUrl(primaryUrl));
+  const isExternal = Boolean(!isArchive && primaryUrl && isExternalUrl(primaryUrl));
+
+  let name = stream.name;
+  if (isArchive) {
+    if (!name || !name.startsWith('🔲')) {
+      name = name ? `🔲 ${name}` : '🔲 Archive';
+    }
+  }
 
   let title = stream.title;
   if (isExternal) {
@@ -32,7 +40,7 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     const restHints = { ...behaviorHints };
     delete restHints.proxyHeaders;
     return {
-      name: stream.name,
+      name,
       title,
       description: stream.description,
       externalUrl: primaryUrl,
@@ -40,10 +48,19 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     };
   }
 
-  return {
+  if (title && title.startsWith('🖥️ ')) {
+    title = title.slice(3).trim();
+  }
+
+  const cleanStream: StremioStream = {
     ...stream,
+    name,
+    title,
+    url: primaryUrl,
     behaviorHints,
   };
+  delete cleanStream.externalUrl;
+  return cleanStream;
 }
 
 function getStreamDedupeKey(stream: StremioStream): string {

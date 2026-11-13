@@ -21,12 +21,6 @@ const WEB_EXTENSIONS = new Set([
   ".aspx",
   ".jsp",
   ".cgi",
-  ".zip",
-  ".rar",
-  ".7z",
-  ".tar",
-  ".gz",
-  ".iso",
 ]);
 
 const EMBED_PATH_PATTERNS = [

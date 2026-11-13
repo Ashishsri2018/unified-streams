@@ -2,9 +2,8 @@ const VIDEO_EXTENSIONS = new Set([
   ".mp4", ".mkv", ".m3u8", ".mpd", ".webm", ".avi", ".mov", ".flv", ".ts", ".m4v",
 ]);
 
-const WEB_OR_ARCHIVE_EXTENSIONS = new Set([
+const WEB_EXTENSIONS = new Set([
   ".html", ".htm", ".php", ".asp", ".aspx", ".jsp", ".cgi",
-  ".zip", ".rar", ".7z", ".tar", ".gz", ".iso", ".bz2", ".xz",
 ]);
 
 const EMBED_PATH_PATTERNS = [
@@ -80,7 +79,7 @@ export function isWebPage(url: string, stream?: StreamTextHint): boolean {
     return false;
   }
 
-  for (const ext of WEB_OR_ARCHIVE_EXTENSIONS) {
+  for (const ext of WEB_EXTENSIONS) {
     if (pathname.endsWith(ext)) return true;
   }
 

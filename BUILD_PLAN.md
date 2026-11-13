@@ -366,17 +366,18 @@ OPTIONS    <all public paths>
 
 Adopt the URL classifier behavior proven in all three independent addons.
 
-Classify as external when the URL is:
+Classify as external (`externalUrl`) ONLY when the URL is an HTML page:
 
-- A web page
-- An HTML embed
+- A web page (`.html`, `.htm`, `.php`, `.asp`, `.aspx`, `.jsp`, `.cgi`)
+- An HTML embed or web player
 - A Telegram bot redirect
-- A `.zip`, `.rar`, or `.7z` archive
 
 Rules:
 
-- Direct playable media keeps `url`: `.m3u8`, `.mpd`, `.mp4`, `.mkv`, Cloudflare R2, Google UserContent, and comparable direct video links.
-- External links map to Stremio `externalUrl`.
+- Only HTML pages belong in `externalUrl`; links with no extension (e.g., bridge endpoints like `dash-hls-bridge`, direct CDN streams) and compressed files (`.zip`, `.rar`, etc.) must NOT be in `externalUrl`.
+- Direct playable media and extensionless streams keep `url`: `.m3u8`, `.mpd`, `.mp4`, `.mkv`, Cloudflare R2, Google UserContent, and comparable direct video links.
+- Compressed files (`.zip`, `.rar`, `.7z`, etc.) remain in `url` (not `externalUrl`) and have their `name` prefixed with the `🔲 ` emoji.
+- External links map to Stremio `externalUrl` and have their `title` prefixed with the `🖥️ ` emoji.
 - External links must omit `url`, `proxyHeaders`, and `subtitles`.
 - Drop known anti-bot/rate-limit blocker links such as `/slowdown`.
 - Sort direct playable streams before external links.

@@ -28,7 +28,8 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 |  |      * Gateway Cache: 180s full TTL, 30s partial TTL, non-empty only         |  |
 |  |      * Content ID Parser: tt, tmdb:, mal:                                    |  |
 |  |      * Metadata Resolver: Cinemeta, TMDB, Jikan (rate-limited)               |  |
-|  |      * Stream Merger & Classifier: direct playable vs externalUrl            |  |
+|  |      * Stream Merger & Classifier: direct playable vs externalUrl (HTML only) |  |
+|  |      * Stream Tagging: 🖥️ for externalUrl title, 🔲 for zip/archive name     |  |
 |  |      * Filters: Resolution, File Size, Separate Subtitles                    |  |
 |  |      * Concurrency: Global deadline (12s), Timeout clamp, Request coalescing|  |
 |  |      * Telemetry: Canonical sliding-window health & stats                    |  |

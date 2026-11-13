@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isBlockerUrl, isExternalUrl, canonicalizeStreamKey } from '../../src/addon/classifier.js';
+import { isBlockerUrl, isArchiveUrl, isExternalUrl, canonicalizeStreamKey } from '../../src/addon/classifier.js';
 import { mergeAndFilterStreams, FleetStreamsInput } from '../../src/addon/merge.js';
 import { StreamFilterConfig } from '../../src/addon/filters.js';
 
@@ -8,10 +8,28 @@ describe('classifier and merger', () => {
     expect(isBlockerUrl('https://example.com/slowdown')).toBe(true);
     expect(isBlockerUrl('https://example.com/stream.mp4')).toBe(false);
 
-    expect(isExternalUrl('https://archive.org/download/item.zip')).toBe(true);
-    expect(isExternalUrl('https://example.com/player/embed.html')).toBe(true);
-    expect(isExternalUrl('https://t.me/stream_bot')).toBe(true);
+    // Compressed archive files are NOT externalUrl
+    expect(isExternalUrl('https://archive.org/download/item.zip')).toBe(false);
+    expect(isExternalUrl('https://example.com/movie.rar')).toBe(false);
+    expect(isArchiveUrl('https://archive.org/download/item.zip')).toBe(true);
+    expect(isArchiveUrl('https://example.com/movie.rar')).toBe(true);
+    expect(isArchiveUrl('https://example.com/movie.mp4')).toBe(false);
 
+    // Links with no extension are NOT externalUrl
+    expect(
+      isExternalUrl(
+        'https://dash-hls-bridge.johndoesemc.workers.dev/?url=https%3A%2F%2Fsacdn.hakunaymatata.com%2Fdash%2Fmaster.m3u8',
+      ),
+    ).toBe(false);
+    expect(isExternalUrl('https://cdn.example.com/stream/token123')).toBe(false);
+
+    // Only HTML / web embed pages are externalUrl
+    expect(isExternalUrl('https://example.com/player/embed.html')).toBe(true);
+    expect(isExternalUrl('https://example.com/embed/123')).toBe(true);
+    expect(isExternalUrl('https://t.me/stream_bot')).toBe(true);
+    expect(isExternalUrl('https://moviesapi.to/watch/123')).toBe(true);
+
+    // Direct playable media is NOT externalUrl
     expect(isExternalUrl('https://cdn.example.com/video/master.m3u8')).toBe(false);
     expect(isExternalUrl('https://cdn.example.com/movie.mp4')).toBe(false);
   });
@@ -90,16 +108,70 @@ describe('classifier and merger', () => {
       {
         fleet: 'nuvio',
         streams: [
-          { title: 'Pixeldrain 1080p', externalUrl: 'https://pixeldrain.dev/api/file/123' },
-          { title: '🖥️ Already prefixed', externalUrl: 'https://example.com/stream' },
-          { externalUrl: 'https://example.com/notitle' },
+          { title: 'Embed player', externalUrl: 'https://example.com/embed/123' },
+          { title: '🖥️ Already prefixed', externalUrl: 'https://example.com/player/test.html' },
+          { externalUrl: 'https://example.com/watch/live.html' },
         ],
       },
     ];
 
     const merged = mergeAndFilterStreams(inputs, defaultFilters, 10);
-    expect(merged[0].title).toBe('🖥️ Pixeldrain 1080p');
+    expect(merged[0].title).toBe('🖥️ Embed player');
     expect(merged[1].title).toBe('🖥️ Already prefixed');
     expect(merged[2].title).toBe('🖥️ External Link');
+  });
+
+  it('adds 🔲 emoji to name for zip/archive files and keeps them in url, not externalUrl', () => {
+    const defaultFilters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: null,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+
+    const inputs: FleetStreamsInput[] = [
+      {
+        fleet: 'nuvio',
+        streams: [
+          { name: 'Nuvio 1080p', title: 'Archive 1', url: 'https://example.com/files/season1.zip' },
+          { name: '🔲 Already prefixed', title: 'Archive 2', externalUrl: 'https://example.com/files/season2.rar' },
+          { title: 'No name archive', url: 'https://example.com/files/movie.7z' },
+          {
+            name: 'Bridge Stream',
+            title: 'Dash HLS',
+            url: 'https://dash-hls-bridge.johndoesemc.workers.dev/?url=https%3A%2F%2Fsacdn.hakunaymatata.com%2Fmaster.m3u8',
+          },
+        ],
+      },
+    ];
+
+    const merged = mergeAndFilterStreams(inputs, defaultFilters, 10);
+    expect(merged).toHaveLength(4);
+
+    // Bridge stream (no extension) must be in url, not externalUrl, and not have 🖥️ or 🔲
+    const bridge = merged.find((s) => s.title === 'Dash HLS');
+    expect(bridge?.url).toContain('dash-hls-bridge');
+    expect(bridge?.externalUrl).toBeUndefined();
+    expect(bridge?.name).toBe('Bridge Stream');
+
+    // Zip files must have 🔲 in name, be in url, and NOT in externalUrl
+    const zip1 = merged.find((s) => s.title === 'Archive 1');
+    expect(zip1?.name).toBe('🔲 Nuvio 1080p');
+    expect(zip1?.url).toBe('https://example.com/files/season1.zip');
+    expect(zip1?.externalUrl).toBeUndefined();
+
+    const rar = merged.find((s) => s.title === 'Archive 2');
+    expect(rar?.name).toBe('🔲 Already prefixed');
+    expect(rar?.url).toBe('https://example.com/files/season2.rar');
+    expect(rar?.externalUrl).toBeUndefined();
+
+    const archiveNoName = merged.find((s) => s.title === 'No name archive');
+    expect(archiveNoName?.name).toBe('🔲 Archive');
+    expect(archiveNoName?.url).toBe('https://example.com/files/movie.7z');
+    expect(archiveNoName?.externalUrl).toBeUndefined();
   });
 });

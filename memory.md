@@ -215,6 +215,13 @@
     2. Series (*Breaking Bad* S01E01 - `tt0903747:1:1`): 54 streams returned (22 direct, 32 external). 100% of external streams prefixed with `🖥️`. Completed in 13.77s.
     3. Anime (*Attack on Titan* S01E01 - `tt2560140:1:1`): 40 streams returned (11 direct, 29 external). 100% of external streams prefixed with `🖥️`. Completed in 12.52s.
 
+- HTML-Only External URL Classification & Zip Emoji Tagging:
+  - Enforced strict classification across gateway (`src/addon/classifier.ts`, `src/addon/merge.ts`) and all three fleets (`sa7`, `nuvio`, `vega`):
+    1. Only HTML pages (`.html`, `.htm`, `.php`, `.asp`, `.aspx`, `.jsp`, `.cgi`, embed path patterns, known embed domains) are mapped to `externalUrl` and tagged with `🖥️` in `title`.
+    2. Extensionless URLs (such as `dash-hls-bridge` or direct CDN/API video streams) are NOT `externalUrl`: they remain direct playable streams (`url`).
+    3. Compressed archive files (`.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.bz2`, `.iso`, `.xz`) are NOT `externalUrl`: they remain in `url` and have their `name` property prefixed with the `🔲 ` emoji.
+  - Updated all unit tests in `tests/features/merge.test.ts` to cover extensionless bridge URLs, compressed files with `🔲` emoji in `name`, and HTML embed pages with `🖥️` in `title`. All 47 tests, ESLint, and TypeScript checks pass.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.

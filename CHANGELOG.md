@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Fixed
+- Restrict `externalUrl` classification strictly to HTML pages; extensionless URLs (such as `dash-hls-bridge` or direct CDN endpoints) remain direct playable streams in `url`, and compressed files (`.zip`, `.rar`, etc.) remain in `url` with a `🔲 ` emoji prefix added to their `name`.
 - Revert timeout defaults to `GLOBAL_DEADLINE_MS=13000` and `BACKEND_TIMEOUT_MS=12000` (11s worker budget), ensuring cold requests return before Beamup's ~13.2s proxy cutoff and preventing Cloudflare 504 gateway timeouts.
 - Add `🖥️` identification emoji prefix to the title of all `externalUrl` streams during gateway normalization.
 - Nuvio and Vega workers now derive their global deadline from `BACKEND_TIMEOUT_MS` minus a 1s margin, so partial results return before the gateway aborts the worker request.
