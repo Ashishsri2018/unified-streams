@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 ### Fixed
 - Nuvio and Vega workers now derive their global deadline from `BACKEND_TIMEOUT_MS` minus a 1s margin, so partial results return before the gateway aborts the worker request.
-- Raise default `BACKEND_TIMEOUT_MS` to 18000 and `GLOBAL_DEADLINE_MS` to 19000, giving workers a 17s deadline. The Beamup proxy hard limit is ~19s, so the previous 27s budget produced Cloudflare 504s before the gateway could return partial results.
+- Lower default `BACKEND_TIMEOUT_MS` to 12000 and `GLOBAL_DEADLINE_MS` to 13000, giving workers an 11s deadline. Live cache-busted requests showed the Beamup proxy cutting responses as early as ~14s; the previous 18s budget returned Cloudflare 504s, while the 12s budget returns partial results at ~11s.
 - Disable Vega settle timers (`SETTLE_MS=0`, `EMPTY_FENCE_MS=0`). Slow providers now use the full worker deadline instead of being aborted early after a pause in progress.
 - Remove `--no-restart` from the CI Dokku environment sync; the Beamup wrapper rejects it, so secrets were never applied.
 - Vega now records deadline-truncated providers as `skipped` instead of `ok + empty`, so health and stats no longer report timeout starvation as genuine empty results.
