@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 ### Fixed
 - Nuvio and Vega workers now derive their global deadline from `BACKEND_TIMEOUT_MS` minus a 1s margin, so partial results return before the gateway aborts the worker request.
+- Raise default `BACKEND_TIMEOUT_MS` to 11000 and `GLOBAL_DEADLINE_MS` to 13000, giving workers a 10s deadline while staying at the Beamup proxy limit.
 - SA7 now receives the derived `ADDON_DEADLINE_MS` (and matching stream-cap/circuit env names) instead of falling back to its 25s default.
 - Nuvio bounds TMDB resolution and snapshot loading by the request deadline.
 - Worker stream handlers abort in-flight provider work when the gateway disconnects.

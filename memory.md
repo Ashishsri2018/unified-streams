@@ -200,7 +200,7 @@
 
 - Worker Deadline & Streaming Cache Header Fix:
   - Diagnosed "responded but Empty" providers: the gateway aborts worker fetches at `BACKEND_TIMEOUT_MS` (10s) while workers used `GLOBAL_DEADLINE_MS` (12s), so results were discarded after provider stats incremented.
-  - Derived every worker deadline from `BACKEND_TIMEOUT_MS - 1000`; SA7 now receives `ADDON_DEADLINE_MS`, `MAX_PER_PROVIDER_STREAMS`, `MAX_TOTAL_STREAMS`, and `BREAKER_*` under the names it actually reads.
+  - Raised defaults to `BACKEND_TIMEOUT_MS=11000` and `GLOBAL_DEADLINE_MS=13000`, yielding a 10s worker deadline. Derived every worker deadline from `BACKEND_TIMEOUT_MS - 1000`; SA7 now receives `ADDON_DEADLINE_MS`, `MAX_PER_PROVIDER_STREAMS`, `MAX_TOTAL_STREAMS`, and `BREAKER_*` under the names it actually reads.
   - Bounded Nuvio TMDB resolution and snapshot loading by the request deadline; nuvio/vega workers abort pipeline work when the gateway disconnects.
   - Preserved `isPartial` through cache coalescing, and treat responses arriving within the worker deadline margin as partial so they receive the 30s TTL.
   - Live verification showed Beamup's Cloudflare zone rewrites stream cache headers to `max-age=14400`. Per user direction, Cloudflare is for log storage only: stream responses now send `cache-control: no-store` with no CDN cache headers, while 180s/30s TTLs remain internal to the gateway cache.
