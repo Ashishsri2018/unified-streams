@@ -127,7 +127,8 @@ describe('provider policy and concurrency', () => {
     const vegaEnv = deriveFleetEnv(env, 'vega', 7003);
     expect(Number(vegaEnv.GLOBAL_DEADLINE_MS)).toBe(9000);
     expect(Number(vegaEnv.SEARCH_TIMEOUT_MS)).toBeLessThanOrEqual(9000);
-    expect(Number(vegaEnv.SETTLE_MS)).toBeLessThanOrEqual(9000);
+    expect(Number(vegaEnv.SETTLE_MS)).toBe(0);
+    expect(Number(vegaEnv.EMPTY_FENCE_MS)).toBe(0);
 
     const nuvioEnv = deriveFleetEnv(env, 'nuvio', 7002);
     expect(Number(nuvioEnv.GLOBAL_DEADLINE_MS)).toBe(9000);
@@ -135,12 +136,12 @@ describe('provider policy and concurrency', () => {
 
     const tightEnv = deriveFleetEnv(loadAppEnv({ BACKEND_TIMEOUT_MS: '3000' }), 'vega', 7003);
     expect(Number(tightEnv.GLOBAL_DEADLINE_MS)).toBe(2000);
-    expect(Number(tightEnv.SETTLE_MS)).toBe(2000);
+    expect(Number(tightEnv.SETTLE_MS)).toBe(0);
 
     const defaultEnv = loadAppEnv();
     const defaultVega = deriveFleetEnv(defaultEnv, 'vega', 7003);
-    expect(Number(defaultEnv.BACKEND_TIMEOUT_MS)).toBe(24000);
-    expect(Number(defaultEnv.GLOBAL_DEADLINE_MS)).toBe(27000);
-    expect(Number(defaultVega.GLOBAL_DEADLINE_MS)).toBe(23000);
+    expect(Number(defaultEnv.BACKEND_TIMEOUT_MS)).toBe(18000);
+    expect(Number(defaultEnv.GLOBAL_DEADLINE_MS)).toBe(19000);
+    expect(Number(defaultVega.GLOBAL_DEADLINE_MS)).toBe(17000);
   });
 });

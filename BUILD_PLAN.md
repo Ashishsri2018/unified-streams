@@ -903,8 +903,8 @@ LOG_FLUSH_MS=5000
 LOG_QUEUE_MAX=10000
 CACHE_TTL_MS=180000
 CACHE_PARTIAL_TTL_MS=30000
-BACKEND_TIMEOUT_MS=24000
-GLOBAL_DEADLINE_MS=27000
+BACKEND_TIMEOUT_MS=18000
+GLOBAL_DEADLINE_MS=19000
 MAX_STREAMS_PER_PROVIDER=100
 MAX_STREAMS=1000
 CIRCUIT_FAILURE_THRESHOLD=3
@@ -922,7 +922,7 @@ NUVIO_INTERNAL_URL=http://127.0.0.1:7002
 VEGA_INTERNAL_URL=http://127.0.0.1:7003
 ```
 
-Live verification shows the Beamup proxy allows stream responses longer than 17s. The gateway deadline must stay below the proxy hard limit; the current 27s budget leaves a 3s margin under 30s. Vega and Nuvio multi-stage providers need more than the previous 10s worker deadline, so the worker deadline is 23s (`BACKEND_TIMEOUT_MS - 1000`).
+Live verification shows the Beamup proxy cuts stream responses at roughly 19s (a request that ran to the old 27s budget returned a Cloudflare 504 at ~19.3s). The worker deadline is therefore 17s (`BACKEND_TIMEOUT_MS - 1000`), and the gateway aborts at 18s, leaving about 1s of proxy margin. Vega settle timers are disabled (`SETTLE_MS=0`, `EMPTY_FENCE_MS=0`) so slow providers are not aborted early once progress pauses; they can use the full worker deadline.
 
 ### Secrets and overrides
 

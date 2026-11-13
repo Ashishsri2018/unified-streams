@@ -15,8 +15,8 @@ export const EnvSchema = z.object({
   LOG_QUEUE_MAX: z.coerce.number().int().min(100).default(10000),
   CACHE_TTL_MS: z.coerce.number().int().min(1000).default(180000),
   CACHE_PARTIAL_TTL_MS: z.coerce.number().int().min(1000).default(30000),
-  BACKEND_TIMEOUT_MS: z.coerce.number().int().min(500).default(24000),
-  GLOBAL_DEADLINE_MS: z.coerce.number().int().min(1000).default(27000),
+  BACKEND_TIMEOUT_MS: z.coerce.number().int().min(500).default(18000),
+  GLOBAL_DEADLINE_MS: z.coerce.number().int().min(1000).default(19000),
   MAX_STREAMS_PER_PROVIDER: z.coerce.number().int().min(1).default(100),
   MAX_STREAMS: z.coerce.number().int().min(1).default(1000),
   SEARCH_CONCURRENCY: z.coerce.number().int().min(1).default(30),
@@ -233,7 +233,8 @@ export function deriveFleetEnv(
     outEnv.SEARCH_TIMEOUT_MS = String(Math.min(10000, workerDeadlineMs));
     outEnv.META_TIMEOUT_MS = String(Math.min(15000, workerDeadlineMs));
     outEnv.STREAM_TIMEOUT_MS = String(Math.min(20000, workerDeadlineMs));
-    outEnv.SETTLE_MS = String(Math.min(8000, workerDeadlineMs));
+    outEnv.SETTLE_MS = '0';
+    outEnv.EMPTY_FENCE_MS = '0';
 
     let vegaSettings: { skipTimings?: boolean; kv?: Record<string, unknown> } = {};
     try {

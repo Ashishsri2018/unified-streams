@@ -100,7 +100,7 @@ jobs:
           [ -n "$GRAMCINEMA_TOKEN" ] && CONFIG_PAIRS+=("GRAMCINEMA_TOKEN='$GRAMCINEMA_TOKEN'")
           [ -n "$PUBLIC_BASE_URL" ] && CONFIG_PAIRS+=("PUBLIC_BASE_URL='$PUBLIC_BASE_URL'")
           if [ ${#CONFIG_PAIRS[@]} -gt 0 ]; then
-            ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:set --no-restart $APP ${CONFIG_PAIRS[*]}" || echo "::warning::Dokku config:set failed or skipped"
+            ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:set $APP ${CONFIG_PAIRS[*]}"
           fi
 
       - name: Push to Beamup
