@@ -5,8 +5,12 @@ import http from 'node:http';
 describe('worker client and internal worker contract', () => {
   let server: http.Server;
   let serverPort: number;
+  let streamBody: Record<string, unknown>;
+  let streamDelayMs: number;
 
   beforeEach(async () => {
+    streamBody = { streams: [{ title: 'Stream 1', url: 'https://test/1.mp4' }] };
+    streamDelayMs = 0;
     server = http.createServer((req, res) => {
       const parsed = new URL(req.url || '/', `http://127.0.0.1`);
       if (req.method === 'OPTIONS') {
@@ -29,7 +33,8 @@ describe('worker client and internal worker contract', () => {
           return res.end();
         }
         res.writeHead(200, { 'content-type': 'application/json' });
-        return res.end(JSON.stringify({ streams: [{ title: 'Stream 1', url: 'https://test/1.mp4' }] }));
+        setTimeout(() => res.end(JSON.stringify(streamBody)), streamDelayMs);
+        return;
       }
 
       if (parsed.pathname === '/internal/reload' && req.method === 'POST') {
@@ -72,5 +77,35 @@ describe('worker client and internal worker contract', () => {
 
     const reloaded = await client.reload();
     expect(reloaded).toBe(true);
+  });
+
+  it('treats responses near the worker deadline as partial', async () => {
+    streamDelayMs = 400;
+    const client = new WorkerClient({
+      fleet: 'sa7',
+      baseUrl: `http://127.0.0.1:${serverPort}`,
+    });
+
+    const nearDeadline = await client.fetchStream('movie', 'tt0111161', '', 1300);
+    expect(nearDeadline.streams).toHaveLength(1);
+    expect(nearDeadline.outcome).toBe('timeout');
+
+    const relaxed = await client.fetchStream('movie', 'tt0111161', '', 5000);
+    expect(relaxed.streams).toHaveLength(1);
+    expect(relaxed.outcome).toBe('ok');
+  });
+
+  it('honors an explicit partial flag from the worker', async () => {
+    streamBody = {
+      streams: [{ title: 'Stream 1', url: 'https://test/1.mp4' }],
+      partial: true,
+    };
+    const client = new WorkerClient({
+      fleet: 'sa7',
+      baseUrl: `http://127.0.0.1:${serverPort}`,
+    });
+
+    const result = await client.fetchStream('movie', 'tt0111161', '', 5000);
+    expect(result.outcome).toBe('timeout');
   });
 });

@@ -55,12 +55,18 @@ async function handleStream(req: http.IncomingMessage, res: http.ServerResponse,
   }
 
   const controller = new AbortController();
+  const abortOnClose = (): void => {
+    if (!res.writableEnded) controller.abort(new Error('client disconnected'));
+  };
+  res.on('close', abortOnClose);
   try {
     const rawStreams = await pipeline.handle(streamRequest, controller.signal);
     const streams = Array.isArray(rawStreams) ? (rawStreams as StremioStream[]) : [];
     sendJson(res, 200, { streams }, requestId);
   } catch {
     sendJson(res, 200, { streams: [] }, requestId);
+  } finally {
+    res.off('close', abortOnClose);
   }
 }
 

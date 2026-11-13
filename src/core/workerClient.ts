@@ -1,4 +1,5 @@
 import { INTERNAL_HEADERS, InternalStreamResponse } from './contract.js';
+import { WORKER_DEADLINE_MARGIN_MS } from './env.js';
 import { WorkerHealth } from './telemetry.js';
 import { StremioStream } from '../addon/filters.js';
 
@@ -73,13 +74,20 @@ export class WorkerClient {
         return { streams: [], outcome: 'error', fleet: this.fleet, durationMs };
       }
 
-      const body = (await res.json()) as { streams?: StremioStream[] };
+      const body = (await res.json()) as { streams?: StremioStream[]; partial?: boolean };
+      const responseMs = Date.now() - startTime;
       const streams = Array.isArray(body?.streams) ? body.streams : [];
+      // Workers stop one second before the gateway timeout. A response that
+      // arrives at the derived deadline is deadline-truncated, so cache it with
+      // the partial TTL even though the worker returned HTTP 200.
+      const deadlineProximityMs = Math.max(0, timeoutMs - WORKER_DEADLINE_MARGIN_MS);
+      const partial =
+        body?.partial === true || (streams.length > 0 && responseMs >= deadlineProximityMs);
       return {
         streams,
-        outcome: streams.length > 0 ? 'ok' : 'empty',
+        outcome: streams.length > 0 ? (partial ? 'timeout' : 'ok') : 'empty',
         fleet: this.fleet,
-        durationMs,
+        durationMs: responseMs,
       };
     } catch (err: unknown) {
       const durationMs = Date.now() - startTime;

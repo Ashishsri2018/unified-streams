@@ -81,13 +81,58 @@ describe('gateway HTTP endpoints and contract', () => {
   });
 
   it('HEAD /stream/... returns 200 with no body and does not fan out to workers', async () => {
-    mockWorker.fetchStream = vi.fn();
+    const fetchMock = mockWorker.fetchStream as ReturnType<typeof vi.fn>;
+    fetchMock.mockClear();
 
     const resHead = await request(app).head('/stream/movie/tt0111161.json');
     expect(resHead.status).toBe(200);
     expect(resHead.text).toBeFalsy();
     expect(resHead.headers['x-cache']).toBe('bypass');
-    expect(mockWorker.fetchStream).not.toHaveBeenCalled();
+    expect(resHead.headers['cache-control']).toBe('private, max-age=180');
+    expect(resHead.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=180');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockClear();
+  });
+
+  it('GET /stream returns stream cache headers that resist Cloudflare TTL overrides', async () => {
+    const res = await request(app).get('/stream/movie/tt0111161.json');
+    expect(res.status).toBe(200);
+    expect(res.body.streams.length).toBeGreaterThan(0);
+    expect(res.headers['cache-control']).toBe('private, max-age=180');
+    expect(res.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=180');
+  });
+
+  it('GET /stream uses the partial cache TTL when a worker times out', async () => {
+    const okWorker = {
+      ...mockWorker,
+      fetchStream: vi.fn().mockResolvedValue({
+        streams: [{ title: 'Direct', url: 'https://test/partial.mp4' }],
+        outcome: 'ok',
+      }),
+    };
+    const timedOutWorker = {
+      ...mockWorker,
+      fetchStream: vi.fn().mockResolvedValue({ streams: [], outcome: 'timeout' }),
+    };
+    const partialApp = createGatewayApp(
+      {
+        ...ctx,
+        cache: new GatewayStreamCache(),
+        workers: {
+          sa7: okWorker,
+          nuvio: timedOutWorker,
+          vega: timedOutWorker,
+        } as unknown as StreamHandlerContext['workers'],
+      },
+      Date.now(),
+    );
+
+    const res = await request(partialApp).get('/stream/movie/tt0111161.json');
+    expect(res.status).toBe(200);
+    expect(res.body.streams.length).toBeGreaterThan(0);
+    expect(res.headers['cache-control']).toBe('private, max-age=30');
+    expect(res.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=30');
   });
 
   it('GET /configure returns HTML with security headers', async () => {

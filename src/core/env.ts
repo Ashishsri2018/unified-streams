@@ -86,11 +86,16 @@ export function loadAppEnv(customEnv: NodeJS.ProcessEnv = process.env): AppEnv {
   return EnvSchema.parse(merged);
 }
 
+export const WORKER_DEADLINE_MARGIN_MS = 1000;
+
 export function deriveFleetEnv(
   env: AppEnv,
   fleet: 'sa7' | 'nuvio' | 'vega',
   port: number,
 ): Record<string, string> {
+  // The gateway aborts a worker fetch at BACKEND_TIMEOUT_MS. Workers must finish
+  // (and return partial results) before that hard cutoff, so keep a safety margin.
+  const workerDeadlineMs = Math.max(2000, env.BACKEND_TIMEOUT_MS - WORKER_DEADLINE_MARGIN_MS);
   let fleetSettings = '{}';
   if (env.PROVIDER_SETTINGS_JSON) {
     try {
@@ -134,7 +139,7 @@ export function deriveFleetEnv(
     LOG_FORMAT: env.LOG_FORMAT,
     STREAM_CACHE_TTL_MS: '0', // Workers must not cache stream responses
     PROVIDER_TIMEOUT_MS: String(env.BACKEND_TIMEOUT_MS),
-    GLOBAL_DEADLINE_MS: String(env.GLOBAL_DEADLINE_MS),
+    GLOBAL_DEADLINE_MS: String(workerDeadlineMs),
     MAX_STREAMS_PER_PROVIDER: String(env.MAX_STREAMS_PER_PROVIDER),
     CIRCUIT_FAILURE_THRESHOLD: String(env.CIRCUIT_FAILURE_THRESHOLD),
     CIRCUIT_COOLDOWN_MS: String(env.CIRCUIT_COOLDOWN_MS),
@@ -158,6 +163,11 @@ export function deriveFleetEnv(
       outEnv.PROVIDERS = list;
       outEnv.SA7_PROVIDERS = list;
     }
+    outEnv.ADDON_DEADLINE_MS = String(workerDeadlineMs);
+    outEnv.MAX_PER_PROVIDER_STREAMS = String(env.MAX_STREAMS_PER_PROVIDER);
+    outEnv.MAX_TOTAL_STREAMS = String(env.MAX_STREAMS);
+    outEnv.BREAKER_FAILURE_THRESHOLD = String(env.CIRCUIT_FAILURE_THRESHOLD);
+    outEnv.BREAKER_COOLDOWN_MS = String(env.CIRCUIT_COOLDOWN_MS);
   } else if (fleet === 'nuvio') {
     const list = env.NUVIO_DISABLED_SCRAPERS || nuvioDeny;
     if (list) {
@@ -169,6 +179,7 @@ export function deriveFleetEnv(
     outEnv.NUVIO_BUNDLED_DIR = fs.existsSync(distBundled) ? distBundled : srcBundled;
     outEnv.NUVIO_CACHE_DIR = fleetDataDir;
     outEnv.SCRAPER_CONCURRENCY = String(env.SCRAPER_CONCURRENCY);
+    outEnv.SCRAPER_TIMEOUT_MS = String(workerDeadlineMs);
 
     let scraperSettings: Record<string, Record<string, unknown>> = {};
     if (env.SCRAPER_SETTINGS_JSON) {
@@ -219,6 +230,10 @@ export function deriveFleetEnv(
       outEnv.VEGA_DISABLED_PROVIDERS = list;
     }
     outEnv.SEARCH_CONCURRENCY = String(env.SEARCH_CONCURRENCY);
+    outEnv.SEARCH_TIMEOUT_MS = String(Math.min(10000, workerDeadlineMs));
+    outEnv.META_TIMEOUT_MS = String(Math.min(15000, workerDeadlineMs));
+    outEnv.STREAM_TIMEOUT_MS = String(Math.min(20000, workerDeadlineMs));
+    outEnv.SETTLE_MS = String(Math.min(8000, workerDeadlineMs));
 
     let vegaSettings: { skipTimings?: boolean; kv?: Record<string, unknown> } = {};
     try {

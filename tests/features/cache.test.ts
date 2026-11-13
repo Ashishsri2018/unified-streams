@@ -57,4 +57,24 @@ describe('gateway stream cache', () => {
     const stats = cache.getStats();
     expect(stats.coalesced).toBe(2);
   });
+
+  it('preserves the partial flag on fresh and coalesced responses', async () => {
+    const cache = new GatewayStreamCache<{ streams: unknown[] }>();
+    const fetcher = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return { value: { streams: [{ url: 'https://test/partial.mp4' }] }, isPartial: true };
+    };
+
+    const [fresh, coalesced] = await Promise.all([
+      cache.coalesce('key2', fetcher),
+      cache.coalesce('key2', fetcher),
+    ]);
+
+    expect(fresh.isPartial).toBe(true);
+    expect(coalesced.isPartial).toBe(true);
+
+    const cached = cache.get('key2');
+    expect(cached.hit).toBe(true);
+    if (cached.hit) expect(cached.isPartial).toBe(true);
+  });
 });

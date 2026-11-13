@@ -198,6 +198,14 @@
   - Added unit test in `tests/features/core.test.ts` to ensure default and custom values for `SEARCH_CONCURRENCY` and `SCRAPER_CONCURRENCY` are correctly parsed and forwarded to fleet child environments.
   - Audited SA7 scraper concurrency: SA7 fires all enabled providers concurrently using `Promise.all` bounded by per-provider timeout (`Math.min(providerTimeoutMs, deadline - now())`) and circuit breaker status, without a bounded semaphore pool.
 
+- Worker Deadline & Streaming Cache Header Fix:
+  - Diagnosed "responded but Empty" providers: the gateway aborts worker fetches at `BACKEND_TIMEOUT_MS` (10s) while workers used `GLOBAL_DEADLINE_MS` (12s), so results were discarded after provider stats incremented.
+  - Derived every worker deadline from `BACKEND_TIMEOUT_MS - 1000`; SA7 now receives `ADDON_DEADLINE_MS`, `MAX_PER_PROVIDER_STREAMS`, `MAX_TOTAL_STREAMS`, and `BREAKER_*` under the names it actually reads.
+  - Bounded Nuvio TMDB resolution and snapshot loading by the request deadline; nuvio/vega workers abort pipeline work when the gateway disconnects.
+  - Preserved `isPartial` through cache coalescing, and treat responses arriving within the worker deadline margin as partial so they receive the 30s TTL.
+  - Stream responses now send `cache-control: private, max-age=180/30` plus `cloudflare-cdn-cache-control` to stop Beamup's 4h Cloudflare Browser Cache TTL from overriding origin TTLs.
+  - Local full-stack validation: SA7/Nuvio/Vega all return partial results at ~9.1s; merged requests return streams (e.g. 45 for *The Dark Knight*) with `max-age=30` and immediate cache hits.
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.

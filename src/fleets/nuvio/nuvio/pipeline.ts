@@ -354,11 +354,26 @@ export class StreamPipeline {
     signal: AbortSignal | undefined,
     cacheKey: string,
   ): Promise<ProduceResult> {
+    const deadlineAt = Date.now() + Math.max(1, this.config.globalDeadlineMs);
     try {
-      const tmdbId =
-        "tmdbId" in request
-          ? request.tmdbId
-          : await this.cinemeta.resolveTmdbId(request.type, request.imdbId);
+      let tmdbId: number | null;
+      try {
+        tmdbId =
+          "tmdbId" in request
+            ? request.tmdbId
+            : await withTimeout(
+                this.cinemeta.resolveTmdbId(request.type, request.imdbId),
+                Math.max(1, deadlineAt - Date.now()),
+                "tmdb lookup",
+              );
+      } catch (error) {
+        if (!(error instanceof TimeoutError)) throw error;
+        this.logger.info("nuvio_tmdb_id_timeout", {
+          type: request.type,
+          ...requestLogFields(request),
+        });
+        return { streams: [], outcome: "tmdb_missing", meta: null };
+      }
       if (tmdbId === null) {
         this.logger.info("nuvio_tmdb_id_missing", {
           type: request.type,
@@ -367,7 +382,21 @@ export class StreamPipeline {
         return { streams: [], outcome: "tmdb_missing", meta: null };
       }
 
-      const snapshot = await this.snapshots.ensure();
+      let snapshot;
+      try {
+        snapshot = await withTimeout(
+          this.snapshots.ensure(),
+          Math.max(1, deadlineAt - Date.now()),
+          "snapshot load",
+        );
+      } catch (error) {
+        if (!(error instanceof TimeoutError)) throw error;
+        this.logger.warn("nuvio_snapshot_timeout", {
+          type: request.type,
+          ...requestLogFields(request),
+        });
+        return { streams: [], outcome: "snapshot_unavailable", meta: null };
+      }
       if (!snapshot) {
         this.logger.warn("nuvio_snapshot_unavailable", {
           type: request.type,
@@ -387,7 +416,7 @@ export class StreamPipeline {
       const { collected, stats } = await collectStreams({
         scrapers,
         concurrency: this.config.scraperConcurrency,
-        deadlineMs: this.config.globalDeadlineMs,
+        deadlineMs: Math.max(1, deadlineAt - Date.now()),
         perProviderTimeoutMs: this.config.scraperTimeoutMs,
         logger: this.logger,
         run: (scraper) =>

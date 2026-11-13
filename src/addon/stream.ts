@@ -17,6 +17,14 @@ export interface StreamHandlerContext {
   workerTimeoutMs: number;
 }
 
+// Beamup's Cloudflare zone enforces a 4h Browser Cache TTL and raises any
+// lower origin max-age. `private` is preserved for browsers, while
+// Cloudflare-CDN-Cache-Control keeps edge caching at the intended TTL.
+function setStreamCacheHeaders(res: Response, maxAge: number): void {
+  res.setHeader('Cache-Control', `private, max-age=${maxAge}`);
+  res.setHeader('Cloudflare-CDN-Cache-Control', `public, max-age=${maxAge}`);
+}
+
 export async function handleStreamRoute(
   req: Request,
   res: Response,
@@ -47,7 +55,7 @@ export async function handleStreamRoute(
 
   // Handle HEAD requests without provider fan-out
   if (req.method === 'HEAD') {
-    res.setHeader('Cache-Control', 'public, max-age=180');
+    setStreamCacheHeaders(res, 180);
     res.setHeader('X-Cache', 'bypass');
     res.status(200).end();
     return;
@@ -62,9 +70,10 @@ export async function handleStreamRoute(
   try {
     const { value, isPartial, hit } = await ctx.cache.coalesce(cacheKey, async () => {
       const selectedFleets = userConfig.backends.filter((b) => ctx.workers[b]);
+      const workerTimeoutMs = Math.min(ctx.workerTimeoutMs, ctx.globalDeadlineMs);
       const fleetPromises = selectedFleets.map(async (fleetName) => {
         const worker = ctx.workers[fleetName];
-        const resStream = await worker.fetchStream(rawType, rawId, rawConfig, ctx.workerTimeoutMs, requestId);
+        const resStream = await worker.fetchStream(rawType, rawId, rawConfig, workerTimeoutMs, requestId);
         return { fleet: fleetName, streams: resStream.streams, outcome: resStream.outcome };
       });
 
@@ -81,7 +90,7 @@ export async function handleStreamRoute(
     });
 
     const maxAge = isPartial ? 30 : 180;
-    res.setHeader('Cache-Control', `public, max-age=${maxAge}`);
+    setStreamCacheHeaders(res, maxAge);
     res.setHeader('X-Cache', hit ? 'hit' : 'miss');
 
     res.status(200).json(value);

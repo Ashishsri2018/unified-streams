@@ -32,7 +32,7 @@ interface CacheEntry<T> {
 
 export class GatewayStreamCache<T extends { streams: unknown[] }> {
   private map = new Map<string, CacheEntry<T>>();
-  private inFlight = new Map<string, Promise<T>>();
+  private inFlight = new Map<string, Promise<{ value: T; isPartial: boolean }>>();
   private stats: CacheStats;
   private readonly fullTtlMs: number;
   private readonly partialTtlMs: number;
@@ -117,22 +117,22 @@ export class GatewayStreamCache<T extends { streams: unknown[] }> {
     if (running) {
       this.stats.coalesced++;
       const res = await running;
-      return { value: res, isPartial: false, hit: true };
+      return { value: res.value, isPartial: res.isPartial, hit: true };
     }
 
     const promise = (async () => {
       try {
         const result = await fn();
         this.set(key, result.value, result.isPartial);
-        return result.value;
+        return result;
       } finally {
         this.inFlight.delete(key);
       }
     })();
 
     this.inFlight.set(key, promise);
-    const value = await promise;
-    return { value, isPartial: false, hit: false };
+    const result = await promise;
+    return { value: result.value, isPartial: result.isPartial, hit: false };
   }
 
   getStats(): CacheStats {

@@ -268,6 +268,9 @@ Rules:
 - Do not run a stream response cache.
 - Enforce a per-provider stream cap of `100` before returning results.
 - Clamp each provider timeout to the remaining global deadline.
+- Derive each worker's `GLOBAL_DEADLINE_MS` from the gateway's `BACKEND_TIMEOUT_MS` minus a 1s margin so partial results are returned before the gateway aborts the worker request.
+- Treat a worker response that arrives within that 1s margin as a partial result, so it uses the 30s TTL even when the worker returned HTTP 200.
+- Clamp worker-level `SEARCH_TIMEOUT_MS`, `SETTLE_MS`, `META_TIMEOUT_MS`, `STREAM_TIMEOUT_MS`, and `SCRAPER_TIMEOUT_MS` to the derived deadline.
 - Add a small timer guard so the global deadline records `skipped` instead of being masked by a provider timeout race.
 - Treat provider outcomes as `ok`, `empty`, `timeout`, `error`, or `skipped`.
 - `skipped` never counts as a provider failure.
@@ -402,8 +405,9 @@ Never add a media proxy route. Playback URLs must stay direct or use `externalUr
 - Exclude `HEAD` requests from the cache and from cache statistics.
 - Cache `GET` empty results as a miss, not a stored empty entry.
 - Report hits, misses, coalesced, sets, evictions, expired, partial sets, empty skips, size, max entries, and TTL.
-- Complete stream response header: `cache-control: public, max-age=180`.
-- Partial stream response header: `cache-control: public, max-age=30`.
+- Complete stream response header: `cache-control: private, max-age=180` plus `cloudflare-cdn-cache-control: public, max-age=180`.
+- Partial stream response header: `cache-control: private, max-age=30` plus `cloudflare-cdn-cache-control: public, max-age=30`.
+- `private` prevents Beamup's Cloudflare zone (4h Browser Cache TTL) from extending the browser TTL; the `cloudflare-cdn-cache-control` header keeps edge caching at the intended TTL.
 - Worker stream caches must be disabled with `STREAM_CACHE_TTL_MS=0`.
 
 ### HTTP methods and `HEAD`
@@ -416,7 +420,7 @@ Rules:
 - Reuse response-header helpers so `GET` and `HEAD` cannot drift.
 - Never send a response body for `HEAD`.
 - Never call workers or upstream providers for `HEAD /stream/...`.
-- Return `200` with `content-type: application/json` and `cache-control: public, max-age=180` for valid stream `HEAD` requests.
+- Return `200` with `content-type: application/json` and `cache-control: private, max-age=180` (with matching `cloudflare-cdn-cache-control`) for valid stream `HEAD` requests.
 - Use `x-cache: bypass` on stream `HEAD` responses to make the no-cache-lookup behavior explicit.
 - Return `200` for a stream `HEAD` request even when the equivalent GET could return empty streams. `HEAD` is an endpoint capability check, not a content check.
 - Return `404` for unknown `HEAD` routes with no body.

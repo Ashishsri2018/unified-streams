@@ -115,4 +115,26 @@ describe('provider policy and concurrency', () => {
     const nuvioCustomEnv = deriveFleetEnv(customAppEnv, 'nuvio', 7002);
     expect(nuvioCustomEnv.SCRAPER_CONCURRENCY).toBe('15');
   });
+
+  it('keeps worker deadlines below the gateway backend timeout', () => {
+    const env = loadAppEnv({ BACKEND_TIMEOUT_MS: '10000', GLOBAL_DEADLINE_MS: '12000' });
+
+    const sa7Env = deriveFleetEnv(env, 'sa7', 7001);
+    expect(Number(sa7Env.ADDON_DEADLINE_MS)).toBe(9000);
+    expect(sa7Env.MAX_PER_PROVIDER_STREAMS).toBe(String(env.MAX_STREAMS_PER_PROVIDER));
+    expect(sa7Env.BREAKER_FAILURE_THRESHOLD).toBe(String(env.CIRCUIT_FAILURE_THRESHOLD));
+
+    const vegaEnv = deriveFleetEnv(env, 'vega', 7003);
+    expect(Number(vegaEnv.GLOBAL_DEADLINE_MS)).toBe(9000);
+    expect(Number(vegaEnv.SEARCH_TIMEOUT_MS)).toBeLessThanOrEqual(9000);
+    expect(Number(vegaEnv.SETTLE_MS)).toBeLessThanOrEqual(9000);
+
+    const nuvioEnv = deriveFleetEnv(env, 'nuvio', 7002);
+    expect(Number(nuvioEnv.GLOBAL_DEADLINE_MS)).toBe(9000);
+    expect(Number(nuvioEnv.SCRAPER_TIMEOUT_MS)).toBe(9000);
+
+    const tightEnv = deriveFleetEnv(loadAppEnv({ BACKEND_TIMEOUT_MS: '3000' }), 'vega', 7003);
+    expect(Number(tightEnv.GLOBAL_DEADLINE_MS)).toBe(2000);
+    expect(Number(tightEnv.SETTLE_MS)).toBe(2000);
+  });
 });
