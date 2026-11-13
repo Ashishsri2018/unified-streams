@@ -203,7 +203,7 @@
   - Derived every worker deadline from `BACKEND_TIMEOUT_MS - 1000`; SA7 now receives `ADDON_DEADLINE_MS`, `MAX_PER_PROVIDER_STREAMS`, `MAX_TOTAL_STREAMS`, and `BREAKER_*` under the names it actually reads.
   - Bounded Nuvio TMDB resolution and snapshot loading by the request deadline; nuvio/vega workers abort pipeline work when the gateway disconnects.
   - Preserved `isPartial` through cache coalescing, and treat responses arriving within the worker deadline margin as partial so they receive the 30s TTL.
-  - Stream responses now send `cache-control: private, max-age=180/30` plus `cloudflare-cdn-cache-control` to stop Beamup's 4h Cloudflare Browser Cache TTL from overriding origin TTLs.
+  - Live verification showed Beamup's Cloudflare zone still rewrites `private, max-age=180/30` to `max-age=14400` (Browser Cache TTL). Stream responses now send `cache-control: no-store` (preserved by Cloudflare) plus `cloudflare-cdn-cache-control: public, max-age=180/30` for edge caching.
   - Local full-stack validation: SA7/Nuvio/Vega all return partial results at ~9.1s; merged requests return streams (e.g. 45 for *The Dark Knight*) with `max-age=30` and immediate cache hits.
 
 ## Key Decisions & Conventions

@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 - Worker stream handlers abort in-flight provider work when the gateway disconnects.
 - Gateway cache coalescing preserves the partial flag so partial responses emit `max-age=30`.
 - Responses arriving at the derived worker deadline are treated as partial even when a worker returns HTTP 200.
-- Stream responses send `private, max-age=180/30` with `cloudflare-cdn-cache-control` to prevent Beamup's Cloudflare zone from rewriting the browser TTL to 4h.
+- Stream responses send `cache-control: no-store` with `cloudflare-cdn-cache-control: public, max-age=180/30`, because Beamup's Cloudflare zone rewrites lower `max-age` values (even `private`) to 4h on the browser but honors the CDN TTL for edge caching.
 
 ## [1.0.0] - 2026-11-12
 ### Added

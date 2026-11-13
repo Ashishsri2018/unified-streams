@@ -88,7 +88,7 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(resHead.status).toBe(200);
     expect(resHead.text).toBeFalsy();
     expect(resHead.headers['x-cache']).toBe('bypass');
-    expect(resHead.headers['cache-control']).toBe('private, max-age=180');
+    expect(resHead.headers['cache-control']).toBe('no-store');
     expect(resHead.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=180');
     expect(fetchMock).not.toHaveBeenCalled();
 
@@ -99,7 +99,7 @@ describe('gateway HTTP endpoints and contract', () => {
     const res = await request(app).get('/stream/movie/tt0111161.json');
     expect(res.status).toBe(200);
     expect(res.body.streams.length).toBeGreaterThan(0);
-    expect(res.headers['cache-control']).toBe('private, max-age=180');
+    expect(res.headers['cache-control']).toBe('no-store');
     expect(res.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=180');
   });
 
@@ -131,7 +131,7 @@ describe('gateway HTTP endpoints and contract', () => {
     const res = await request(partialApp).get('/stream/movie/tt0111161.json');
     expect(res.status).toBe(200);
     expect(res.body.streams.length).toBeGreaterThan(0);
-    expect(res.headers['cache-control']).toBe('private, max-age=30');
+    expect(res.headers['cache-control']).toBe('no-store');
     expect(res.headers['cloudflare-cdn-cache-control']).toBe('public, max-age=30');
   });
 
