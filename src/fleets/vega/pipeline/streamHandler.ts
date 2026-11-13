@@ -362,7 +362,7 @@ export class StreamPipeline implements StreamHandlerApi {
           timeouts: stat?.timeouts ?? 0,
           skipped: stat?.skipped ?? 0,
           successRate,
-          avgMs: stat ? stat.avgLatencyMs : null,
+          avgMs: stat && calls > 0 ? stat.avgLatencyMs : null,
           lastMs: stat ? stat.lastMs : null,
           maxMs: null,
           lastError: stat ? stat.lastError : null,
@@ -833,6 +833,7 @@ export class StreamPipeline implements StreamHandlerApi {
     durationMs: number,
     collected: boolean,
     error?: unknown,
+    skipped = false,
   ): void {
     const key = providerValue.toLowerCase();
     const stat: ProviderStat = this.providerStats.get(key) ?? {
@@ -842,11 +843,16 @@ export class StreamPipeline implements StreamHandlerApi {
       errors: 0,
       timeouts: 0,
       skipped: 0,
-      avgLatencyMs: durationMs,
+      avgLatencyMs: 0,
       failures: 0,
       lastMs: null,
       lastError: null,
     };
+    if (skipped) {
+      stat.skipped += 1;
+      this.providerStats.set(key, stat);
+      return;
+    }
     stat.calls += 1;
     stat.lastMs = durationMs;
     stat.avgLatencyMs =
@@ -876,12 +882,14 @@ export class StreamPipeline implements StreamHandlerApi {
     const startedAt = Date.now();
     let collected = false;
     let tracked = true;
+    let finished = false;
     let runError: unknown = undefined;
     try {
-      if (!providerValue || ctx.stopped) {
+      if (!providerValue) {
         tracked = false;
         return;
       }
+      if (ctx.stopped) return;
       if (this.isCircuitOpen(providerValue)) {
         tracked = false;
         this.logger.debug("pipeline.provider_circuit_open", { provider: providerValue });
@@ -889,19 +897,27 @@ export class StreamPipeline implements StreamHandlerApi {
       }
 
       const posts = await this.searchProvider(bundle, ctx);
-      if (ctx.stopped || posts.length === 0) return;
+      if (ctx.stopped) return;
+      if (posts.length === 0) {
+        finished = true;
+        return;
+      }
 
       const ranked = rankCandidates(
         posts,
         { title: ctx.info.title, year: ctx.info.year, type: ctx.info.request.type },
         MAX_CANDIDATES,
       );
-      if (ranked.length === 0) return;
+      if (ranked.length === 0) {
+        finished = true;
+        return;
+      }
 
       const mapping = await this.resolveCandidate(bundle, ranked, ctx);
       if (ctx.stopped) return;
       if (!mapping.candidate) {
         if (mapping.failed) this.recordFailure(providerValue, ctx, undefined, 'mapping failed');
+        finished = true;
         return;
       }
 
@@ -909,9 +925,13 @@ export class StreamPipeline implements StreamHandlerApi {
       if (ctx.stopped) return;
       if (links.failed && links.links.length === 0) {
         this.recordFailure(providerValue, ctx, undefined, 'links resolution failed');
+        finished = true;
         return;
       }
-      if (links.links.length === 0) return;
+      if (links.links.length === 0) {
+        finished = true;
+        return;
+      }
 
       const streams = await this.fetchStreams(bundle, links.links, ctx);
       if (ctx.stopped) return;
@@ -922,9 +942,13 @@ export class StreamPipeline implements StreamHandlerApi {
           stage: "stream",
           ...requestLogFields(ctx.info.request),
         });
+        finished = true;
         return;
       }
-      if (streams.streams.length === 0) return;
+      if (streams.streams.length === 0) {
+        finished = true;
+        return;
+      }
 
       const mapped = mapProviderStreams(streams.streams, {
         providerValue,
@@ -932,16 +956,31 @@ export class StreamPipeline implements StreamHandlerApi {
         includeMagnets: this.config.includeMagnets,
         perProviderLimit: MAX_STREAMS_PER_PROVIDER,
       });
-      if (ctx.stopped || mapped.length === 0) return;
+      if (ctx.stopped) return;
+      if (mapped.length === 0) {
+        finished = true;
+        return;
+      }
       ctx.collected.push(...mapped);
       ctx.lastProgressAt = Date.now();
       collected = true;
+      finished = true;
     } catch (err) {
-      runError = err;
-      this.recordFailure(providerValue, ctx, err);
+      if (!ctx.stopped) {
+        runError = err;
+        finished = true;
+        this.recordFailure(providerValue, ctx, err);
+      }
     } finally {
       if (tracked && providerValue) {
-        this.recordProviderResult(providerValue, Date.now() - startedAt, collected, runError);
+        const skipped = !finished && runError === undefined;
+        this.recordProviderResult(
+          providerValue,
+          Date.now() - startedAt,
+          collected,
+          runError,
+          skipped,
+        );
       }
     }
   }

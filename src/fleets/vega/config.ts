@@ -246,9 +246,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
 export function configWarnings(config: AppConfig): string[] {
   const warnings: string[] = [];
-  if (config.globalDeadlineMs > 10_000) {
+  if (config.globalDeadlineMs > 30_000) {
     warnings.push(
-      `GLOBAL_DEADLINE_MS=${config.globalDeadlineMs} exceeds the ~10s Beamup proxy deadline; requests may be cut off with a 504`,
+      `GLOBAL_DEADLINE_MS=${config.globalDeadlineMs} exceeds the 30s Beamup proxy budget; verify the proxy hard limit before deploying`,
     );
   }
   return warnings;

@@ -903,8 +903,8 @@ LOG_FLUSH_MS=5000
 LOG_QUEUE_MAX=10000
 CACHE_TTL_MS=180000
 CACHE_PARTIAL_TTL_MS=30000
-BACKEND_TIMEOUT_MS=11000
-GLOBAL_DEADLINE_MS=13000
+BACKEND_TIMEOUT_MS=24000
+GLOBAL_DEADLINE_MS=27000
 MAX_STREAMS_PER_PROVIDER=100
 MAX_STREAMS=1000
 CIRCUIT_FAILURE_THRESHOLD=3
@@ -921,6 +921,8 @@ SA7_INTERNAL_URL=http://127.0.0.1:7001
 NUVIO_INTERNAL_URL=http://127.0.0.1:7002
 VEGA_INTERNAL_URL=http://127.0.0.1:7003
 ```
+
+Live verification shows the Beamup proxy allows stream responses longer than 17s. The gateway deadline must stay below the proxy hard limit; the current 27s budget leaves a 3s margin under 30s. Vega and Nuvio multi-stage providers need more than the previous 10s worker deadline, so the worker deadline is 23s (`BACKEND_TIMEOUT_MS - 1000`).
 
 ### Secrets and overrides
 
