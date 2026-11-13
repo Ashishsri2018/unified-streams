@@ -59,6 +59,7 @@ Follow the Stremio addon protocol.
 - Merge partial results from healthy workers.
 - Deduplicate by normalized URL or info hash.
 - Sort direct streams before external links, then by quality and container.
+- Tag externalUrl streams with the 🖥️ emoji prefix in their title for clear identification.
 - Cap results at `MAX_STREAMS`.
 - Set `cache-control: no-store` on stream responses. Cloudflare is used for log delivery only, not caching; keep 180s/30s TTLs in the gateway cache.
 - Never cache empty stream results.

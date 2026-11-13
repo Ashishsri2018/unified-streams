@@ -140,8 +140,8 @@ describe('provider policy and concurrency', () => {
 
     const defaultEnv = loadAppEnv();
     const defaultVega = deriveFleetEnv(defaultEnv, 'vega', 7003);
-    expect(Number(defaultEnv.BACKEND_TIMEOUT_MS)).toBe(13000);
-    expect(Number(defaultEnv.GLOBAL_DEADLINE_MS)).toBe(14000);
-    expect(Number(defaultVega.GLOBAL_DEADLINE_MS)).toBe(12000);
+    expect(Number(defaultEnv.BACKEND_TIMEOUT_MS)).toBe(12000);
+    expect(Number(defaultEnv.GLOBAL_DEADLINE_MS)).toBe(13000);
+    expect(Number(defaultVega.GLOBAL_DEADLINE_MS)).toBe(11000);
   });
 });

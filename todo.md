@@ -91,7 +91,7 @@
   - [x] Verify Fjoral (GramCinema) upstream token authentication, 720p filter default, and direct CDN link generation
   - [x] Verify Showbox FebBox cookie validity and document upstream `showbox.media` TLS reset constraint
   - [x] Fix 0% success rate providers in SA7: alias `cheerio-without-node-native` to `cheerio` (fixing RedFlix and TopCartoons) and align circuit breaker metrics with Nuvio/Vega
-  - [x] Tune timeout budgets: 14s gateway global deadline, 13s backend worker abort, and 12s worker budget
+  - [x] Tune timeout budgets: 13s global deadline, 12s backend worker abort, 11s worker budget; add 🖥️ emoji to externalUrl stream titles
   - [ ] Monitor provider success/timeout rates via `/stats`
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs

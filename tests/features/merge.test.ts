@@ -71,5 +71,35 @@ describe('classifier and merger', () => {
 
     expect(merged[2].externalUrl).toBe('https://example.com/embed/123');
     expect(merged[2].url).toBeUndefined();
+    expect(merged[2].title).toBe('🖥️ External embed');
+  });
+
+  it('prefixes externalUrl streams with an identification emoji', () => {
+    const defaultFilters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: null,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+
+    const inputs: FleetStreamsInput[] = [
+      {
+        fleet: 'nuvio',
+        streams: [
+          { title: 'Pixeldrain 1080p', externalUrl: 'https://pixeldrain.dev/api/file/123' },
+          { title: '🖥️ Already prefixed', externalUrl: 'https://example.com/stream' },
+          { externalUrl: 'https://example.com/notitle' },
+        ],
+      },
+    ];
+
+    const merged = mergeAndFilterStreams(inputs, defaultFilters, 10);
+    expect(merged[0].title).toBe('🖥️ Pixeldrain 1080p');
+    expect(merged[1].title).toBe('🖥️ Already prefixed');
+    expect(merged[2].title).toBe('🖥️ External Link');
   });
 });

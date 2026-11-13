@@ -22,12 +22,18 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     bingeGroup,
   };
 
-  if (primaryUrl && isExternalUrl(primaryUrl)) {
+  const isExternal = Boolean(stream.externalUrl || (primaryUrl && isExternalUrl(primaryUrl)));
+
+  let title = stream.title;
+  if (isExternal) {
+    if (!title || !title.startsWith('🖥️')) {
+      title = title ? `🖥️ ${title}` : '🖥️ External Link';
+    }
     const restHints = { ...behaviorHints };
     delete restHints.proxyHeaders;
     return {
       name: stream.name,
-      title: stream.title,
+      title,
       description: stream.description,
       externalUrl: primaryUrl,
       behaviorHints: restHints,
