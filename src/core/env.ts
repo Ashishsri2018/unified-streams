@@ -2,9 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 
+type Fleet = 'sa7' | 'nuvio' | 'vega';
+
 export const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(7000),
   DATA_DIR: z.string().default('/data'),
+  INSTANCE_PROFILE: z.string().regex(/^[A-Za-z0-9_-]+$/).default('generic'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   LOG_FORMAT: z.enum(['json', 'pretty']).default('json'),
   LOG_SINK: z.enum(['stdout', 'cloudflare']).default('stdout'),
@@ -21,6 +24,7 @@ export const EnvSchema = z.object({
   MAX_STREAMS: z.coerce.number().int().min(1).default(1000),
   SEARCH_CONCURRENCY: z.coerce.number().int().min(1).default(30),
   SCRAPER_CONCURRENCY: z.coerce.number().int().min(1).default(30),
+  SA7_CONCURRENCY: z.coerce.number().int().min(1).default(30),
   CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().min(1).default(3),
   CIRCUIT_COOLDOWN_MS: z.coerce.number().int().min(1000).default(300000),
   UPDATE_ON_START: z.preprocess((val) => val === 'true' || val === true || val === '1', z.boolean()).default(true),
@@ -41,9 +45,11 @@ export const EnvSchema = z.object({
   SCRAPER_SETTINGS_JSON: z.string().optional(),
   FEBBOX_UI_COOKIE: z.string().optional(),
   GRAMCINEMA_TOKEN: z.string().optional(),
-  SA7_PROVIDERS: z.string().optional(),
+  SA7_ENABLED_PROVIDERS: z.string().optional(),
   SA7_DISABLED_PROVIDERS: z.string().optional(),
+  NUVIO_ENABLED_SCRAPERS: z.string().optional(),
   NUVIO_DISABLED_SCRAPERS: z.string().optional(),
+  VEGA_ENABLED_PROVIDERS: z.string().optional(),
   VEGA_DISABLED_PROVIDERS: z.string().optional(),
   COOKIES_FILE: z.string().optional(),
   GITHUB_TOKEN: z.string().optional(),
@@ -73,10 +79,21 @@ export function parseDefaultsEnv(filePath: string): Record<string, string> {
   return result;
 }
 
+function loadProfileEnv(profile: string): Record<string, string> {
+  if (!/^[A-Za-z0-9_-]+$/.test(profile)) return {};
+  const profilePath = path.resolve(process.cwd(), 'config', 'instances', `${profile}.env`);
+  return parseDefaultsEnv(profilePath);
+}
+
 export function loadAppEnv(customEnv: NodeJS.ProcessEnv = process.env): AppEnv {
   const defaultsPath = path.resolve(process.cwd(), 'config', 'defaults.env');
   const defaults = parseDefaultsEnv(defaultsPath);
-  const merged: Record<string, unknown> = { ...defaults };
+  const requestedProfile =
+    (customEnv.INSTANCE_PROFILE && customEnv.INSTANCE_PROFILE.trim()) ||
+    defaults.INSTANCE_PROFILE ||
+    'generic';
+  const profileDefaults = loadProfileEnv(requestedProfile);
+  const merged: Record<string, unknown> = { ...defaults, ...profileDefaults };
 
   for (const [key, value] of Object.entries(customEnv)) {
     if (value !== undefined && value !== '') {
@@ -89,6 +106,28 @@ export function loadAppEnv(customEnv: NodeJS.ProcessEnv = process.env): AppEnv {
 
 export const WORKER_DEADLINE_MARGIN_MS = 1000;
 
+// These classes are disabled for every fleet and every instance regardless of
+// the selected provider policy. Only an explicit policy change to this list
+// can re-enable them.
+const HARD_DISABLED_PROVIDERS = ['torrentio', 'internetarchive', 'youtube', 'brellor'];
+
+export interface FleetPolicy {
+  mode: 'allow' | 'deny';
+  ids: string[];
+}
+
+interface PolicyFile {
+  sa7?: FleetPolicy;
+  nuvio?: FleetPolicy;
+  vega?: FleetPolicy;
+  instances?: Record<string, Partial<Record<Fleet, FleetPolicy>>>;
+}
+
+interface EffectivePolicy {
+  enabled: string[] | null;
+  disabled: string[];
+}
+
 function cleanEnvList(raw?: string): string[] {
   if (!raw) return [];
   return raw
@@ -98,148 +137,112 @@ function cleanEnvList(raw?: string): string[] {
     .filter(Boolean);
 }
 
-function deriveSa7Env(
-  outEnv: Record<string, string>,
-  env: AppEnv,
-  sa7Deny: string,
-  workerDeadlineMs: number,
-): void {
-  const extraDisabled = cleanEnvList(env.SA7_DISABLED_PROVIDERS);
-  const baseline = sa7Deny ? sa7Deny.split(',').map((s) => s.trim()) : [];
-  const list = Array.from(new Set([...baseline, ...extraDisabled])).filter(Boolean).join(',');
-  if (list) {
-    outEnv.DISABLED_PROVIDERS = list;
-    outEnv.SA7_DISABLED_PROVIDERS = list;
+function dedupeList(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of values) {
+    const value = raw.trim();
+    if (!value) continue;
+    const key = value === '*' ? '*' : value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(value);
   }
-  outEnv.ADDON_DEADLINE_MS = String(workerDeadlineMs);
-  outEnv.MAX_PER_PROVIDER_STREAMS = String(env.MAX_STREAMS_PER_PROVIDER);
-  outEnv.MAX_TOTAL_STREAMS = String(env.MAX_STREAMS);
-  outEnv.BREAKER_FAILURE_THRESHOLD = String(env.CIRCUIT_FAILURE_THRESHOLD);
-  outEnv.BREAKER_COOLDOWN_MS = String(env.CIRCUIT_COOLDOWN_MS);
+  return result;
 }
 
-function deriveNuvioEnv(
-  outEnv: Record<string, string>,
-  env: AppEnv,
-  nuvioDeny: string,
-  fleetDataDir: string,
-  workerDeadlineMs: number,
-): void {
-  const extraDisabled = cleanEnvList(env.NUVIO_DISABLED_SCRAPERS);
-  const baseline = nuvioDeny ? nuvioDeny.split(',').map((s) => s.trim()) : [];
-  const list = Array.from(new Set([...baseline, ...extraDisabled])).filter(Boolean).join(',');
-  if (list) {
-    outEnv.DISABLED_SCRAPERS = list;
-    outEnv.NUVIO_DISABLED_SCRAPERS = list;
-  }
-  const distBundled = path.resolve(process.cwd(), 'dist/fleets/nuvio/snapshot');
-  const srcBundled = path.resolve(process.cwd(), 'src/fleets/nuvio/snapshot');
-  outEnv.NUVIO_BUNDLED_DIR = fs.existsSync(distBundled) ? distBundled : srcBundled;
-  outEnv.NUVIO_CACHE_DIR = fleetDataDir;
-  outEnv.SCRAPER_CONCURRENCY = String(env.SCRAPER_CONCURRENCY);
-  outEnv.SCRAPER_TIMEOUT_MS = String(workerDeadlineMs);
-
-  let scraperSettings: Record<string, Record<string, unknown>> = {};
-  if (env.SCRAPER_SETTINGS_JSON) {
-    try {
-      const parsed = JSON.parse(env.SCRAPER_SETTINGS_JSON);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        scraperSettings = parsed as Record<string, Record<string, unknown>>;
-      }
-    } catch {
-      scraperSettings = {};
-    }
-  }
-  if (env.PROVIDER_SETTINGS_JSON) {
-    try {
-      const parsed = JSON.parse(env.PROVIDER_SETTINGS_JSON) as Record<string, unknown>;
-      if (parsed && typeof parsed === 'object' && parsed.nuvio && typeof parsed.nuvio === 'object') {
-        scraperSettings = { ...(parsed.nuvio as Record<string, Record<string, unknown>>), ...scraperSettings };
-      }
-    } catch {
-      // ignore
-    }
-  }
-  if (env.GRAMCINEMA_TOKEN) {
-    let rawToken = env.GRAMCINEMA_TOKEN.trim();
-    if (rawToken.startsWith('gc_session=')) {
-      rawToken = rawToken.slice('gc_session='.length).trim();
-    }
-    if (rawToken.toLowerCase().startsWith('bearer ')) {
-      rawToken = rawToken.slice(7).trim();
-    }
-    if (rawToken) {
-      scraperSettings.fjoral = {
-        enable720p: true,
-        enable1080p: true,
-        enable2160p: true,
-        ...(scraperSettings.fjoral || {}),
-        cinemaTvToken: rawToken,
-      };
-    }
-  }
-  if (Object.keys(scraperSettings).length > 0) {
-    outEnv.SCRAPER_SETTINGS_JSON = JSON.stringify(scraperSettings);
+function loadPolicyFile(): PolicyFile {
+  const policyPath = path.resolve(process.cwd(), 'config', 'providers.json');
+  if (!fs.existsSync(policyPath)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(policyPath, 'utf-8')) as PolicyFile;
+  } catch {
+    return {};
   }
 }
 
-function deriveVegaEnv(
+function resolveFleetPolicy(policy: PolicyFile, profile: string, fleet: Fleet): FleetPolicy {
+  const instancePolicy = policy.instances?.[profile]?.[fleet];
+  if (
+    instancePolicy &&
+    (instancePolicy.mode === 'allow' || instancePolicy.mode === 'deny') &&
+    Array.isArray(instancePolicy.ids)
+  ) {
+    return instancePolicy;
+  }
+  const base = policy[fleet];
+  if (base && (base.mode === 'allow' || base.mode === 'deny') && Array.isArray(base.ids)) {
+    return base;
+  }
+  return { mode: 'deny', ids: [] };
+}
+
+function resolveEffectivePolicy(
+  base: FleetPolicy,
+  enabledOverride: string[],
+  disabledOverride: string[],
+): EffectivePolicy {
+  const hardDisabled = HARD_DISABLED_PROVIDERS;
+  const disableSet = new Set(disabledOverride.map((id) => id.toLowerCase()));
+
+  if (base.mode === 'allow' || enabledOverride.length > 0) {
+    const allowed = enabledOverride.length > 0 ? enabledOverride : base.ids;
+    const enabled = dedupeList(
+      allowed.filter((id) => {
+        if (id === '*') return false;
+        const lower = id.toLowerCase();
+        return !hardDisabled.includes(lower) && !disableSet.has(lower);
+      }),
+    );
+    const disabled = dedupeList([...hardDisabled, ...disabledOverride, ...(enabled.length === 0 ? ['*'] : [])]);
+    return { enabled, disabled };
+  }
+
+  return {
+    enabled: null,
+    disabled: dedupeList([...base.ids, ...hardDisabled, ...disabledOverride]),
+  };
+}
+
+function applyPolicyEnv(
   outEnv: Record<string, string>,
-  env: AppEnv,
-  vegaDeny: string,
-  fleetSettings: string,
-  workerDeadlineMs: number,
+  prefix: 'SA7' | 'NUVIO' | 'VEGA',
+  enabledVar: 'ENABLED_PROVIDERS' | 'ENABLED_SCRAPERS',
+  disabledVar: 'DISABLED_PROVIDERS' | 'DISABLED_SCRAPERS',
+  policy: EffectivePolicy,
+  options: { lowercase: boolean },
 ): void {
-  const extraDisabled = cleanEnvList(env.VEGA_DISABLED_PROVIDERS);
-  const mappedExtra: string[] = [];
-  for (const item of extraDisabled) {
-    mappedExtra.push(item);
+  const normalize = (value: string) => (options.lowercase ? value.toLowerCase() : value);
+  const disabled = dedupeList(policy.disabled.map(normalize));
+  if (disabled.length > 0) {
+    const list = disabled.join(',');
+    outEnv[disabledVar] = list;
+    outEnv[`${prefix}_${disabledVar}`] = list;
+  }
+  if (policy.enabled && policy.enabled.length > 0) {
+    const list = dedupeList(policy.enabled.map(normalize)).join(',');
+    outEnv[enabledVar] = list;
+    outEnv[`${prefix}_${enabledVar}`] = list;
+  }
+}
+
+function aliasVegaDisabled(list: string[]): string[] {
+  const mapped: string[] = [];
+  for (const item of list) {
+    mapped.push(item);
     const lower = item.toLowerCase();
     if (lower === 'rogmovies' || lower === 'rogmovie') {
-      mappedExtra.push('luxMovies');
+      mapped.push('luxMovies');
     } else if (lower === 'luxmovies') {
-      mappedExtra.push('rogmovies');
+      mapped.push('rogmovies');
     }
   }
-  const baseline = vegaDeny ? vegaDeny.split(',').map((s) => s.trim()) : [];
-  const list = Array.from(new Set([...baseline, ...mappedExtra])).filter(Boolean).join(',');
-  if (list) {
-    outEnv.DISABLED_PROVIDERS = list;
-    outEnv.VEGA_DISABLED_PROVIDERS = list;
-  }
-  outEnv.SEARCH_CONCURRENCY = String(env.SEARCH_CONCURRENCY);
-  outEnv.SEARCH_TIMEOUT_MS = String(Math.min(10000, workerDeadlineMs));
-  outEnv.META_TIMEOUT_MS = String(Math.min(15000, workerDeadlineMs));
-  outEnv.STREAM_TIMEOUT_MS = String(Math.min(20000, workerDeadlineMs));
-  outEnv.SETTLE_MS = '0';
-  outEnv.EMPTY_FENCE_MS = '0';
-
-  let vegaSettings: { skipTimings?: boolean; kv?: Record<string, unknown> } = {};
-  try {
-    vegaSettings = JSON.parse(fleetSettings);
-    if (!vegaSettings || typeof vegaSettings !== 'object' || Array.isArray(vegaSettings)) {
-      vegaSettings = {};
-    }
-  } catch {
-    vegaSettings = {};
-  }
-  if (!vegaSettings.kv || typeof vegaSettings.kv !== 'object' || Array.isArray(vegaSettings.kv)) {
-    vegaSettings.kv = {};
-  }
-  if (env.FEBBOX_UI_COOKIE) {
-    const cookie = env.FEBBOX_UI_COOKIE.trim();
-    if (cookie) {
-      vegaSettings.kv.febboxCookie = cookie.startsWith('ui=') ? cookie : `ui=${cookie}`;
-    }
-  }
-  if (Object.keys(vegaSettings.kv).length > 0 || vegaSettings.skipTimings !== undefined) {
-    outEnv.PROVIDER_SETTINGS_JSON = JSON.stringify(vegaSettings);
-  }
+  return mapped;
 }
 
 export function deriveFleetEnv(
   env: AppEnv,
-  fleet: 'sa7' | 'nuvio' | 'vega',
+  fleet: Fleet,
   port: number,
 ): Record<string, string> {
   // The gateway aborts a worker fetch at BACKEND_TIMEOUT_MS. Workers must finish
@@ -262,21 +265,8 @@ export function deriveFleetEnv(
   }
 
   const fleetDataDir = path.join(env.DATA_DIR, fleet);
-  const policyPath = path.resolve(process.cwd(), 'config', 'providers.json');
-  let sa7Deny = '';
-  let nuvioDeny = '';
-  let vegaDeny = '';
-
-  if (fs.existsSync(policyPath)) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(policyPath, 'utf-8'));
-      if (raw.sa7?.ids) sa7Deny = raw.sa7.ids.join(',');
-      if (raw.nuvio?.ids) nuvioDeny = raw.nuvio.ids.join(',');
-      if (raw.vega?.ids) vegaDeny = raw.vega.ids.join(',');
-    } catch {
-      // ignore
-    }
-  }
+  const policy = loadPolicyFile();
+  const basePolicy = resolveFleetPolicy(policy, env.INSTANCE_PROFILE, fleet);
 
   const outEnv: Record<string, string> = {
     NODE_ENV: 'production',
@@ -307,11 +297,115 @@ export function deriveFleetEnv(
   }
 
   if (fleet === 'sa7') {
-    deriveSa7Env(outEnv, env, sa7Deny, workerDeadlineMs);
+    const effective = resolveEffectivePolicy(
+      basePolicy,
+      cleanEnvList(env.SA7_ENABLED_PROVIDERS),
+      cleanEnvList(env.SA7_DISABLED_PROVIDERS),
+    );
+    applyPolicyEnv(outEnv, 'SA7', 'ENABLED_PROVIDERS', 'DISABLED_PROVIDERS', effective, {
+      lowercase: true,
+    });
+    outEnv.ADDON_DEADLINE_MS = String(workerDeadlineMs);
+    outEnv.MAX_PER_PROVIDER_STREAMS = String(env.MAX_STREAMS_PER_PROVIDER);
+    outEnv.MAX_TOTAL_STREAMS = String(env.MAX_STREAMS);
+    outEnv.BREAKER_FAILURE_THRESHOLD = String(env.CIRCUIT_FAILURE_THRESHOLD);
+    outEnv.BREAKER_COOLDOWN_MS = String(env.CIRCUIT_COOLDOWN_MS);
+    outEnv.PROVIDER_CONCURRENCY = String(env.SA7_CONCURRENCY);
   } else if (fleet === 'nuvio') {
-    deriveNuvioEnv(outEnv, env, nuvioDeny, fleetDataDir, workerDeadlineMs);
+    const effective = resolveEffectivePolicy(
+      basePolicy,
+      cleanEnvList(env.NUVIO_ENABLED_SCRAPERS),
+      cleanEnvList(env.NUVIO_DISABLED_SCRAPERS),
+    );
+    applyPolicyEnv(outEnv, 'NUVIO', 'ENABLED_SCRAPERS', 'DISABLED_SCRAPERS', effective, {
+      lowercase: true,
+    });
+    const distBundled = path.resolve(process.cwd(), 'dist/fleets/nuvio/snapshot');
+    const srcBundled = path.resolve(process.cwd(), 'src/fleets/nuvio/snapshot');
+    outEnv.NUVIO_BUNDLED_DIR = fs.existsSync(distBundled) ? distBundled : srcBundled;
+    outEnv.NUVIO_CACHE_DIR = fleetDataDir;
+    outEnv.SCRAPER_CONCURRENCY = String(env.SCRAPER_CONCURRENCY);
+    outEnv.SCRAPER_TIMEOUT_MS = String(workerDeadlineMs);
+
+    let scraperSettings: Record<string, Record<string, unknown>> = {};
+    if (env.SCRAPER_SETTINGS_JSON) {
+      try {
+        const parsed = JSON.parse(env.SCRAPER_SETTINGS_JSON);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          scraperSettings = parsed as Record<string, Record<string, unknown>>;
+        }
+      } catch {
+        scraperSettings = {};
+      }
+    }
+    if (env.PROVIDER_SETTINGS_JSON) {
+      try {
+        const parsed = JSON.parse(env.PROVIDER_SETTINGS_JSON) as Record<string, unknown>;
+        if (parsed && typeof parsed === 'object' && parsed.nuvio && typeof parsed.nuvio === 'object') {
+          scraperSettings = { ...(parsed.nuvio as Record<string, Record<string, unknown>>), ...scraperSettings };
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (env.GRAMCINEMA_TOKEN) {
+      let rawToken = env.GRAMCINEMA_TOKEN.trim();
+      if (rawToken.startsWith('gc_session=')) {
+        rawToken = rawToken.slice('gc_session='.length).trim();
+      }
+      if (rawToken.toLowerCase().startsWith('bearer ')) {
+        rawToken = rawToken.slice(7).trim();
+      }
+      if (rawToken) {
+        scraperSettings.fjoral = {
+          enable720p: true,
+          enable1080p: true,
+          enable2160p: true,
+          ...(scraperSettings.fjoral || {}),
+          cinemaTvToken: rawToken,
+        };
+      }
+    }
+    if (Object.keys(scraperSettings).length > 0) {
+      outEnv.SCRAPER_SETTINGS_JSON = JSON.stringify(scraperSettings);
+    }
   } else if (fleet === 'vega') {
-    deriveVegaEnv(outEnv, env, vegaDeny, fleetSettings, workerDeadlineMs);
+    const effective = resolveEffectivePolicy(
+      basePolicy,
+      cleanEnvList(env.VEGA_ENABLED_PROVIDERS),
+      aliasVegaDisabled(cleanEnvList(env.VEGA_DISABLED_PROVIDERS)),
+    );
+    applyPolicyEnv(outEnv, 'VEGA', 'ENABLED_PROVIDERS', 'DISABLED_PROVIDERS', effective, {
+      lowercase: false,
+    });
+    outEnv.SEARCH_CONCURRENCY = String(env.SEARCH_CONCURRENCY);
+    outEnv.SEARCH_TIMEOUT_MS = String(Math.min(10000, workerDeadlineMs));
+    outEnv.META_TIMEOUT_MS = String(Math.min(15000, workerDeadlineMs));
+    outEnv.STREAM_TIMEOUT_MS = String(Math.min(20000, workerDeadlineMs));
+    outEnv.SETTLE_MS = '0';
+    outEnv.EMPTY_FENCE_MS = '0';
+
+    let vegaSettings: { skipTimings?: boolean; kv?: Record<string, unknown> } = {};
+    try {
+      vegaSettings = JSON.parse(fleetSettings);
+      if (!vegaSettings || typeof vegaSettings !== 'object' || Array.isArray(vegaSettings)) {
+        vegaSettings = {};
+      }
+    } catch {
+      vegaSettings = {};
+    }
+    if (!vegaSettings.kv || typeof vegaSettings.kv !== 'object' || Array.isArray(vegaSettings.kv)) {
+      vegaSettings.kv = {};
+    }
+    if (env.FEBBOX_UI_COOKIE) {
+      const cookie = env.FEBBOX_UI_COOKIE.trim();
+      if (cookie) {
+        vegaSettings.kv.febboxCookie = cookie.startsWith('ui=') ? cookie : `ui=${cookie}`;
+      }
+    }
+    if (Object.keys(vegaSettings.kv).length > 0 || vegaSettings.skipTimings !== undefined) {
+      outEnv.PROVIDER_SETTINGS_JSON = JSON.stringify(vegaSettings);
+    }
   }
 
   return outEnv;

@@ -95,14 +95,14 @@ jobs:
           set -e
           APP="a38b6dd4fcd1/unified-streams-docker"
           CONFIG_PAIRS=()
+          # Selects config/instances/beamup.env. CI only sets the profile and
+          # credentials; any per-instance setting changed later in Dokku wins on
+          # the next deploy because it is not overwritten here.
+          CONFIG_PAIRS+=("INSTANCE_PROFILE=beamup")
           [ -n "$TMDB_API_KEY" ] && CONFIG_PAIRS+=("TMDB_API_KEY='$TMDB_API_KEY'")
           [ -n "$FEBBOX_UI_COOKIE" ] && CONFIG_PAIRS+=("FEBBOX_UI_COOKIE='$FEBBOX_UI_COOKIE'")
           [ -n "$GRAMCINEMA_TOKEN" ] && CONFIG_PAIRS+=("GRAMCINEMA_TOKEN='$GRAMCINEMA_TOKEN'")
           [ -n "$PUBLIC_BASE_URL" ] && CONFIG_PAIRS+=("PUBLIC_BASE_URL='$PUBLIC_BASE_URL'")
-          # Beamup: Strictly keep only 4 providers active (Vega: animeworld, movies4u, luxMovies/RogMovies; Nuvio: sylphera; SA7: all disabled)
-          CONFIG_PAIRS+=("SA7_DISABLED_PROVIDERS=moviesdrive,4khdhub,hdhub4u,vegamovies,castle,redflix,kurage,anizone,desiflix,dahmermovies,dahmermovies-tv,moviebox,moviesmod,movix-vf,playimdb,topcartoons,torrentio,vidrock,reanime,animeworld,animesalt,anizen,netmirror,anikage,multimovies,toonstream,puretoons,einthusan")
-          CONFIG_PAIRS+=("NUVIO_DISABLED_SCRAPERS=brellor,bdix-cf,bdix-df,durnel,esvyl,evyrith,fastrion,fendrix,bdix-fh,fjoral,fyron,gravix,haylox,hexion,ilvyrel,jhaeros,jyniq,karnis,kethrax,kryxalia,lenyr,lyrin,maelith,mavonyx,novus,nyxora,onyxia,ozeris,phraxis,praxiel,pynvix,qorva,quinox,qyrvaen,rylvane,rynara,solunix,soryn,svartok,tyvrel,vornix,vyranel,waelum,wrenok,xandril,xylos,zevran,zyrvael")
-          CONFIG_PAIRS+=("VEGA_DISABLED_PROVIDERS=vega,autoEmbed,drive,multi,4khdhub,1cinevood,world4u,katmovies,mod,uhd,protonMovies,cinemaLuxe,filmyfly,movieBox,movieBoxWeb,gokuHD,dramacool,mkvDrama,eonMovies,kmMovies,zeefliz,katMovieFix,ringz,netflixMirror,primeMirror,disneyMirror,hdhub4u,ogomovies,a111477,vadapav,moviesApi,moviezwap,showbox,ridoMovies,flixhq,primewire,hiAnime,animetsu,tokyoInsider,kissKh,dooflix,topmovies,guardahd,skyMovieHD,Joya9tv,uniquestream,torrentio,cinefreak,anikoto,kickAssAnime,animesub,everything,castle,animesalt,movielinkdb,mxplayer,youtube,kartoons,1flex,internetArchive,rareanimes")
           if [ ${#CONFIG_PAIRS[@]} -gt 0 ]; then
             set +e
             output=$(ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:set $APP ${CONFIG_PAIRS[*]}" 2>&1)
@@ -167,9 +167,10 @@ jobs:
             exit 1
           fi
 
-          # Set Railway-specific extended timeout budgets (27s backend / 29s global)
-          railway variable set "BACKEND_TIMEOUT_MS=27000" --service unified-streams --skip-deploys || true
-          railway variable set "GLOBAL_DEADLINE_MS=29000" --service unified-streams --skip-deploys || true
+          # Selects config/instances/railway.env. CI only sets the profile and
+          # credentials; per-instance values changed later in Railway win on the
+          # next deploy because they are not overwritten here.
+          railway variable set "INSTANCE_PROFILE=railway" --service unified-streams --skip-deploys || true
 
           if [ -n "$TMDB_API_KEY" ]; then
             railway variable set "TMDB_API_KEY=$TMDB_API_KEY" --service unified-streams --skip-deploys || true

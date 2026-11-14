@@ -47,6 +47,22 @@ function normalizeStreamKey(stream) {
   return '';
 }
 
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workerCount = Math.min(Math.max(1, limit), items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 function dedupe(results) {
   const seen = new Set();
   const deduped = [];
@@ -107,8 +123,10 @@ function createCollector({
     );
     const providers = providersForFn(mediaType);
     let partial = false;
-    const results = await Promise.all(
-      providers.map(async (provider) => {
+    const results = await mapWithConcurrency(
+      providers,
+      config.providerConcurrency,
+      async (provider) => {
         if (!breaker.attempt(provider.id)) return [];
 
         const started = now();
@@ -155,7 +173,7 @@ function createCollector({
           }
           return [];
         }
-      })
+      },
     );
 
     const deadlineHit = now() >= deadline;

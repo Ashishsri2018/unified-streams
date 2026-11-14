@@ -87,6 +87,76 @@ describe('disabled providers derivation', () => {
     expect(disabled).toContain('luxMovies');
   });
 
+  it('applies the Beamup profile with only its four providers and 40-way concurrency', () => {
+    const appEnv = loadAppEnv({ INSTANCE_PROFILE: 'beamup' });
+    expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(12000);
+    expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(13000);
+    expect(Number(appEnv.SEARCH_CONCURRENCY)).toBe(40);
+    expect(Number(appEnv.SCRAPER_CONCURRENCY)).toBe(40);
+    expect(Number(appEnv.SA7_CONCURRENCY)).toBe(40);
+
+    const sa7Env = deriveFleetEnv(appEnv, 'sa7', 7001);
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).toContain('*');
+    expect(Number(sa7Env.PROVIDER_CONCURRENCY)).toBe(40);
+
+    const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
+    expect(nuvioEnv.ENABLED_SCRAPERS).toBe('sylphera');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).not.toContain('sylphera');
+    expect(nuvioEnv.SCRAPER_CONCURRENCY).toBe('40');
+
+    const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
+    const enabled = vegaEnv.ENABLED_PROVIDERS.split(',');
+    expect(enabled).toContain('animeworld');
+    expect(enabled).toContain('movies4u');
+    expect(enabled).toContain('luxMovies');
+    expect(vegaEnv.SEARCH_CONCURRENCY).toBe('40');
+  });
+
+  it('applies the Railway profile deny lists with 40-way concurrency', () => {
+    const appEnv = loadAppEnv({ INSTANCE_PROFILE: 'railway' });
+    expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(27000);
+    expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(29000);
+    expect(Number(appEnv.SEARCH_CONCURRENCY)).toBe(40);
+
+    const sa7Env = deriveFleetEnv(appEnv, 'sa7', 7001);
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).toContain('moviesdrive');
+    expect(Number(sa7Env.PROVIDER_CONCURRENCY)).toBe(40);
+
+    const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('sylphera');
+
+    const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
+    const disabled = vegaEnv.DISABLED_PROVIDERS.split(',');
+    expect(disabled).toContain('animeworld');
+    expect(disabled).toContain('movies4u');
+    expect(disabled).toContain('luxMovies');
+  });
+
+  it('lets runtime env override profile provider selection without code changes', () => {
+    const appEnv = loadAppEnv({
+      INSTANCE_PROFILE: 'beamup',
+      VEGA_DISABLED_PROVIDERS: 'animeworld',
+      NUVIO_DISABLED_SCRAPERS: '*',
+    });
+
+    const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
+    expect(vegaEnv.ENABLED_PROVIDERS.split(',')).not.toContain('animeworld');
+    expect(vegaEnv.ENABLED_PROVIDERS.split(',')).toContain('movies4u');
+
+    const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('*');
+  });
+
+  it('never re-enables hard-disabled providers through an allowlist', () => {
+    const appEnv = loadAppEnv({
+      INSTANCE_PROFILE: 'beamup',
+      VEGA_ENABLED_PROVIDERS: 'torrentio,animeworld',
+    });
+    const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
+    expect(vegaEnv.ENABLED_PROVIDERS).toBe('animeworld');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('torrentio');
+  });
+
   it('verifies baseline policy has sylphera, animeworld, movies4u, and luxMovies disabled by default', () => {
     const defaultEnv = loadAppEnv({});
     const nuvioEnv = deriveFleetEnv(defaultEnv, 'nuvio', 7002);

@@ -1,5 +1,14 @@
 # Unified Streams Memory Log
 
+- Completed Provider Allocation & Deployment Separation (Session Nov 14 2026):
+  - Added `SA7_DISABLED_PROVIDERS` support in SA7 worker runtime with instant env override (`process.env.SA7_DISABLED_PROVIDERS`).
+  - Added bidirectional alias support for Vega's `rogmovie` / `rogmovies` to `luxMovies` in `src/core/env.ts`.
+  - Configured baseline provider policy in `config/providers.json` targeting Railway with 69 active scrapers (disabling `sylphera`, `animeworld`, `movies4u`, `luxMovies`, plus duplicates, torrents, IA, and YouTube).
+  - Configured Beamup deployment in `.github/workflows/ci.yml` with Dokku environment sync targeting strictly 4 active scrapers: Vega `animeworld`, `movies4u`, `luxMovies` (`RogMovies`) and Nuvio `sylphera` (SA7 all 28 disabled).
+  - All test suites passing (53/53 Vitest tests). CI run `43550994196` succeeded across all verification, Docker, and deployment stages.
+  - Verified Railway live endpoint: 69 active providers operational (SA7: 14, Nuvio: 30, Vega: 25).
+  - Stopped further execution per user request.
+
 ## Current Status
 - Completed Phase 1 (Project Scaffold & Infrastructure):
   - Repository initialized with `.nvmrc`, `.gitignore`, `.dockerignore`.
@@ -321,3 +330,16 @@
   - Aliasing in `src/core/env.ts`: `deriveVegaEnv()` automatically maps `rogmovies` and `rogmovie` to `luxMovies` (and vice-versa).
   - Updated `config/providers.json`, `config/defaults.env`, `.env.example`, `.github/workflows/ci.yml`.
   - Added unit tests in `tests/features/disabledProviders.test.ts`; all 53 Vitest feature tests and `npm run verify` pass 100%.
+
+- Instance Profile Configuration & Runtime-Overridable Policy:
+  - Replaced per-platform CI hardcoding with `INSTANCE_PROFILE`. Loading order is `config/defaults.env` → `config/instances/<profile>.env` → platform env, so an operator can change timeouts or providers later without a code change while CI only sets the profile and credentials.
+  - Added `config/instances/beamup.env` (12s/13s, 40-way concurrency) and `config/instances/railway.env` (27s/29s, 40-way concurrency).
+  - Moved Beamup's 4-provider selection into `config/providers.json` under `instances.beamup` (SA7 `*` deny; Nuvio `sylphera` allow; Vega `animeworld`/`movies4u`/`luxMovies` allow). Top-level deny lists remain the Railway/default policy.
+  - Added allow-list support and `*` wildcard to SA7, Nuvio, and Vega workers, plus `SA7_CONCURRENCY` bounded provider fan-out. Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`) cannot be re-enabled.
+  - Added Vega > Nuvio > SA7 duplicate priority in `src/addon/merge.ts` so duplicate URLs keep the Vega copy.
+  - CI now sets only `INSTANCE_PROFILE` and secrets for each platform; `scripts/check-provider-policy.mjs` validates default and per-instance blocks.
+  - Added profile, override, wildcard, hard-disable, and merge-priority tests; all 58 Vitest tests and `npm run verify` pass 100%.
+
+- One-Time Legacy Env Cleanup:
+  - Added `.github/workflows/cleanup-env.yml` (`workflow_dispatch`, requires typing `CLEAN`). It lists existing Dokku config keys without printing values and unsets legacy `SA7_ENABLED_PROVIDERS`, `SA7_DISABLED_PROVIDERS`, `NUVIO_ENABLED_SCRAPERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_ENABLED_PROVIDERS`, and `VEGA_DISABLED_PROVIDERS`; the unset restarts the app so the current release uses the profile.
+  - Run it once after the instance-profile Beamup deploy finishes. Normal pushes still sync only `INSTANCE_PROFILE` and credentials, so later runtime overrides are preserved.

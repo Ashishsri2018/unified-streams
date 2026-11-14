@@ -15,6 +15,7 @@ export interface AppConfig {
   updateIntervalMinHours: number;
   updateIntervalMaxHours: number;
   updateConcurrency: number;
+  enabledProviders: string[];
   disabledProviders: string[];
   httpTimeoutMs: number;
   searchConcurrency: number;
@@ -98,7 +99,7 @@ const envList = z.preprocess(
     }
     return value;
   },
-  z.array(z.string().regex(/^[A-Za-z0-9_.-]+$/, "must be a provider value")),
+  z.array(z.string().regex(/^[A-Za-z0-9_.*-]+$/, "must be a provider value or *")),
 );
 
 const schema = z.object({
@@ -120,6 +121,7 @@ const schema = z.object({
   UPDATE_INTERVAL_MIN_HOURS: envNumber(20, 0.05, 24),
   UPDATE_INTERVAL_MAX_HOURS: envNumber(24, 0.05, 24),
   UPDATE_CONCURRENCY: envInt(8, 1, 32),
+  ENABLED_PROVIDERS: envList,
   DISABLED_PROVIDERS: envList,
   HTTP_TIMEOUT_MS: envInt(15000, 1000, 120000),
   SEARCH_CONCURRENCY: envInt(30, 1, 60),
@@ -210,7 +212,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     updateIntervalMinHours: value.UPDATE_INTERVAL_MIN_HOURS,
     updateIntervalMaxHours: value.UPDATE_INTERVAL_MAX_HOURS,
     updateConcurrency: value.UPDATE_CONCURRENCY,
-    disabledProviders: Array.from(new Set(value.DISABLED_PROVIDERS)),
+    enabledProviders: Array.from(
+      new Set(value.ENABLED_PROVIDERS.map((provider) => provider.toLowerCase())),
+    ),
+    disabledProviders: Array.from(
+      new Set(value.DISABLED_PROVIDERS.map((provider) => provider.toLowerCase())),
+    ),
     httpTimeoutMs: value.HTTP_TIMEOUT_MS,
     searchConcurrency: value.SEARCH_CONCURRENCY,
     searchTimeoutMs: value.SEARCH_TIMEOUT_MS,

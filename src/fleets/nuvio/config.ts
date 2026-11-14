@@ -55,7 +55,7 @@ const envList = z.preprocess(
     }
     return value;
   },
-  z.array(z.string().regex(/^[A-Za-z0-9_.-]+$/, "must be a scraper id")),
+  z.array(z.string().regex(/^[A-Za-z0-9_.*-]+$/, "must be a scraper id or *")),
 );
 
 const schema = z.object({
@@ -83,6 +83,7 @@ const schema = z.object({
   STREAM_PARTIAL_CACHE_TTL_MS: envInt(30000, 0, 3600000),
   TMDB_API_KEY: optionalString,
   SCRAPER_SETTINGS_JSON: optionalString,
+  ENABLED_SCRAPERS: envList,
   DISABLED_SCRAPERS: envList,
   PROXY_ENABLED: envBool(true),
   CINEMETA_URL: z.string().url().default("https://v3-cinemeta.strem.io"),
@@ -156,7 +157,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     streamPartialCacheTtlMs: value.STREAM_PARTIAL_CACHE_TTL_MS,
     tmdbApiKey: value.TMDB_API_KEY,
     scraperSettings: parseScraperSettings(value.SCRAPER_SETTINGS_JSON),
-    disabledScrapers: Array.from(new Set(value.DISABLED_SCRAPERS)),
+    enabledScrapers: Array.from(new Set(value.ENABLED_SCRAPERS.map((id) => id.toLowerCase()))),
+    disabledScrapers: Array.from(new Set(value.DISABLED_SCRAPERS.map((id) => id.toLowerCase()))),
     proxyEnabled: value.PROXY_ENABLED,
     cinemetaUrl: trimTrailingSlash(value.CINEMETA_URL),
     tmdbUrl: trimTrailingSlash(value.TMDB_URL),

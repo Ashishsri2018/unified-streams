@@ -101,6 +101,9 @@
   - [x] Convert SA7 provider policy from allow-list to deny-list (`SA7_DISABLED_PROVIDERS`), aligning with Nuvio and Vega conventions
   - [x] Enable instance-level environment variable overrides for disabled providers (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`) without requiring code changes
   - [x] Configure 4-provider exclusive routing on Beamup (Vega: animeworld, movies4u, luxMovies/RogMovies; Nuvio: sylphera; SA7: disabled) and primary routing on Railway (excluding Beamup 4, duplicates, IA, YouTube, torrents)
+  - [x] Move per-instance timeouts and provider policy into `config/instances/<profile>.env` plus `instances` blocks in `config/providers.json`; CI now sets only `INSTANCE_PROFILE` and credentials
+  - [x] Add allow-list and `*` wildcard support to all workers, 40-way SA7 provider concurrency, and Vega > Nuvio > SA7 duplicate priority
+  - [ ] Run the one-time `Cleanup Legacy Environment` workflow on Beamup to unset legacy provider env vars (requires typing `CLEAN`)
   - [ ] Monitor provider success/timeout rates via `/stats`
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs

@@ -904,10 +904,14 @@ LOG_FLUSH_MS=5000
 LOG_QUEUE_MAX=10000
 CACHE_TTL_MS=180000
 CACHE_PARTIAL_TTL_MS=30000
+INSTANCE_PROFILE=generic
 BACKEND_TIMEOUT_MS=12000
 GLOBAL_DEADLINE_MS=13000
 MAX_STREAMS_PER_PROVIDER=100
 MAX_STREAMS=1000
+SEARCH_CONCURRENCY=30
+SCRAPER_CONCURRENCY=30
+SA7_CONCURRENCY=30
 CIRCUIT_FAILURE_THRESHOLD=3
 CIRCUIT_COOLDOWN_MS=300000
 UPDATE_ON_START=true
@@ -923,7 +927,11 @@ NUVIO_INTERNAL_URL=http://127.0.0.1:7002
 VEGA_INTERNAL_URL=http://127.0.0.1:7003
 ```
 
-Live verification shows the Beamup proxy can cut stream responses as early as ~13.2s–14s. The configuration sets `BACKEND_TIMEOUT_MS=12000` and `GLOBAL_DEADLINE_MS=13000`, giving workers an 11s deadline (`BACKEND_TIMEOUT_MS - 1000`). Workers return partial results at ~11s before the gateway aborts at 12s, leaving over 1s of proxy margin to prevent Cloudflare 504 gateway timeouts on cold cache misses. Vega settle timers are disabled (`SETTLE_MS=0`, `EMPTY_FENCE_MS=0`) so slow providers are not aborted early once progress pauses; they can use the full worker deadline. In addition, all `externalUrl` streams are tagged with a `🖥️` emoji in their title for clear identification. Cloudflare may still serve previously cached stream responses with a 4h TTL until those entries expire.
+`INSTANCE_PROFILE` selects `config/instances/<profile>.env`. Loading order is `config/defaults.env` → instance profile → `process.env`, so a platform environment variable always wins and can be changed later without a code change. The two production profiles are `config/instances/beamup.env` (`BACKEND_TIMEOUT_MS=12000`, `GLOBAL_DEADLINE_MS=13000`, 40-way concurrency) and `config/instances/railway.env` (`27000` / `29000`, 40-way concurrency). CI sets only `INSTANCE_PROFILE` plus credentials.
+
+Run the one-time `Cleanup Legacy Environment` workflow after the profile deploy finishes to unset legacy `SA7_*`, `NUVIO_*`, and `VEGA_*` provider env vars on Beamup. The unset restarts the app so the current release reads the profile. This is a one-time migration step and is not repeated on normal pushes.
+
+Live verification shows the Beamup proxy can cut stream responses as early as ~13.2s–14s. The Beamup profile sets `BACKEND_TIMEOUT_MS=12000` and `GLOBAL_DEADLINE_MS=13000`, giving workers an 11s deadline (`BACKEND_TIMEOUT_MS - 1000`). Workers return partial results at ~11s before the gateway aborts at 12s, leaving over 1s of proxy margin to prevent Cloudflare 504 gateway timeouts on cold cache misses. Vega settle timers are disabled (`SETTLE_MS=0`, `EMPTY_FENCE_MS=0`) so slow providers are not aborted early once progress pauses; they can use the full worker deadline. In addition, all `externalUrl` streams are tagged with a `🖥️` emoji in their title for clear identification. Cloudflare may still serve previously cached stream responses with a 4h TTL until those entries expire.
 
 ### Secrets and overrides
 
@@ -970,9 +978,18 @@ Provider settings:
   "vega": {
     "mode": "deny",
     "ids": []
+  },
+  "instances": {
+    "beamup": {
+      "sa7": { "mode": "deny", "ids": ["*"] },
+      "nuvio": { "mode": "allow", "ids": ["sylphera"] },
+      "vega": { "mode": "allow", "ids": ["animeworld", "movies4u", "luxMovies"] }
+    }
   }
 }
 ```
+
+The top-level lists are the default policy (Railway). `instances.<profile>` overrides a fleet for that instance. `*` disables every provider in a fleet. Environment allow/deny lists (`SA7_ENABLED_PROVIDERS`, `NUVIO_ENABLED_SCRAPERS`, `VEGA_ENABLED_PROVIDERS`, and the matching `*_DISABLED_*` variables) are applied after policy resolution so a single instance can be changed without editing this file. Hard-disabled classes cannot be re-enabled by an allow list.
 
 Rules:
 
@@ -983,6 +1000,7 @@ Rules:
 - Disable YouTube, torrent scraper, and Internet Archive providers by default.
 - Treat only those scraper classes as disabled by default; other disabled duplicate providers are a reserve pool.
 - Do not re-enable a default-disabled scraper as part of provider replacement.
+- Instance profiles may enable reserve providers for platform-specific reasons, but hard-disabled classes stay disabled everywhere.
 - Keep the existing duplicate ownership decisions unless live testing changes them.
 
 `scripts/check-provider-policy.mjs` must verify:

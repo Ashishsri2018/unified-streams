@@ -140,6 +140,7 @@ export interface AppConfig {
   streamPartialCacheTtlMs: number;
   tmdbApiKey: string | null;
   scraperSettings: Record<string, Record<string, unknown>>;
+  enabledScrapers: string[];
   disabledScrapers: string[];
   proxyEnabled: boolean;
   cinemetaUrl: string;

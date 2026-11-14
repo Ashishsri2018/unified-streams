@@ -25,6 +25,11 @@ module.exports = {
   tmdbCacheMaxEntries: envInt('TMDB_CACHE_MAX_ENTRIES', 5000, 1),
   maxPerProviderStreams: envInt('MAX_PER_PROVIDER_STREAMS', 100, 1),
   maxTotalStreams: envInt('MAX_TOTAL_STREAMS', 1000, 1),
+  providerConcurrency: envInt('PROVIDER_CONCURRENCY', 30, 1),
+  enabledProviders: String(process.env.ENABLED_PROVIDERS || process.env.SA7_ENABLED_PROVIDERS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
   disabledProviders: String(process.env.DISABLED_PROVIDERS || process.env.SA7_DISABLED_PROVIDERS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())

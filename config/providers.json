@@ -64,5 +64,21 @@
       "movies4u",
       "luxMovies"
     ]
+  },
+  "instances": {
+    "beamup": {
+      "sa7": {
+        "mode": "deny",
+        "ids": ["*"]
+      },
+      "nuvio": {
+        "mode": "allow",
+        "ids": ["sylphera"]
+      },
+      "vega": {
+        "mode": "allow",
+        "ids": ["animeworld", "movies4u", "luxMovies"]
+      }
+    }
   }
 }

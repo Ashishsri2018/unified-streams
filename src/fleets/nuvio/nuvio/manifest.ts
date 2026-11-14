@@ -92,9 +92,15 @@ export function parseNuvioManifest(bytes: Buffer): NuvioManifest {
 export function selectScrapers(
   manifest: NuvioManifest,
   disabledIds: Iterable<string>,
+  enabledIds: Iterable<string> = [],
 ): NuvioScraperEntry[] {
   const disabled = new Set(disabledIds);
+  if (disabled.has("*")) return [];
+  const enabled = new Set(enabledIds);
   return manifest.scrapers.filter(
-    (scraper) => scraper.enabled && !disabled.has(scraper.id),
+    (scraper) =>
+      scraper.enabled &&
+      !disabled.has(scraper.id) &&
+      (enabled.size === 0 || enabled.has(scraper.id)),
   );
 }

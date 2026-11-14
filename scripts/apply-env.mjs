@@ -16,6 +16,12 @@ const defaults = parseDefaultsEnv(defaultsPath);
 
 const allowedKeys = new Set([
   ...Object.keys(defaults),
+  'SA7_ENABLED_PROVIDERS',
+  'SA7_DISABLED_PROVIDERS',
+  'NUVIO_ENABLED_SCRAPERS',
+  'NUVIO_DISABLED_SCRAPERS',
+  'VEGA_ENABLED_PROVIDERS',
+  'VEGA_DISABLED_PROVIDERS',
   'PUBLIC_BASE_URL',
   'TMDB_API_KEY',
   'PROVIDER_SETTINGS_JSON',

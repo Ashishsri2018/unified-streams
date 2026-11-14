@@ -89,9 +89,14 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
   );
 
   const disabled = new Set((config.disabledProviders || []).map((p) => p.toLowerCase()));
-  const activeProviders = registryProviders.filter(
-    (b) => !disabled.has(b.entry.value.toLowerCase()),
-  );
+  const enabled = new Set((config.enabledProviders || []).map((p) => p.toLowerCase()));
+  const disableAll = disabled.has('*');
+  const activeProviders = registryProviders.filter((b) => {
+    const value = b.entry.value.toLowerCase();
+    if (disableAll || disabled.has(value)) return false;
+    if (enabled.size > 0 && !enabled.has(value)) return false;
+    return true;
+  });
 
   const stats = activeProviders.map((b) => {
     const id = b.entry.value;

@@ -56,9 +56,15 @@ function buildRegistry() {
     ...DISABLED_PROVIDER_IDS,
     ...(config.disabledProviders || []),
   ]);
-  const entries = (manifest.providers || []).filter(
-    (p) => p.enabled !== false && !disabled.has(p.id.toLowerCase())
-  );
+  const enabled = new Set(config.enabledProviders || []);
+  const disableAll = disabled.has('*');
+  const entries = (manifest.providers || []).filter((p) => {
+    if (p.enabled === false) return false;
+    const id = p.id.toLowerCase();
+    if (disableAll || disabled.has(id)) return false;
+    if (enabled.size > 0 && !enabled.has(id)) return false;
+    return true;
+  });
 
   const next = [];
   for (const entry of entries) {

@@ -8,6 +8,8 @@ const rootDir = path.resolve(__dirname, '..');
 
 const POLICY_PATH = path.join(rootDir, 'config', 'providers.json');
 const AUDIT_PATH = path.join(rootDir, 'config', 'provider-audit.csv');
+const FLEETS = ['sa7', 'nuvio', 'vega'];
+const HARD_DISABLED = ['youtube', 'torrentio', 'internetarchive', 'brellor'];
 
 function parseCsv(content) {
   const lines = content.split('\n').filter((l) => l.trim().length > 0);
@@ -40,53 +42,83 @@ function parseCsv(content) {
   return rows;
 }
 
+function validateFleetBlock(block, fleet, label) {
+  if (!block) {
+    throw new Error(`Missing fleet '${fleet}' in ${label}`);
+  }
+  if (!['allow', 'deny'].includes(block.mode)) {
+    throw new Error(`Invalid mode '${block.mode}' for '${fleet}' in ${label}`);
+  }
+  if (!Array.isArray(block.ids)) {
+    throw new Error(`'ids' must be an array for '${fleet}' in ${label}`);
+  }
+  return block;
+}
+
+function validateHardDisabled(block, fleet, label) {
+  const ids = new Set(block.ids.map((id) => id.toLowerCase()));
+  if (block.mode === 'allow') {
+    for (const disabled of HARD_DISABLED) {
+      if (ids.has(disabled)) {
+        throw new Error(
+          `Default-disabled provider '${disabled}' cannot be allowlisted in '${fleet}' (${label})`,
+        );
+      }
+    }
+  }
+}
+
 function verifyPolicy() {
   if (!fs.existsSync(POLICY_PATH)) {
     throw new Error(`Policy file missing at ${POLICY_PATH}`);
   }
   const policy = JSON.parse(fs.readFileSync(POLICY_PATH, 'utf-8'));
 
-  for (const fleet of ['sa7', 'nuvio', 'vega']) {
-    if (!policy[fleet]) {
-      throw new Error(`Missing fleet '${fleet}' in policy`);
-    }
-    if (!['allow', 'deny'].includes(policy[fleet].mode)) {
-      throw new Error(`Invalid mode '${policy[fleet].mode}' for fleet '${fleet}'`);
-    }
-    if (!Array.isArray(policy[fleet].ids)) {
-      throw new Error(`'ids' must be an array for fleet '${fleet}'`);
+  const auditByFleet = { sa7: new Set(), nuvio: new Set(), vega: new Set() };
+  if (fs.existsSync(AUDIT_PATH)) {
+    const auditRows = parseCsv(fs.readFileSync(AUDIT_PATH, 'utf-8'));
+    for (const row of auditRows) {
+      if (auditByFleet[row.component]) {
+        auditByFleet[row.component].add(row.id.toLowerCase());
+      }
     }
   }
 
-  // Validate against provider-audit.csv if present
-  if (fs.existsSync(AUDIT_PATH)) {
-    const auditRows = parseCsv(fs.readFileSync(AUDIT_PATH, 'utf-8'));
-    const auditByFleet = { sa7: new Set(), nuvio: new Set(), vega: new Set() };
-    for (const row of auditRows) {
-      if (auditByFleet[row.component]) {
-        auditByFleet[row.component].add(row.id);
-      }
-    }
+  const blocks = [];
+  for (const fleet of FLEETS) {
+    const block = validateFleetBlock(policy[fleet], fleet, 'default policy');
+    validateHardDisabled(block, fleet, 'default policy');
+    blocks.push({ fleet, block, label: 'default policy' });
+  }
 
-    // Verify all policy ids exist in audit for that fleet
-    for (const fleet of ['sa7', 'nuvio', 'vega']) {
-      for (const id of policy[fleet].ids) {
-        if (auditByFleet[fleet].size > 0 && !auditByFleet[fleet].has(id)) {
-          console.warn(`[check-policy] Note: ID '${id}' in fleet '${fleet}' is not listed in provider-audit.csv`);
+  const instances = policy.instances;
+  if (instances !== undefined) {
+    if (!instances || typeof instances !== 'object' || Array.isArray(instances)) {
+      throw new Error("'instances' must be an object keyed by instance name");
+    }
+    for (const [name, instance] of Object.entries(instances)) {
+      if (!instance || typeof instance !== 'object' || Array.isArray(instance)) {
+        throw new Error(`Instance '${name}' must be an object keyed by fleet`);
+      }
+      for (const [fleet, block] of Object.entries(instance)) {
+        if (!FLEETS.includes(fleet)) {
+          throw new Error(`Instance '${name}' has unknown fleet '${fleet}'`);
         }
+        validateFleetBlock(block, fleet, `instance '${name}'`);
+        validateHardDisabled(block, fleet, `instance '${name}'`);
+        blocks.push({ fleet, block, label: `instance '${name}'` });
       }
     }
+  }
 
-    // Verify default-disabled classes remain disabled (YouTube, torrent scraper, Internet Archive)
-    const disabledClasses = ['youtube', 'torrentio', 'internetArchive', 'brellor'];
-    for (const target of disabledClasses) {
-      let isDisabled = false;
-      if (policy.vega.ids.includes(target) && policy.vega.mode === 'deny') isDisabled = true;
-      if (policy.nuvio.ids.includes(target) && policy.nuvio.mode === 'deny') isDisabled = true;
-      if (!policy.sa7.ids.includes(target) && policy.sa7.mode === 'allow') isDisabled = true;
-      if (policy.sa7.ids.includes(target) && policy.sa7.mode === 'deny') isDisabled = true;
-      if (!isDisabled) {
-        throw new Error(`Default-disabled provider '${target}' must remain disabled`);
+  for (const { fleet, block, label } of blocks) {
+    if (auditByFleet[fleet].size === 0) continue;
+    for (const id of block.ids) {
+      if (id === '*') continue;
+      if (!auditByFleet[fleet].has(id.toLowerCase())) {
+        console.warn(
+          `[check-policy] Note: ID '${id}' in '${fleet}' (${label}) is not listed in provider-audit.csv`,
+        );
       }
     }
   }

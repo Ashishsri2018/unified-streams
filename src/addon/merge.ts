@@ -6,6 +6,14 @@ export interface FleetStreamsInput {
   streams: StremioStream[];
 }
 
+// When the same stream is returned by more than one fleet, keep the copy from
+// the highest-priority fleet. Vega is primary, then Nuvio, then SA7.
+const FLEET_PRIORITY: Record<string, number> = { vega: 0, nuvio: 1, sa7: 2 };
+
+function fleetPriority(fleet: string): number {
+  return FLEET_PRIORITY[fleet] ?? 3;
+}
+
 function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStream | null {
   const primaryUrl = stream.url || stream.externalUrl;
   if (!primaryUrl && !stream.infoHash) return null;
@@ -86,37 +94,40 @@ export function mergeAndFilterStreams(
   filterConfig: StreamFilterConfig,
   maxStreams = 1000,
 ): StremioStream[] {
-  const normalizedList: StremioStream[] = [];
+  const normalizedList: Array<{ stream: StremioStream; fleet: string }> = [];
 
   for (const input of fleetInputs) {
     for (const rawStream of input.streams) {
       const normalized = normalizeStreamItem(rawStream, input.fleet);
       if (normalized) {
-        normalizedList.push(normalized);
+        normalizedList.push({ stream: normalized, fleet: input.fleet });
       }
     }
   }
 
-  // Sort: direct before external, then by resolution descending, then container
+  // Sort: direct before external, then by resolution descending, then container,
+  // then fleet priority so duplicate URLs resolve to Vega before Nuvio/SA7.
   normalizedList.sort((a, b) => {
-    const aExt = a.externalUrl ? 1 : 0;
-    const bExt = b.externalUrl ? 1 : 0;
+    const aExt = a.stream.externalUrl ? 1 : 0;
+    const bExt = b.stream.externalUrl ? 1 : 0;
     if (aExt !== bExt) return aExt - bExt;
 
-    const aRes = inferResolution(a) || 0;
-    const bRes = inferResolution(b) || 0;
+    const aRes = inferResolution(a.stream) || 0;
+    const bRes = inferResolution(b.stream) || 0;
     if (aRes !== bRes) return bRes - aRes;
 
-    const aRank = getContainerRank(a.url || a.externalUrl);
-    const bRank = getContainerRank(b.url || b.externalUrl);
-    return aRank - bRank;
+    const aRank = getContainerRank(a.stream.url || a.stream.externalUrl);
+    const bRank = getContainerRank(b.stream.url || b.stream.externalUrl);
+    if (aRank !== bRank) return aRank - bRank;
+
+    return fleetPriority(a.fleet) - fleetPriority(b.fleet);
   });
 
   // Deduplicate and apply filters
   const seenKeys = new Set<string>();
   const finalStreams: StremioStream[] = [];
 
-  for (const stream of normalizedList) {
+  for (const { stream } of normalizedList) {
     const key = getStreamDedupeKey(stream);
     if (key && seenKeys.has(key)) continue;
     if (key) seenKeys.add(key);

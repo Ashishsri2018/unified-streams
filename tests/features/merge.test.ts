@@ -174,4 +174,42 @@ describe('classifier and merger', () => {
     expect(archiveNoName?.url).toBe('https://example.com/files/movie.7z');
     expect(archiveNoName?.externalUrl).toBeUndefined();
   });
+
+  it('keeps duplicate URLs from the highest-priority fleet (vega > nuvio > sa7)', () => {
+    const defaultFilters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: null,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+
+    const inputs: FleetStreamsInput[] = [
+      {
+        fleet: 'sa7',
+        streams: [
+          { title: 'SA7 copy', quality: '1080p', url: 'https://cdn.test/shared.mp4', behaviorHints: { bingeGroup: 'sa7' } },
+        ],
+      },
+      {
+        fleet: 'vega',
+        streams: [
+          { title: 'Vega copy', quality: '1080p', url: 'https://cdn.test/shared.mp4', behaviorHints: { bingeGroup: 'vega' } },
+        ],
+      },
+      {
+        fleet: 'nuvio',
+        streams: [
+          { title: 'Nuvio copy', quality: '1080p', url: 'https://cdn.test/shared.mp4', behaviorHints: { bingeGroup: 'nuvio' } },
+        ],
+      },
+    ];
+
+    const merged = mergeAndFilterStreams(inputs, defaultFilters, 100);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].title).toBe('Vega copy');
+  });
 });

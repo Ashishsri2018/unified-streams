@@ -53,7 +53,7 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 ```
 
 ## 2. Directory Layout
-- `config/`: Default settings (`defaults.env`) and canonical provider policy (`providers.json`).
+- `config/`: Default settings (`defaults.env`), per-instance profiles (`instances/beamup.env`, `instances/railway.env`), and canonical provider policy (`providers.json`). Loading order is defaults → selected profile → platform environment.
 - `assets/`: Static branding assets (`logo.png` 512x512, `logo.svg`, `favicon.ico`).
 - `src/core/`: Shared runtime utilities:
   - `env.ts`: Unified environment schema and fleet derivation.
@@ -104,18 +104,22 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - Service: `unified-streams` (ID: `02132873-33e4-47cf-986f-15ef3f6050da`)
   - Public URL: `https://unified-streams-production.up.railway.app`
 - **Platform-Differentiated Timeout Strategy**:
-  - **Beamup Deployment**: Uses default settings (`config/defaults.env`) with `BACKEND_TIMEOUT_MS=12000` (12s), `GLOBAL_DEADLINE_MS=13000` (13s), and derived worker deadline `11000` (11s) to fit strictly within Beamup's ~14s reverse proxy cut-off.
-  - **Railway Deployment**: Uses service-level environment overrides with `BACKEND_TIMEOUT_MS=27000` (27s), `GLOBAL_DEADLINE_MS=29000` (29s), and derived worker deadline `26000` (26s), taking advantage of Railway's support for extended connection durations to yield streams from slower scrapers (e.g. `4khdHub`, `Maelith`).
+  - `INSTANCE_PROFILE` selects `config/instances/<profile>.env`; values are overlaid on `config/defaults.env` and then platform env wins. CI sets only `INSTANCE_PROFILE` plus credentials, so later runtime overrides persist across deploys.
+  - **Beamup Deployment**: `config/instances/beamup.env` sets `BACKEND_TIMEOUT_MS=12000` (12s), `GLOBAL_DEADLINE_MS=13000` (13s), and derived worker deadline `11000` (11s) to fit strictly within Beamup's ~14s reverse proxy cut-off.
+  - **Railway Deployment**: `config/instances/railway.env` sets `BACKEND_TIMEOUT_MS=27000` (27s), `GLOBAL_DEADLINE_MS=29000` (29s), and derived worker deadline `26000` (26s), taking advantage of Railway's support for extended connection durations to yield streams from slower scrapers (e.g. `4khdHub`, `Maelith`).
+  - Both profiles set 40-way concurrency (`SEARCH_CONCURRENCY`, `SCRAPER_CONCURRENCY`, `SA7_CONCURRENCY`).
 - **Dual CI/CD Deployment Pipeline (`.github/workflows/ci.yml`)**:
   - Runs on `main` push and manual `workflow_dispatch`.
   - Stages:
     1. `Verify`: Policy check, icon check, ESLint, TypeScript typecheck, Vitest feature tests, build.
     2. `Docker`: Docker build & container smoke test.
     3. Concurrently deploys to:
-       - `deploy-beamup`: Syncs Dokku environment (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `PUBLIC_BASE_URL`) and pushes to Beamup Dokku.
-       - `deploy-railway`: Installs Railway CLI, syncs environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and triggers `railway up --service unified-streams --detach`.
-- **Active Fleets & Unified Disabled Providers System**:
-  - All three fleets (SA7, Nuvio, Vega) use a unified deny-list (`mode: "deny"`) architecture in `config/providers.json`.
+       - `deploy-beamup`: Syncs `INSTANCE_PROFILE=beamup` plus Dokku credentials (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `PUBLIC_BASE_URL`) and pushes to Beamup Dokku.
+       - `deploy-railway`: Installs Railway CLI, sets `INSTANCE_PROFILE=railway`, syncs credentials (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and triggers `railway up --service unified-streams --detach`.
+  - `Cleanup Legacy Environment` (`workflow_dispatch`) is a one-time task that unsets legacy Beamup provider env vars (`SA7_*`, `NUVIO_*`, `VEGA_*`). Run it once after the profile-based Beamup deploy finishes; the restart makes the current release use the profile and `instances.beamup` policy. Subsequent deploys keep the minimal CI env sync.
+- **Active Fleets & Per-Instance Provider Policy**:
+  - `config/providers.json` holds a default policy per fleet plus optional `instances.<profile>` overrides. A fleet can use `allow` or `deny` mode; `*` disables a whole fleet.
+  - Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`) are enforced in the gateway derivation and cannot be re-enabled by a profile or environment allow list.
   - **Railway Instance Routing (Primary)**:
     - SA7 (14 active): 14 duplicate scrapers disabled (`moviesdrive, 4khdhub, hdhub4u, vegamovies, castle, anizone, moviebox, moviesmod, torrentio, reanime, animeworld, animesalt, anizen, anikage`), leaving 14 active scrapers (`dahmermovies, dahmermovies-tv, desiflix, einthusan, kurage, movix-vf, multimovies, netmirror, playimdb, puretoons, redflix, toonstream, topcartoons, vidrock`).
     - Nuvio (30 active): Baseline 20 duplicates/BDIX/dead scrapers + `sylphera` disabled (21 disabled), leaving 30 active scrapers.
@@ -126,7 +130,7 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
       - `nuvio`: `sylphera` (1 active).
       - `vega`: `animeworld`, `movies4u`, `luxMovies` (RogMovies) (3 active).
       - `sa7`: All 28 providers disabled (0 active).
-    - Enforced via Dokku environment variables (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`).
+    - Enforced by `instances.beamup` in `config/providers.json` (SA7 `*` deny, Nuvio `sylphera` allow, Vega `animeworld`/`movies4u`/`luxMovies` allow). Runtime `*_ENABLED_*` and `*_DISABLED_*` env vars can override this per instance without a code change.
   - **Instance-Level Environment Overrides & Alias Mapping**:
     - Any deployment instance can selectively customize scrapers purely via environment variables without requiring code changes.
     - In `src/core/env.ts`, `deriveVegaEnv` automatically aliases `rogmovies` / `rogmovie` to `luxMovies` (and vice-versa), ensuring consistent scraper targeting across fleets. Quotes are stripped and lists are merged with base canonical policy.

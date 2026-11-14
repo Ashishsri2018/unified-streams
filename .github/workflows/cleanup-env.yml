@@ -1,0 +1,62 @@
+name: Cleanup Legacy Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type CLEAN to unset legacy provider env vars on Beamup'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  clean-beamup:
+    name: Unset legacy Beamup provider env vars
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'CLEAN'
+    steps:
+      - name: Configure SSH
+        env:
+          BEAMUP_SSH_PRIVATE_KEY: ${{ secrets.BEAMUP_SSH_PRIVATE_KEY }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$BEAMUP_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -H a.baby-beamup.club >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Unset legacy provider variables
+        run: |
+          set -euo pipefail
+          APP="a38b6dd4fcd1/unified-streams-docker"
+          LEGACY_KEYS=(
+            SA7_ENABLED_PROVIDERS
+            SA7_DISABLED_PROVIDERS
+            NUVIO_ENABLED_SCRAPERS
+            NUVIO_DISABLED_SCRAPERS
+            VEGA_ENABLED_PROVIDERS
+            VEGA_DISABLED_PROVIDERS
+          )
+
+          # config:keys lists names only, so no secret values enter the runner.
+          existing=$(ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:keys $APP" 2>/dev/null | sed -n 's/^\([A-Z0-9_]*\).*/\1/p')
+          present=()
+          for key in "${LEGACY_KEYS[@]}"; do
+            if printf '%s\n' "$existing" | grep -qx "$key"; then
+              present+=("$key")
+            fi
+          done
+
+          if [ ${#present[@]} -eq 0 ]; then
+            echo "No legacy provider env vars are set on Beamup."
+            exit 0
+          fi
+
+          echo "Unsetting: ${present[*]}"
+          # Run this after the profile-based deploy has finished. The restart
+          # makes the current release read config/instances/beamup.env and the
+          # instances.beamup policy without the legacy overrides.
+          ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:unset $APP ${present[*]}"
+          echo "Done. Beamup now uses config/instances/beamup.env and instances.beamup policy."
