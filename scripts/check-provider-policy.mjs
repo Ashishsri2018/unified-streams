@@ -9,7 +9,7 @@ const rootDir = path.resolve(__dirname, '..');
 const POLICY_PATH = path.join(rootDir, 'config', 'providers.json');
 const AUDIT_PATH = path.join(rootDir, 'config', 'provider-audit.csv');
 const FLEETS = ['sa7', 'nuvio', 'vega'];
-const HARD_DISABLED = ['youtube', 'torrentio', 'internetarchive', 'brellor'];
+const HARD_DISABLED = ['youtube', 'torrentio', 'internetarchive', 'brellor', 'mxplayer'];
 
 function parseCsv(content) {
   const lines = content.split('\n').filter((l) => l.trim().length > 0);

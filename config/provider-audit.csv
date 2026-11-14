@@ -119,7 +119,7 @@ vega,movies4u,Movies4U,global,"fastdl.zip,movies4u.vg",,,enabled,yes,yes,keep,,,
 vega,moviesApi,MoviesApi,english,ext.8man.me,,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,moviezwap,MoviezWap,india,,,,enabled,yes,yes,keep,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
 vega,multi,MultiMovies,global,"embed.filmu.in,multimovies.garden,vidout.pages.dev",multimovies,sa7:multimovies,manifest_disabled,no,no,decide_by_stats,,,,,,disable_redundant,Already manifest-disabled; duplicate of SA7 MultiMovies.
-vega,mxplayer,MX Player,india,"d3sgzbosmwirao.cloudfront.net,mxplayer.in,qqcdnpictest.mxplay.com",,,enabled,yes,yes,keep,,,,,,,
+vega,mxplayer,MX Player,india,"d3sgzbosmwirao.cloudfront.net,mxplayer.in,qqcdnpictest.mxplay.com",,,env_disabled,no,yes,keep_disabled,,,,,,disable_requested,MX Player; disabled by user request.
 vega,netflixMirror,NetflixMirror,global,net52.cc,netmirror,sa7:netmirror,failing,no,yes,disable_redundant,,,,,,disable_redundant,Upstream net52.cc times out. Replaced by sa7:netmirror.
 vega,ogomovies,Ogomovies,india,"cdn.bewab.co,ogomovies.mobi",,,manifest_disabled,no,no,keep_disabled,,,,,,,
 vega,primeMirror,PrimeMirror,global,net52.cc,netmirror,sa7:netmirror,failing,no,yes,disable_redundant,,,,,,disable_redundant,Upstream net52.cc times out. Replaced by sa7:netmirror.

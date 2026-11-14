@@ -457,3 +457,15 @@
   - Added Docker section with build, run, docker-compose instructions, port mapping, data volume persistence, and health check details.
   - Added Legal Disclaimer detailing browser/indexer search model and no-media-hosting policy.
   - Added Third-Party Licenses and attribution section specifying compliance with SA7 ANI (GPL-3.0), Eclipsia / Nuvio (MIT), and Vega / Zenda-Cross (MIT) licenses.
+
+- Fleet Runtime Classification Heuristics (Nov 14 2026):
+  - Investigated Railway status page showing 100% empty responses for certain scrapers due to silent upstream error swallowing (`try { ... } catch { return []; }`).
+  - Implemented Approach B runtime classification heuristics via `AsyncLocalStorage` network request tracking across all three fleets (SA7, Nuvio, Vega) in `src/core/networkClassifier.ts`.
+  - Added unit tests in `tests/features/networkClassifier.test.ts` (8 tests) and verified that aborted/timed out requests or HTTP 4xx/5xx responses are classified accurately as `timeout` or `error` rather than `empty`.
+  - Committed changes in `d8e9a23`.
+
+- Hard-Disable MX Player Provider (Nov 14 2026):
+  - Added `mxplayer` to the hard-disabled providers list alongside `torrentio`, `internetarchive`, `youtube`, and `brellor`.
+  - Synchronized policy across `src/core/env.ts` (`HARD_DISABLED_PROVIDERS`), `src/core/policy.ts` (`DEFAULT_DISABLED_PROVIDERS`), `scripts/check-provider-policy.mjs` (`HARD_DISABLED`), `config/providers.json` (`vega.ids`), `config/provider-audit.csv` (`vega,mxplayer`), `architecture.md`, and `AGENTS.md`.
+  - Added unit test expectation in `tests/features/core.test.ts`.
+  - Per explicit user instruction, bypassed lint/test/verify runs and committed changes directly.

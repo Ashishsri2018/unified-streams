@@ -31,6 +31,7 @@ describe('provider policy and concurrency', () => {
     // Default disabled scrapers are always disabled
     expect(policy.isProviderEnabled('vega', 'torrentio')).toBe(false);
     expect(policy.isProviderEnabled('vega', 'youtube')).toBe(false);
+    expect(policy.isProviderEnabled('vega', 'mxplayer')).toBe(false);
   });
 
   it('circuit breaker transitions between closed, open, and half-open', () => {

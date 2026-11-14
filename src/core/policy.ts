@@ -17,6 +17,7 @@ const DEFAULT_DISABLED_PROVIDERS = new Set([
   'internetarchive',
   'youtube',
   'brellor',
+  'mxplayer',
 ]);
 
 export class ProviderPolicy {

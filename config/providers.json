@@ -40,7 +40,8 @@
       "disneyMirror",
       "netflixMirror",
       "primeMirror",
-      "luxMovies"
+      "luxMovies",
+      "mxplayer"
     ]
   },
   "instances": {

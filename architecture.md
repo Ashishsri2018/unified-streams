@@ -124,12 +124,12 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `Cleanup Legacy Environment` (`workflow_dispatch`) is a one-time task that unsets legacy Beamup provider env vars (`SA7_*`, `NUVIO_*`, `VEGA_*`). Run it once after the profile-based Beamup deploy finishes; the restart makes the current release use the profile and `instances.beamup` policy. Subsequent deploys keep the minimal CI env sync.
 - **Active Fleets & Per-Instance Provider Policy**:
   - `config/providers.json` holds a default policy per fleet plus optional `instances.<profile>` overrides. A fleet can use `allow` or `deny` mode; `*` disables a whole fleet.
-  - Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`) are enforced in the gateway derivation and cannot be re-enabled by a profile or environment allow list.
+  - Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`, `mxplayer`) are enforced in the gateway derivation and cannot be re-enabled by a profile or environment allow list.
   - **Railway Instance Routing (Primary)**:
     - SA7 (14 active): 14 duplicate scrapers disabled (`moviesdrive, 4khdhub, hdhub4u, vegamovies, castle, anizone, moviebox, moviesmod, torrentio, reanime, animeworld, animesalt, anizen, anikage`), leaving 14 active scrapers (`dahmermovies, dahmermovies-tv, desiflix, einthusan, kurage, movix-vf, multimovies, netmirror, playimdb, puretoons, redflix, toonstream, topcartoons, vidrock`).
     - Nuvio (30 active): Baseline 20 duplicates/BDIX/dead scrapers + `sylphera` disabled (21 disabled), leaving 30 active scrapers.
-    - Vega (25 active): Baseline 13 torrent/IA/youtube/duplicate scrapers + `animeworld, movies4u, luxMovies` (and `rogmovies`) disabled (16 disabled), leaving 25 active scrapers.
-    - Total active providers on Railway = **69 providers**.
+    - Vega (24 active): Baseline 14 torrent/IA/youtube/mxplayer/duplicate scrapers + `animeworld, movies4u, luxMovies` (and `rogmovies`) disabled (17 disabled), leaving 24 active scrapers.
+    - Total active providers on Railway = **68 providers**.
   - **Beamup Instance Routing (Duplicate & Exclusive Scrapers)**:
     - Beamup runs the duplicate scrapers disabled in Railway along with its exclusive scrapers:
       - `sa7` (13 active): `moviesdrive`, `4khdhub`, `hdhub4u`, `vegamovies`, `castle`, `anizone`, `moviebox`, `moviesmod`, `reanime`, `animeworld`, `animesalt`, `anizen`, `anikage` (the 13 redundant duplicate scrapers disabled on Railway).

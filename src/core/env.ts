@@ -111,7 +111,7 @@ export const WORKER_DEADLINE_MARGIN_MS = 1000;
 // These classes are disabled for every fleet and every instance regardless of
 // the selected provider policy. Only an explicit policy change to this list
 // can re-enable them.
-const HARD_DISABLED_PROVIDERS = ['torrentio', 'internetarchive', 'youtube', 'brellor'];
+const HARD_DISABLED_PROVIDERS = ['torrentio', 'internetarchive', 'youtube', 'brellor', 'mxplayer'];
 
 export interface FleetPolicy {
   mode: 'allow' | 'deny';
