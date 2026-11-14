@@ -1,6 +1,6 @@
-# Instance Comparison Report: Railway vs Docker Beamup
+# Instance Comparison & Provider Compatibility Report: Railway vs Docker Beamup
 
-**Date:** 2026-11-13  
+**Date:** 2026-11-14  
 **Target Instances:**
 1. **Railway Production:** `https://unified-streams-production.up.railway.app/`
 2. **Docker Beamup:** `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/`
@@ -9,131 +9,108 @@
 
 ## 1. Executive Summary
 
-Both instances were evaluated by querying identical movie content IDs:
-- **Test Target 1:** *Fight Club* (`tt0137523`)
-- **Test Target 2:** *The Shawshank Redemption* (`tt0111161`)
+A targeted multi-media test suite was executed across both instances consisting of **2 movies, 2 TV series, and 2 anime**:
+- **Movies:** *Fight Club* (`tt0137523`), *Interstellar* (`tt0816692`)
+- **TV Series:** *Breaking Bad* S01E01 (`tt0903747:1:1`), *Stranger Things* S01E01 (`tt4574334:1:1`)
+- **Anime:** *Attack on Titan* S01E01 (`tt2560140:1:1`), *Death Note* S01E01 (`tt0877057:1:1`)
 
-Both deployments are operational, running application version `1.0.0` with identical baseline/snapshot commits across all internal fleets (**SA7**: bundled, **Nuvio**: `de572df35a304fb135eefff5cd164e61007e57224e544820681d783315d40ec9`, **Vega**: `fc747cdca16aa4334cce42017e8b1c40789d6df1`).
-
-However, **Railway consistently returns ~50–60% more streams than Beamup**:
-- **Fight Club (`tt0137523`):** 115 streams (Railway) vs 71 streams (Beamup) — 50 streams share identical URLs.
-- **The Shawshank Redemption (`tt0111161`):** 85 streams (Railway) vs 60 streams (Beamup) — 41 streams share identical URLs.
-
----
-
-## 2. Quantitative Comparison
-
-### 2.1 Fight Club (`tt0137523`)
-
-| Metric / Attribute | Railway (`unified-streams-production`) | Beamup (`unified-streams-docker`) | Difference |
-| :--- | :--- | :--- | :--- |
-| **HTTP Status** | `200 OK` | `200 OK` | Identical |
-| **Response Latency (Cold Miss)** | `17,176 ms` | `17,026 ms` | ~150 ms delta |
-| **Total Stream Count** | **115** | **71** | **+44 on Railway** |
-| **Direct Streams (`url`)** | 97 (84.3%) | 53 (74.6%) | +44 on Railway |
-| **External Links (`externalUrl`)** | 18 (15.7%) | 18 (25.4%) | Identical |
-| **Torrent / InfoHash Streams** | 0 | 0 | Identical |
-| **2160p / 4K Streams** | 12 (1 2160p, 11 4K) | 2 (1 2160p, 1 4K) | +10 on Railway |
-| **1080p Streams** | 55 | 39 | +16 on Railway |
-| **720p Streams** | 7 | 3 | +4 on Railway |
-| **480p Streams** | 4 | 1 | +3 on Railway |
-| **Unknown Resolution** | 37 | 26 | +11 on Railway |
-| **URL Overlap** | 50 identical URLs | 50 identical URLs | 65 Railway unique / 21 Beamup unique |
-| **Manifest `idPrefixes`** | `["tt"]` | `["tt", "tmdb:"]` | Beamup exposes TMDB support |
-| **Edge Server / Routing** | Railway Hikari (`sin1.nzn2`) | Cloudflare CDN (`sin1`) | Distinct edge proxy layers |
-| **Cache-Control Header** | `no-store` | `no-store` | Fully compliant |
-
-### 2.2 The Shawshank Redemption (`tt0111161`)
-
-| Metric / Attribute | Railway (`unified-streams-production`) | Beamup (`unified-streams-docker`) | Difference |
-| :--- | :--- | :--- | :--- |
-| **HTTP Status** | `200 OK` | `200 OK` | Identical |
-| **Response Latency (Cold Miss)** | `16,897 ms` | `12,480 ms` | -4,417 ms on Beamup |
-| **Total Stream Count** | **85** | **60** | **+25 on Railway** |
-| **Direct Streams (`url`)** | 71 (83.5%) | 46 (76.7%) | +25 on Railway |
-| **External Links (`externalUrl`)** | 14 (16.5%) | 14 (23.3%) | Identical |
-| **2160p / 4K Streams** | 15 (2 2160p, 13 4K) | 2 (1 2160p, 1 4K) | +13 on Railway |
-| **1080p Streams** | 38 | 34 | +4 on Railway |
-| **720p Streams** | 6 | 3 | +3 on Railway |
-| **480p Streams** | 3 | 2 | +1 on Railway |
-| **URL Overlap** | 41 identical URLs | 41 identical URLs | 44 Railway unique / 19 Beamup unique |
+Across the 6 targets:
+- **Railway Production** returned **653 total streams** (average 108.8 streams per title).
+- **Docker Beamup** returned **407 total streams** (average 67.8 streams per title).
+- **Total Providers Yielding Streams:** 39 distinct active providers across both environments.
 
 ---
 
-## 3. Provider-by-Provider Breakdown
+## 2. Target-by-Target Summary
 
-### 3.1 Fight Club (`tt0137523`) Provider Stream Counts
+| # | Category | Media Title | IMDb Content ID | Railway Yield | Beamup Yield | Latency Delta |
+| :-: | :--- | :--- | :--- | :-: | :-: | :--- |
+| **1** | Movie | *Fight Club (1999)* | `tt0137523` | **110 streams** (13.4s) | **105 streams** (16.7s) | Railway +5 streams, 3.3s faster |
+| **2** | Movie | *Interstellar (2014)* | `tt0816692` | **99 streams** (18.0s) | **65 streams** (11.6s) | Railway +34 streams |
+| **3** | Series | *Breaking Bad* S01E01 | `tt0903747:1:1` | **143 streams** (20.0s) | **54 streams** (12.0s) | Railway +89 streams |
+| **4** | Series | *Stranger Things* S01E01 | `tt4574334:1:1` | **89 streams** (26.4s) | **66 streams** (12.7s) | Railway +23 streams |
+| **5** | Anime | *Attack on Titan* S01E01 | `tt2560140:1:1` | **74 streams** (26.4s) | **76 streams** (17.3s) | Beamup +2 streams, 9.1s faster |
+| **6** | Anime | *Death Note* S01E01 | `tt0877057:1:1` | **138 streams** (26.5s) | **41 streams** (12.7s) | Railway +97 streams |
+| **Total** | | **All 6 Targets** | | **653 streams** | **407 streams** | **Railway +246 streams (+60.4%)** |
 
-| Fleet | Provider Name | Railway | Beamup | Delta | Description & Host Details |
+---
+
+## 3. Provider Classification
+
+### Tier 1: Providers that Work Well on BOTH Railway and Beamup (18 Providers)
+These providers exhibit **100% or near-identical parity** across both platforms, with zero network blocking or Cloudflare issues.
+
+| Fleet | Provider Name | Railway Streams | Beamup Streams | Stream Type & Features |
+| :--- | :--- | :---: | :---: | :--- |
+| **SA7** | **RedFlix** | 60 | 60 | Direct 1080p/720p mirrors (100% parity) |
+| **SA7** | **MultiMovies** | 55 | 55 | Multi-audio & regional mirrors (100% parity) |
+| **Nuvio** | **Tyvrel.** | 32 | 32 | Direct HLS streams (100% parity) |
+| **Nuvio** | **Esvyl.** | 31 | 31 | VidBolt Callisto multi-lingual streams (100% parity) |
+| **SA7** | **ToonStream** | 28 | 28 | Animation/Anime direct links (100% parity) |
+| **Vega** | **MovieBox Web** | 23 | 23 | Direct MP4/HLS streams (100% parity) |
+| **SA7** | **DesiFlix** | 13 | 13 | 1080p BluRay HEVC 10-bit / WEB-DL (100% parity) |
+| **Nuvio** | **Quinox.** | 8 | 13 | Direct HLS streams (+5 on Beamup) |
+| **SA7** | **VidRock** | 9 | 9 | 1080p FHD Hindi Dubbed streams (100% parity) |
+| **SA7** | **NetMirror** | 8 | 8 | Adaptive HLS Netflix/Hotstar streams (100% parity) |
+| **Vega** | **Castle TV** | 8 | 8 | Direct HLS streams (100% parity) |
+| **SA7** | **Movix VF** | 6 | 6 | French VF stream mirrors (100% parity) |
+| **Nuvio** | **Haylox.** | 6 | 6 | Vidlink 1080p stream mirrors (100% parity) |
+| **Vega** | **1Flex** | 5 | 6 | Cinejoy Light direct streams |
+| **Nuvio** | **Fendrix.** | 5 | 5 | Direct HLS stream mirrors (100% parity) |
+| **Vega** | **MoviezWap** | 3 | 3 | Regional direct mirrors (100% parity) |
+| **Vega** | **AnimeSalt** | 1 | 1 | Anime direct stream (100% parity) |
+| **SA7** | **TopCartoons** | 1 | 1 | Cartoon direct stream (100% parity) |
+
+---
+
+### Tier 2: Providers that Work on RAILWAY ONLY (17 Providers)
+These providers thrive on Railway due to its clean Singapore datacenter egress (`sin1`), but are **blocked, challenged by Cloudflare/anti-bot protection, or timed out** on Beamup (`baby-beamup.club`).
+
+| Fleet | Provider Name | Railway Streams | Beamup Streams | Delta | Primary Failure Mode on Beamup |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **SA7** | **DesiFlix** | 3 | 3 | 0 | 1080p BluRay HEVC 10-bit & WEB-DL Hindi |
-| **SA7** | **Movix VF** | 1 | 1 | 0 | 1080p French VF stream |
-| **SA7** | **MultiMovies** | 12 | 12 | 0 | 1080p WEB-DL Multi-Audio mirrors |
-| **SA7** | **NetMirror** | 2 | 2 | 0 | 1080p Netflix & Hotstar HLS adaptive streams |
-| **SA7** | **RedFlix** | 12 | 12 | 0 | 1080p & 720p direct mirrors |
-| **SA7** | **VidRock** | 4 | 4 | 0 | 1080p FHD Hindi Dubbed streams |
-| **Vega** | **MovieBox Web** | 22 | 22 | 0 | Multi-quality direct MP4/HLS streams |
-| **Vega** | **Castle TV** | 2 | 2 | 0 | Direct HLS streams |
-| **Vega** | **MoviezWap** | 3 | 3 | 0 | Direct regional stream mirrors |
-| **Nuvio** | **Esvyl.** | 4 | 4 | 0 | VidBolt Callisto Russian / Portuguese mirrors |
-| **Nuvio** | **Fendrix.** | 1 | 1 | 0 | Direct stream |
-| **Nuvio** | **Haylox.** | 1 | 1 | 0 | Vidlink 1080p stream |
-| **Vega** | **4khdHub** | 10 | 0 | +10 | Cloudflare R2 Storage & Google Drive downloads |
-| **Vega** | **HdHub4u** | 9 | 0 | +9 | CF Storage & CF Worker fast streams |
-| **Vega** | **MoviesMod** | 7 | 0 | +7 | Resume Cloud (Fast), Worker 1.3 / 1.4 |
-| **Vega** | **🔲 MoviesMod** | 2 | 0 | +2 | Direct archive ZIP downloads |
-| **Vega** | **1Flex** | 2 | 0 | +2 | Cinejoy Light (4K) |
-| **Vega** | **VMovies** | 2 | 0 | +2 | Direct stream mirrors |
-| **Nuvio** | **Maelith.** | 3 | 0 | +3 | Mapple Poseidon 2160p / 1080p |
-| **Nuvio** | **Quinox.** | 3 | 0 | +3 | Direct HLS streams |
-| **Nuvio** | **Tyvrel.** | 4 | 0 | +4 | Direct HLS streams |
-| **Nuvio** | **Xylos.** | 6 | 0 | +6 | Direct HLS streams |
-| **Vega** | **MultiStream** | 0 | 2 | -2 | Cinejoy Light 4K (AutoEmbed extractor) |
-| **Nuvio** | **Sylphera.** | 0 | 2 | -2 | Dexter 2160p & 1080p HLS |
-
-### 3.2 Key Fleet Patterns
-
-1. **SA7 Fleet (100% Parity):** Every SA7 provider returned identical stream counts and exact URL matches across both instances.
-2. **Vega Fleet Discrepancies:** Aggressive scraper providers (`4khdHub`, `HdHub4u`, `MoviesMod`) succeeded on Railway but yielded 0 streams on Beamup.
-3. **Nuvio Fleet Discrepancies:** Heavy resolvers (`Maelith.`, `Quinox.`, `Tyvrel.`, `Xylos.`) succeeded on Railway but timed out on Beamup. `Sylphera.` succeeded on Beamup while returning empty on Railway.
+| **Vega** | **4khdHub** | **152** | **29** | **+123** | Cloudflare Turnstile / IP rate limiting on Beamup |
+| **Vega** | **MultiStream** | **30** | **2** | **+28** | AutoEmbed Cinejoy extraction fails on Beamup |
+| **Vega** | **ShowBox** | **23** | **0** | **+23** | Blocked / returns "no streams found" on Beamup |
+| **Vega** | **HdHub4u** | **20** | **0** | **+20** | Immediate rejection (637ms empty) on Beamup |
+| **Vega** | **VMovies** | **9** | **0** | **+9** | Scraper returns empty on Beamup |
+| **Nuvio** | **Fjoral.** | **32** | **0** | **+32** | Mirror connection blocked on Beamup |
+| **Nuvio** | **Xylos.** | **18** | **0** | **+18** | Egress IP rejected by scraper host |
+| **Nuvio** | **Maelith.** | **18** | **8** | **+10** | Exceeds 11s deadline on Beamup (avgMs: 10,892ms) |
+| **Nuvio** | **Xandril.** | **14** | **0** | **+14** | Blocked on Beamup |
+| **Nuvio** | **Vitrix.** | **8** | **0** | **+8** | Blocked on Beamup |
+| **Nuvio** | **Ozeris.** | **7** | **0** | **+7** | Blocked on Beamup |
+| **Nuvio** | **Ilvyrel.** | **6** | **0** | **+6** | Blocked on Beamup |
+| **Nuvio** | **Solunix.** | **5** | **0** | **+5** | Blocked on Beamup |
+| **Nuvio** | **Qorva.** | **3** | **0** | **+3** | Blocked on Beamup |
+| **Nuvio** | **Lenyr.** | **2** | **0** | **+2** | Blocked on Beamup |
+| **Nuvio** | **Phraxis.** | **2** | **0** | **+2** | Blocked on Beamup |
+| **Nuvio** | **Praxiel.** | **2** | **0** | **+2** | Blocked on Beamup |
 
 ---
 
-## 4. Root Cause Analysis
+### Tier 3: Providers that Work on BEAMUP (4 Providers)
+These providers produced **more streams or resolved exclusively on Beamup**, benefiting from Beamup's specific upstream routing or scraper rotation.
 
-Telemetry from `/health` circuit counters and provider statistics identifies three root causes:
-
-### 4.1 Egress IP Reputation & Anti-Bot Filtering
-- Hosters scraped by `4khdHub`, `HdHub4u`, and `MoviesMod` enforce Cloudflare Turnstile, browser checks, or datacenter IP blacklists.
-- Railway's container egresses from Railway's Singapore datacenter network (`sin1`) with clean egress.
-- Beamup operates on `baby-beamup.club` infrastructure (frequently used for public Stremio addons), which faces elevated IP block rates. On Beamup, `hdhub4u` finished in **637 ms with empty results** (immediate blocking/rejection), whereas on Railway it took **10,123 ms** and extracted 9 streams.
-
-### 4.2 Latency Budgets & Worker Deadlines
-- The gateway enforces a strict per-worker timeout (`BACKEND_TIMEOUT_MS - 1000 = 11,000 ms`). Slow worker responses are cancelled and partial results are merged.
-- On Beamup:
-  - `Maelith.` recorded **12 timeouts out of 17 requests** (`avgMs: 10,892 ms`), consistently missing the deadline.
-  - `Quinox.` recorded **8 timeouts out of 17 requests** (`avgMs: 8,311 ms`).
-- On Railway:
-  - `Maelith.` recorded **0 timeouts** (`avgMs: 8,219 ms`), successfully returning 2160p Mapple streams.
-  - `Quinox.` recorded **0 timeouts**, returning 3 streams.
-
-### 4.3 Gateway Caching Behavior
-- Both instances utilize the gateway cache with request coalescing:
-  - **Full result TTL:** 180 seconds.
-  - **Partial result TTL:** 30 seconds.
-- Because upstream timeouts occurred, both instances marked these initial responses as partial sets (`"partialSets": 1` in `/health`), applying the 30-second TTL rather than the 180-second TTL.
+| Fleet | Provider Name | Railway Streams | Beamup Streams | Delta | Notes |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Vega** | **AnimeWorld** | **0** | **35** | **+35** | Anime series scraper resolved cleanly on Beamup |
+| **Vega** | **Movies4U** | **0** | **10** | **+10** | Direct stream extraction succeeded on Beamup |
+| **Nuvio** | **Sylphera.** | **0** | **8** | **+8** | Dexter 2160p / 1080p HLS mirror active on Beamup |
+| **Vega** | **RogMovies** | **0** | **7** | **+7** | Resolved on Beamup |
 
 ---
 
-## 5. Specification & Addon Protocol Compliance
+### Tier 4: Providers Tested with 0 Streams Across Both (Inactive / Broken)
+These enabled providers were queried across the 6 titles but returned zero streams, timed out, or encountered upstream errors:
 
-Both instances strictly satisfy all constraints in `AGENTS.md`:
+- **SA7:** `dahmermovies`, `dahmermovies-tv`, `einthusan`, `kurage`, `playimdb`, `puretoons`.
+- **Nuvio:** `jyniq`, `kethrax`, `kryxalia`, `lyrin`, `noctyx`, `novus`, `nyxora`, `onyxia`, `rylvane`, `svartok`, `vyranel`, `waelum`, `wrenok`.
+- **Vega:** `anikoto`, `animesub`, `dramacool`, `drive`, `eonMovies`, `everything`, `gokuHD`, `kickAssAnime`, `kissKh`, `kmMovies`, `luxMovies`, `mod` *(MoviesMod - returned 403 Forbidden for series search)*, `movielinkdb`, `mxplayer`, `rareanimes`, `zeefliz`.
 
-1. **Sorting Order:** Direct playable streams (`url`) are strictly ordered before external browser links (`externalUrl`).
-2. **Emoji Prefixes:**
-   - External links are prefixed with the **🖥️** emoji in the `title` attribute.
-   - Compressed archive files (`.zip`, `.rar`) remain in `url` and are tagged with the **🔲** emoji in `name` (e.g. `🔲 MoviesMod`).
-3. **HTTP Semantics:**
-   - `GET` returns full payloads with CORS headers (`access-control-allow-origin: *`).
-   - `HEAD` endpoints bypass provider calls with zero fan-out.
-   - Stream endpoints return `cache-control: no-store` with gateway-managed caching.
+---
+
+## 4. Key Takeaways & Recommendations
+
+1. **SA7 Fleet Stability:** SA7 is rock-solid across both platforms, delivering 100% identical results for all major streaming providers (`RedFlix`, `MultiMovies`, `ToonStream`, `DesiFlix`, `VidRock`, `NetMirror`, `Movix VF`).
+2. **Datacenter Advantage for Vega & Nuvio:** Scrapers in Vega (`4khdHub`, `HdHub4u`, `ShowBox`) and Nuvio (`Fjoral.`, `Xylos.`, `Maelith.`) are heavily dependent on clean egress IPs. Deploying on cloud infrastructure (Railway / Hetzner / AWS) yields significantly higher stream availability than shared community platforms (Beamup).
+3. **Anime Specialization:** Beamup performs well for anime titles (matching or beating Railway on *Attack on Titan*), primarily driven by `AnimeWorld` (+35 streams) and `ToonStream`.

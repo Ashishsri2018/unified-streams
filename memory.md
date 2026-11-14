@@ -278,3 +278,16 @@
     - Updated `.github/workflows/ci.yml` `deploy-railway` job to sync `BACKEND_TIMEOUT_MS=27000` and `GLOBAL_DEADLINE_MS=29000` on every deployment.
     - Hardened Dokku environment sync in `.github/workflows/ci.yml` to treat non-fatal Dokku cluster sync hook errors as warnings, preventing false CI failures when Beamup internal post-deploy triggers time out.
     - Verified all 47 unit/feature tests pass locally without modifying defaults.
+
+- Targeted Multi-Media Provider Benchmark & Platform Categorization:
+  - Ran a targeted 6-title benchmark across both live deployments (Railway vs Docker Beamup):
+    - 2 Movies: *Fight Club* (`tt0137523`), *Interstellar* (`tt0816692`)
+    - 2 Series: *Breaking Bad* S01E01 (`tt0903747:1:1`), *Stranger Things* S01E01 (`tt4574334:1:1`)
+    - 2 Anime: *Attack on Titan* S01E01 (`tt2560140:1:1`), *Death Note* S01E01 (`tt0877057:1:1`)
+  - Overall Stream Yield: Railway returned 653 total streams vs Beamup's 407 total streams (+60.4% on Railway).
+  - Categorized all 39 active providers into platform-compatibility tiers:
+    1. Tier 1 (Cross-Platform Champions - 18 providers): 100% parity across SA7 (`RedFlix`, `MultiMovies`, `ToonStream`, `DesiFlix`, `VidRock`, `NetMirror`, `Movix VF`, `TopCartoons`), Vega (`MovieBox Web`, `Castle TV`, `1Flex`, `MoviezWap`, `AnimeSalt`), and Nuvio (`Tyvrel.`, `Esvyl.`, `Quinox.`, `Haylox.`, `Fendrix.`).
+    2. Tier 2 (Railway-Advantaged / Railway-Only - 17 providers): Vega scrapers (`4khdHub` +123, `MultiStream` +28, `ShowBox` +23, `HdHub4u` +20, `VMovies` +9) and Nuvio scrapers (`Fjoral.` +32, `Xylos.` +18, `Maelith.` +10, `Xandril.` +14, `Vitrix.` +8, `Ozeris.` +7, `Ilvyrel.` +6, `Solunix.` +5, `Qorva.` +3, `Lenyr.` +2, `Phraxis.` +2, `Praxiel.` +2) which are challenged by Cloudflare/IP bans or 11s deadline on Beamup.
+    3. Tier 3 (Beamup-Advantaged - 4 providers): Providers that resolved more or exclusively on Beamup (`AnimeWorld` +35, `Movies4U` +10, `Sylphera.` +8, `RogMovies` +7).
+    4. Tier 4 (Inactive / 0 Streams across both): Documented 34 enabled providers that yielded 0 streams across these 6 targets.
+  - Documented findings in `docs/instance-comparison-report.md`.

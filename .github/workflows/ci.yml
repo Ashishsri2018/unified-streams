@@ -99,6 +99,8 @@ jobs:
           [ -n "$FEBBOX_UI_COOKIE" ] && CONFIG_PAIRS+=("FEBBOX_UI_COOKIE='$FEBBOX_UI_COOKIE'")
           [ -n "$GRAMCINEMA_TOKEN" ] && CONFIG_PAIRS+=("GRAMCINEMA_TOKEN='$GRAMCINEMA_TOKEN'")
           [ -n "$PUBLIC_BASE_URL" ] && CONFIG_PAIRS+=("PUBLIC_BASE_URL='$PUBLIC_BASE_URL'")
+          CONFIG_PAIRS+=("NUVIO_DISABLED_SCRAPERS=fjoral,xylos,maelith,xandril,vitrix,ozeris,ilvyrel,solunix,qorva,lenyr,phraxis,praxiel")
+          CONFIG_PAIRS+=("VEGA_DISABLED_PROVIDERS=4khdhub,autoEmbed,showbox,hdhub4u,vega")
           if [ ${#CONFIG_PAIRS[@]} -gt 0 ]; then
             set +e
             output=$(ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:set $APP ${CONFIG_PAIRS[*]}" 2>&1)

@@ -169,7 +169,15 @@ export function deriveFleetEnv(
     outEnv.BREAKER_FAILURE_THRESHOLD = String(env.CIRCUIT_FAILURE_THRESHOLD);
     outEnv.BREAKER_COOLDOWN_MS = String(env.CIRCUIT_COOLDOWN_MS);
   } else if (fleet === 'nuvio') {
-    const list = env.NUVIO_DISABLED_SCRAPERS || nuvioDeny;
+    const extraDisabled = env.NUVIO_DISABLED_SCRAPERS
+      ? env.NUVIO_DISABLED_SCRAPERS.replace(/^['"]|['"]$/g, '')
+          .split(',')
+          .map((s) => s.replace(/['"]/g, '').trim())
+      : [];
+    const list = Array.from(new Set([
+      ...(nuvioDeny ? nuvioDeny.split(',') : []),
+      ...extraDisabled,
+    ])).map((s) => s.trim()).filter(Boolean).join(',');
     if (list) {
       outEnv.DISABLED_SCRAPERS = list;
       outEnv.NUVIO_DISABLED_SCRAPERS = list;
@@ -224,7 +232,15 @@ export function deriveFleetEnv(
       outEnv.SCRAPER_SETTINGS_JSON = JSON.stringify(scraperSettings);
     }
   } else if (fleet === 'vega') {
-    const list = env.VEGA_DISABLED_PROVIDERS || vegaDeny;
+    const extraDisabled = env.VEGA_DISABLED_PROVIDERS
+      ? env.VEGA_DISABLED_PROVIDERS.replace(/^['"]|['"]$/g, '')
+          .split(',')
+          .map((s) => s.replace(/['"]/g, '').trim())
+      : [];
+    const list = Array.from(new Set([
+      ...(vegaDeny ? vegaDeny.split(',') : []),
+      ...extraDisabled,
+    ])).map((s) => s.trim()).filter(Boolean).join(',');
     if (list) {
       outEnv.DISABLED_PROVIDERS = list;
       outEnv.VEGA_DISABLED_PROVIDERS = list;
