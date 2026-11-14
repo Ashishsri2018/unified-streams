@@ -1,5 +1,5 @@
 import type { NuvioRawStream, StremioStream, StremioSubtitle } from "../types.js";
-import { BLOCKER_URL_PATTERN, isWebPage } from "./urlClassifier.js";
+import { isBlockerUrl, isArchiveUrl, isExternalUrl } from "./urlClassifier.js";
 
 export const MAX_STREAMS = 1000;
 const DEFAULT_PER_PROVIDER_LIMIT = 100;
@@ -145,7 +145,7 @@ export function mapScraperStreams(
     if (!rawUrl) return;
     const parsed = parseHttpUrl(rawUrl);
     if (!parsed || isPlaceholderHost(parsed.hostname)) return;
-    if (BLOCKER_URL_PATTERN.test(rawUrl)) return;
+    if (isBlockerUrl(rawUrl)) return;
 
     const streamKey = normalizeStreamKey(rawUrl);
     if (seenUrls.has(streamKey)) return;
@@ -156,21 +156,37 @@ export function mapScraperStreams(
     const subtitles = normalizeSubtitles(stream.subtitles, options.scraperId, streamIndex);
     const requestHeaders = filterHeaders(stream.headers);
 
-    const webPage = isWebPage(rawUrl, stream);
+    const isArchive = isArchiveUrl(rawUrl);
+    const isExternal = isExternalUrl(rawUrl, stream);
+
+    let streamName = scraperName;
+    if (isArchive && !streamName.startsWith("🔲")) {
+      streamName = `🔲 ${streamName}`;
+    }
+
+    let streamTitle = title;
+    if (isExternal) {
+      const fallback = isArchive ? "Archive" : "External Link";
+      if (!streamTitle) {
+        streamTitle = `🖥️ ${fallback}`;
+      } else if (!streamTitle.startsWith("🖥️")) {
+        streamTitle = `🖥️ ${streamTitle}`;
+      }
+    }
 
     const behaviorHints: NonNullable<StremioStream["behaviorHints"]> = {
       bingeGroup: `${options.scraperId}-${quality || "auto"}`,
     };
-    if (!webPage && options.proxyEnabled && Object.keys(requestHeaders).length > 0) {
+    if (!isExternal && options.proxyEnabled && Object.keys(requestHeaders).length > 0) {
       behaviorHints.proxyHeaders = { request: requestHeaders };
     }
 
     mapped.push({
-      name: scraperName,
-      ...(title ? { title } : {}),
-      ...(webPage ? { externalUrl: rawUrl } : { url: rawUrl }),
+      name: streamName,
+      ...(streamTitle ? { title: streamTitle } : {}),
+      ...(isExternal ? { externalUrl: rawUrl } : { url: rawUrl }),
       behaviorHints,
-      ...(!webPage && subtitles.length > 0 ? { subtitles } : {}),
+      ...(!isExternal && subtitles.length > 0 ? { subtitles } : {}),
     });
   });
 

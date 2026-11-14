@@ -1,31 +1,31 @@
-const VIDEO_EXTENSIONS = new Set([
-  '.mp4',
-  '.mkv',
-  '.m3u8',
-  '.mpd',
-  '.webm',
-  '.avi',
-  '.mov',
-  '.flv',
-  '.ts',
-]);
+'use strict';
 
-const WEB_EXTENSIONS = new Set([
-  '.html',
-  '.htm',
-  '.php',
-  '.asp',
-  '.aspx',
-  '.jsp',
-  '.cgi',
-]);
+const path = require('node:path');
+
+// Attempt to load canonical core classifier when built
+let core = null;
+try {
+  const corePath = path.resolve(process.cwd(), 'dist/core/urlClassifier.js');
+  core = require(corePath);
+} catch {
+  core = null;
+}
+
+const ARCHIVE_EXTENSIONS = /\.(zip|rar|7z|tar|gz|bz2|iso|xz)($|\?|&|#)/i;
+const BLOCKER_URL_PATTERN = /\/(slowdown|ratelimit|antibot)\b/i;
+const DIRECT_MEDIA_PATTERN = /(?:\.|\/)(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts)(?:$|[?&#/])/i;
+const HTML_EXTENSIONS = /\.(html?|php|aspx?|jsp|cgi)($|\?|&|#)/i;
 
 const EMBED_PATH_PATTERNS = [
   /\/embed(?:\/|\?|$)/i,
   /\/e\/[a-zA-Z0-9_-]+/i,
+  /\/v\/[a-zA-Z0-9_-]+/i,
   /\/iframe(?:\/|\?|$)/i,
   /\/player(?:\/|\?|$)/i,
+  /\/watch(?:\/|\?|$)/i,
   /\/tg\/(?:go|bot)\b/i,
+  /t\.me\//i,
+  /telegram\./i,
 ];
 
 const KNOWN_EMBED_DOMAINS = [
@@ -50,17 +50,65 @@ const KNOWN_EMBED_DOMAINS = [
   'vaplayer.',
   'telegram.me',
   't.me',
+  '2embed.to',
+  '2embed.cc',
+  'autoembed.to',
+  'multimovies.site',
+  'superembed.stream',
+  'player.smashystream.com',
+  'streamwish.to',
+  'vidlox.me',
+  'doodstream.com',
+  'dood.to',
+  'dood.so',
+  'mixdrop.co',
+  'filelions.to',
+  'streamtape.com',
 ];
 
+function isBlockerUrl(rawUrl) {
+  if (core && typeof core.isBlockerUrl === 'function') return core.isBlockerUrl(rawUrl);
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  return BLOCKER_URL_PATTERN.test(rawUrl);
+}
+
+function isArchiveUrl(rawUrl) {
+  if (core && typeof core.isArchiveUrl === 'function') return core.isArchiveUrl(rawUrl);
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  if (ARCHIVE_EXTENSIONS.test(rawUrl)) return true;
+  try {
+    const parsed = new URL(rawUrl);
+    return ARCHIVE_EXTENSIONS.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function isDirectMediaUrl(rawUrl) {
+  if (core && typeof core.isDirectMediaUrl === 'function') return core.isDirectMediaUrl(rawUrl);
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  try {
+    const parsed = new URL(rawUrl);
+    const pathname = parsed.pathname;
+    if (DIRECT_MEDIA_PATTERN.test(pathname)) return true;
+    for (const param of ['url', 'stream', 'link', 'source', 'src', 'file', 'm3u8']) {
+      const val = parsed.searchParams.get(param);
+      if (val && DIRECT_MEDIA_PATTERN.test(val)) return true;
+    }
+    return false;
+  } catch {
+    return DIRECT_MEDIA_PATTERN.test(rawUrl);
+  }
+}
+
 function isWebPage(url, stream = {}) {
+  if (core && typeof core.isWebPage === 'function') return core.isWebPage(url, stream);
   if (typeof stream.externalUrl === 'string' && stream.externalUrl.length > 0) return true;
   if (typeof url !== 'string' || url.length === 0) return false;
 
   const textHint = `${stream.server || ''} ${stream.name || ''} ${stream.title || ''}`;
-  if (/\[embed\]|\bembed\b/i.test(textHint)) {
-    const cleanUrl = url.split('#')[0].split('?')[0];
-    const hasVidExt = [...VIDEO_EXTENSIONS].some((ext) => cleanUrl.toLowerCase().endsWith(ext));
-    if (!hasVidExt) return true;
+  if (/\[embed\]|\bembed\b/i.test(textHint) && !isDirectMediaUrl(url)) {
+    return true;
   }
 
   let parsed;
@@ -73,9 +121,7 @@ function isWebPage(url, stream = {}) {
   const pathname = parsed.pathname.toLowerCase();
   const hostname = parsed.hostname.toLowerCase();
 
-  for (const ext of VIDEO_EXTENSIONS) {
-    if (pathname.endsWith(ext)) return false;
-  }
+  if (isDirectMediaUrl(url)) return false;
 
   if (
     hostname.endsWith('.r2.cloudflarestorage.com') ||
@@ -85,9 +131,7 @@ function isWebPage(url, stream = {}) {
     return false;
   }
 
-  for (const ext of WEB_EXTENSIONS) {
-    if (pathname.endsWith(ext)) return true;
-  }
+  if (HTML_EXTENSIONS.test(pathname)) return true;
 
   const fullPathAndQuery = `${pathname}${parsed.search}`;
   for (const pattern of EMBED_PATH_PATTERNS) {
@@ -101,4 +145,16 @@ function isWebPage(url, stream = {}) {
   return false;
 }
 
-module.exports = { isWebPage };
+function isExternalUrl(url, stream = {}) {
+  if (core && typeof core.isExternalUrl === 'function') return core.isExternalUrl(url, stream);
+  if (isArchiveUrl(url)) return true;
+  return isWebPage(url, stream);
+}
+
+module.exports = {
+  isBlockerUrl,
+  isArchiveUrl,
+  isDirectMediaUrl,
+  isWebPage,
+  isExternalUrl,
+};

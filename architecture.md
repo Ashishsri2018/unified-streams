@@ -28,7 +28,7 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 |  |      * Gateway Cache: 180s full TTL, 30s partial TTL, non-empty only         |  |
 |  |      * Content ID Parser: tt, tmdb:, mal:                                    |  |
 |  |      * Metadata Resolver: Cinemeta, TMDB, Jikan (rate-limited)               |  |
-|  |      * Stream Merger & Classifier: direct playable vs externalUrl             |  |
+|  |      * Stream Merger & Deduplication: cross-fleet dedup, quality sort, safety net |  |
 |  |      * Stream Tagging: 🖥️ for externalUrl title, 🔲 for archive name          |  |
 |  |      * Filters: Resolution and File Size; inline subtitles pass through       |  |
 |  |      * Concurrency: Global deadline (12s), Timeout clamp, Request coalescing|  |
@@ -62,6 +62,7 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `cache.ts`: Gateway response cache with coalescing and TTL policies.
   - `contentId.ts` & `metadata.ts` & `jikan.ts`: ID parsing and upstream metadata resolution.
   - `policy.ts`: Provider policy enforcement and verification.
+  - `urlClassifier.ts`: Single source of truth for URL & stream classification (direct media pattern matching, streaming API endpoints like `/api/watch/m3u8`, web embed/player detection, archive detection, blocker URL drops, and stream key canonicalization).
   - `workerClient.ts`: Internal HTTP client with deadline management.
   - `updater/`: In-process snapshot downloaders and installers. SA7 provider files live under `DATA_DIR/sa7/cb-providers` and are swapped atomically; the scheduler waits for worker readiness, verifies the reload, and retries failed checks after 5 minutes.
 - `src/addon/`: Gateway application layer:

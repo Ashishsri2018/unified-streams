@@ -1,5 +1,5 @@
 const { normalizeSubtitles, sizeBytesOf } = require('./filters');
-const { isWebPage } = require('./lib/url-classifier');
+const { isBlockerUrl, isArchiveUrl, isWebPage, isExternalUrl } = require('./lib/url-classifier');
 
 const QUALITY_PATTERNS = [
   [/\b(4k|uhd|2160p?)\b/i, 0],
@@ -23,14 +23,29 @@ function toStremioStream(stream, provider) {
   const targetUrl = stream.url || stream.externalUrl;
   const hasInfoHash = typeof stream.infoHash === 'string' && stream.infoHash.length > 0;
   if (!targetUrl && !hasInfoHash) return null;
+  if (targetUrl && isBlockerUrl(targetUrl)) return null;
+
+  const isArchive = Boolean(targetUrl && isArchiveUrl(targetUrl));
+  const isExternal = Boolean(targetUrl && isExternalUrl(targetUrl, stream));
+
+  let name = provider.name;
+  if (isArchive && !name.startsWith('🔲')) {
+    name = `🔲 ${name}`;
+  }
+
+  let title = stream.description || stream.title || stream.name || 'Stream';
+  if (isExternal && !title.startsWith('🖥️')) {
+    const fallback = isArchive ? 'Archive' : 'External Link';
+    title = `🖥️ ${title || fallback}`;
+  }
 
   const out = {
-    name: provider.name,
-    title: stream.description || stream.title || stream.name || 'Stream',
+    name,
+    title,
   };
 
   if (targetUrl) {
-    if (isWebPage(targetUrl, stream)) {
+    if (isExternal) {
       out.externalUrl = targetUrl;
     } else {
       out.url = targetUrl;
@@ -57,4 +72,4 @@ function toStremioStream(stream, provider) {
   return out;
 }
 
-module.exports = { isWebPage, qualityRank, toStremioStream };
+module.exports = { isWebPage, isExternalUrl, qualityRank, toStremioStream };

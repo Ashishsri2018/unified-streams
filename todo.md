@@ -109,6 +109,7 @@
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs
 
 - [ ] **Phase 11: Logic Bug Fixes & Codebase Hardening**
+  - [x] Unify URL and stream classification in `src/core/urlClassifier.ts`, resolving `/api/watch/m3u8` misclassification as `externalUrl` and centralizing rules across fleets and gateway
   - [ ] Fix SA7 unknown resolution dropping bug on configured requests (`src/fleets/sa7/worker.js`)
   - [ ] Fix SA7 season pack regex parser (`src/fleets/sa7/content-id.js`)
   - [ ] Allow Season 0 (specials) in Nuvio and Vega internal stream parsers (`parseId.ts`)

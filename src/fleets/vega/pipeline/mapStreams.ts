@@ -5,8 +5,9 @@ import type {
   SubtitleTrack,
 } from "../types.js";
 import {
-  isWebPage,
-  BLOCKER_URL_PATTERN,
+  isBlockerUrl,
+  isArchiveUrl,
+  isExternalUrl,
   normalizeStreamKey,
 } from "./urlClassifier.js";
 
@@ -159,7 +160,7 @@ export function mapProviderStreams(
     const link = trimString(stream.link);
     if (!link) return;
 
-    if (BLOCKER_URL_PATTERN.test(link)) return;
+    if (isBlockerUrl(link)) return;
 
     const type = trimString(stream.type).toLowerCase();
     if (type === "torrent" && !options.includeMagnets) return;
@@ -171,6 +172,7 @@ export function mapProviderStreams(
       const url = parseHttpUrl(link);
       if (!url) return;
       if (isPlaceholderHost(url.hostname)) return;
+      if (isBlockerUrl(link)) return;
     }
 
     const key = normalizeStreamKey(link);
@@ -183,7 +185,8 @@ export function mapProviderStreams(
     const titleParts = [server, quality, tags.join(", ")].filter(Boolean);
     const title = titleParts.length > 0 ? titleParts.join(" \u2022 ") : undefined;
 
-    const isExternal = isWebPage(link, {
+    const isArchive = isArchiveUrl(link);
+    const isExternal = isExternalUrl(link, {
       server: stream.server,
       tag: stream.tag,
       tags: stream.tags,
@@ -191,10 +194,25 @@ export function mapProviderStreams(
       quality: stream.quality,
     });
 
+    let streamName = providerName;
+    if (isArchive && !streamName.startsWith("🔲")) {
+      streamName = `🔲 ${streamName}`;
+    }
+
+    let streamTitle = title;
+    if (isExternal) {
+      const fallback = isArchive ? "Archive" : "External Link";
+      if (!streamTitle) {
+        streamTitle = `🖥️ ${fallback}`;
+      } else if (!streamTitle.startsWith("🖥️")) {
+        streamTitle = `🖥️ ${streamTitle}`;
+      }
+    }
+
     if (isExternal) {
       mapped.push({
-        name: providerName,
-        ...(title ? { title } : {}),
+        name: streamName,
+        ...(streamTitle ? { title: streamTitle } : {}),
         externalUrl: link,
         behaviorHints: {
           bingeGroup: `${options.providerValue}-${quality || "auto"}`,
@@ -313,7 +331,7 @@ export function sortStreams(streams: StremioStream[]): StremioStream[] {
     if (!stream) return;
     const targetUrl = stream.url || stream.externalUrl;
     if (typeof targetUrl !== "string" || !targetUrl) return;
-    if (BLOCKER_URL_PATTERN.test(targetUrl)) return;
+    if (isBlockerUrl(targetUrl)) return;
     const key = normalizeStreamKey(targetUrl);
     if (!key || seen.has(key)) return;
     seen.add(key);

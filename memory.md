@@ -1,5 +1,23 @@
 # Unified Streams Memory Log
 
+- Unified URL & Stream Classification Architecture (Session Nov 14 2026):
+  - Solved misclassification of API streaming endpoints like `https://c.toroplay.cymru/api/watch/m3u8?url=...` which were previously marked as `externalUrl` due to `/watch/` matching embed patterns and direct media regexes requiring a leading dot.
+  - Created single source of truth in `src/core/urlClassifier.ts` for all URL classification logic:
+    - Direct media pattern `DIRECT_MEDIA_PATTERN` matching extensions and container path segments (`.m3u8`, `/m3u8`, `.mp4`, `/mp4`, `.mpd`, `/mpd`, etc.) as well as media query parameters (`?url=...`).
+    - Web embed / player detection (`/embed/`, `/watch/` without direct media suffix, known embed domains).
+    - Archive detection (`.zip`, `.rar`, `.7z`, etc.).
+    - Blocker link detection (`/slowdown`, `/ratelimit`, `/antibot`).
+    - Canonical stream key normalization.
+  - Refactored fleets and gateway to share `src/core/urlClassifier.ts`:
+    - Gateway `src/addon/classifier.ts` re-exports canonical functions from `src/core/urlClassifier.ts`.
+    - Vega `src/fleets/vega/pipeline/urlClassifier.ts` re-exports from `src/core/urlClassifier.ts`.
+    - Nuvio `src/fleets/nuvio/addon/urlClassifier.ts` re-exports from `src/core/urlClassifier.ts`.
+    - SA7 `src/fleets/sa7/lib/url-classifier.js` delegates to `dist/core/urlClassifier.js` with unified fallback logic.
+  - Cleaned up gateway `src/addon/merge.ts` (`normalizeStreamItem`) to trust fleet `url` vs `externalUrl` classifications without re-running conflicting embed regexes, while retaining archive safety net and blocker drops.
+  - Added full test coverage in `tests/features/urlClassifier.test.ts` (6 tests) and updated `tests/features/merge.test.ts`.
+  - All 18 test suites passing (92/92 Vitest tests); `npm run verify` passed cleanly (policy, icon, lint, typecheck, tests, build).
+  - Kept changes local without deploying, per user request.
+
 - Completed Provider Allocation & Deployment Separation (Session Nov 14 2026):
   - Added `SA7_DISABLED_PROVIDERS` support in SA7 worker runtime with instant env override (`process.env.SA7_DISABLED_PROVIDERS`).
   - Added bidirectional alias support for Vega's `rogmovie` / `rogmovies` to `luxMovies` in `src/core/env.ts`.
@@ -371,3 +389,8 @@
   - Updated Vitest unit test in `tests/features/disabledProviders.test.ts` to assert that SA7 runs these 13 providers in allowlist mode on Beamup without the wildcard denial.
   - Validated with `npm run policy:check`, `npm run test:feature`, and `npm run verify` (all passed 100%).
   - Kept changes local without deploying or pushing, per user instruction.
+
+- Update Documentation (README.md - Nov 14 2026):
+  - Added Docker section with build, run, docker-compose instructions, port mapping, data volume persistence, and health check details.
+  - Added Legal Disclaimer detailing browser/indexer search model and no-media-hosting policy.
+  - Added Third-Party Licenses and attribution section specifying compliance with SA7 ANI (GPL-3.0), Eclipsia / Nuvio (MIT), and Vega / Zenda-Cross (MIT) licenses.

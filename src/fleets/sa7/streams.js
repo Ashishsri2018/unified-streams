@@ -2,7 +2,7 @@ const config = require('./config');
 const { getRegistry, providersFor } = require('./providers');
 const { tmdbIdOf } = require('./content-id');
 const cinemeta = require('./cinemeta');
-const { isWebPage, qualityRank, toStremioStream } = require('./format');
+const { isWebPage, isExternalUrl, qualityRank, toStremioStream } = require('./format');
 const {
   DEFAULT_CONFIG,
   normalizeSubtitles,
@@ -193,8 +193,8 @@ function createCollector({
       .filter((item) => streamPassesFilters(item.stream, userConfig));
 
     filtered.sort((a, b) => {
-      const aIsExt = isWebPage(a.stream.url || a.stream.externalUrl, a.stream) ? 1 : 0;
-      const bIsExt = isWebPage(b.stream.url || b.stream.externalUrl, b.stream) ? 1 : 0;
+      const aIsExt = isExternalUrl(a.stream.url || a.stream.externalUrl, a.stream) ? 1 : 0;
+      const bIsExt = isExternalUrl(b.stream.url || b.stream.externalUrl, b.stream) ? 1 : 0;
       if (aIsExt !== bIsExt) return aIsExt - bIsExt;
 
       const byQuality = a.rank - b.rank;

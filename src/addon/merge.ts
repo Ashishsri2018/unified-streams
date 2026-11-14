@@ -31,7 +31,7 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
   };
 
   const isArchive = Boolean(primaryUrl && isArchiveUrl(primaryUrl));
-  const isExternal = Boolean(primaryUrl && isExternalUrl(primaryUrl));
+  const isExternal = Boolean(stream.externalUrl || (primaryUrl && isExternalUrl(primaryUrl)));
 
   let name = stream.name;
   if (isArchive) {
