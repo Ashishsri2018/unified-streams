@@ -57,6 +57,7 @@ export interface ComponentHealthInfo {
   name: string;
   displayName: string;
   ok: boolean;
+  status?: 'ok' | 'degraded' | 'error';
   latencyMs: number | null;
   health: unknown;
   process: {
@@ -64,6 +65,7 @@ export interface ComponentHealthInfo {
     uptimeSec: number;
     restarts?: number;
   };
+  updater?: WorkerSnapshot;
   error?: string;
 }
 

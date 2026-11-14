@@ -1,5 +1,26 @@
 # Unified Streams Memory Log
 
+- Fleet Working Status Reflection & Nuvio Non-blocking Snapshot Resolution (Session Nov 14 2026):
+  - Solved synchronous remote snapshot blocking in Nuvio:
+    - Updated `SnapshotManager.ensure()` in `src/fleets/nuvio/nuvio/snapshot.ts` to follow stale-while-revalidate. When an active snapshot is loaded into memory, `ensure()` serves user stream requests immediately without waiting on network downloads, triggering background refresh asynchronously if stale.
+    - Updated `src/fleets/nuvio/nuvio/manifest.ts` with `normalizeScraperFilename`: extracts relative paths (`providers/<id>.js`) from both relative paths and upstream's new full URL format (`https://*.codeberg.page/.../providers/<id>.js`).
+    - Verified that neither SA7 nor Vega perform any network snapshot downloads during stream handling (Vega preloads providers on startup, SA7 reads registry from memory and disk; both update exclusively via `/internal/reload`).
+  - Enhanced fleet health and status reflection in Gateway and Status Dashboard:
+    - Updated `src/fleets/nuvio/worker.ts`: `handleHealth` now accurately returns `snapshots.getHealth()` (`status`, `lastError`, `refreshing`) rather than hardcoded `status: 'ok'` and `lastError: null`.
+    - Updated `src/fleets/vega/worker.ts` and `src/fleets/sa7/worker.js`: report `status: 'ok' | 'degraded' | 'error'` based on provider counts and snapshot errors.
+    - Updated `src/addon/health.ts`:
+      - `buildHealthReport` now records real roundtrip loopback latency (`latencyMs`) for each worker.
+      - `aggregateFleetProviders` now ingests scheduler updater statuses and latencies, computing an accurate component `status` (`'ok' | 'degraded' | 'error'`).
+      - Degrades overall gateway status if any fleet worker or fleet updater is degraded or failing.
+    - Updated `src/addon/statusHtml.ts`:
+      - Fleet cards now prominently display `Status: WORKING` (green), `DEGRADED` (yellow), or `OFFLINE` (red).
+      - Added circuit open count, measured latency in ms, process state, snapshot SHA, and updater status.
+      - Displays dedicated error banners for updater failures or snapshot errors.
+      - Summary card now clearly reflects `${workingCount} of ${totalCount} working`.
+  - Added test suite `tests/features/fleetHealthAndStatus.test.ts` (8 tests) covering relative and remote URL manifest parsing, non-blocking snapshot resolution on stale snapshots, and fleet health degradation reporting.
+  - Ran `npm run test:feature` — all 25 test suites passed (143/143 tests passing).
+  - Kept ESLint/verify untouched per user instruction ("dont run lint/varify").
+
 - Love, Death & Robots Empty Stream & Nuvio Updater Investigation (Session Nov 14 2026):
   - Investigated user report of `https://unified-streams-production.up.railway.app/.../stream/series/tt9561862:1:1.json` returning `{"streams":[]}` on Railway production.
   - Confirmed user hypothesis that Codeberg failure prevented Nuvio providers from returning streams:

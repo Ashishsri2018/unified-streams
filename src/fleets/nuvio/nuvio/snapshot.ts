@@ -93,7 +93,10 @@ export class SnapshotManager {
   }
 
   async ensure(): Promise<NuvioSnapshot | null> {
-    if (this.snapshot && this.isFresh(this.snapshot.fetchedAt)) {
+    if (this.snapshot) {
+      if (!this.isFresh(this.snapshot.fetchedAt) && !this.refreshing) {
+        this.scheduleRefresh();
+      }
       return this.snapshot;
     }
     return this.refresh(false);

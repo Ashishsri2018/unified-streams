@@ -4,6 +4,18 @@ const SAFE_ID = /^[A-Za-z0-9_.-]+$/;
 const PROVIDER_FILE = /^providers\/[A-Za-z0-9_.-]+\.js$/;
 const MAX_SCRAPERS = 200;
 
+export function normalizeScraperFilename(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (PROVIDER_FILE.test(trimmed)) {
+    return trimmed;
+  }
+  const match = trimmed.match(/(?:^|\/)providers\/([A-Za-z0-9_.-]+\.js)$/);
+  if (match) {
+    return `providers/${match[1]}`;
+  }
+  return null;
+}
+
 export class ManifestError extends Error {
   constructor(message: string) {
     super(message);
@@ -60,8 +72,9 @@ export function parseNuvioManifest(bytes: Buffer): NuvioManifest {
     }
     seen.add(id);
 
-    const filename = typeof raw.filename === "string" ? raw.filename.trim() : "";
-    if (!PROVIDER_FILE.test(filename)) {
+    const rawFilename = typeof raw.filename === "string" ? raw.filename.trim() : "";
+    const filename = normalizeScraperFilename(rawFilename);
+    if (!filename) {
       throw new ManifestError(`manifest.json scraper ${id} has an invalid filename`);
     }
 

@@ -84,6 +84,9 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
   }
 
   const snapshot = snapshots.getSnapshot();
+  const snapshotHealth = snapshots.getHealth();
+  const ok = Boolean(snapshot && snapshot.scrapers.length > 0);
+  const status = ok ? snapshotHealth.status : 'error';
   const providerStats = pipeline.getProviderStats();
   const scraperIds = snapshot ? snapshot.scrapers.map((s) => s.entry.id) : [];
   const allIds = Array.from(new Set([...scraperIds, ...Object.keys(providerStats)])).sort();
@@ -117,16 +120,16 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
 
   const payload = {
     fleet: 'nuvio',
-    ok: true,
-    status: 'ok',
+    ok,
+    status,
     startedAt: new Date(startedAt).toISOString(),
     uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
     snapshot: {
-      sha: snapshot?.sha || config.pinnedSha || 'bundled',
-      fetchedAt: snapshot ? new Date(snapshot.fetchedAt).toISOString() : new Date(startedAt).toISOString(),
-      ageMs: snapshot ? Date.now() - snapshot.fetchedAt : Date.now() - startedAt,
-      refreshing: false,
-      lastError: null,
+      sha: snapshotHealth.sha || config.pinnedSha || 'bundled',
+      fetchedAt: snapshotHealth.fetchedAt || new Date(startedAt).toISOString(),
+      ageMs: snapshot ? Math.max(0, Date.now() - snapshot.fetchedAt) : Date.now() - startedAt,
+      refreshing: snapshotHealth.refreshing,
+      lastError: snapshotHealth.lastError,
     },
     providers: {
       total: allIds.length,

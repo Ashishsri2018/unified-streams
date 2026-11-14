@@ -6,6 +6,7 @@ import {
   AggregateProvidersReport,
   AggregateProviderMetric,
   ComponentHealthInfo,
+  WorkerSnapshot,
 } from '../core/telemetry.js';
 import { StreamHandlerContext } from './stream.js';
 import { logger } from '../core/logger.js';
@@ -13,6 +14,8 @@ import { logger } from '../core/logger.js';
 export function aggregateFleetProviders(
   fleets: Record<string, WorkerHealth | { error: string }>,
   startedAt: number,
+  latencies?: Record<string, number>,
+  updater?: Record<string, WorkerSnapshot>,
 ): {
   providers: AggregateProvidersReport;
   components: ComponentHealthInfo[];
@@ -25,23 +28,54 @@ export function aggregateFleetProviders(
 
   for (const [name, fleetHealth] of Object.entries(fleets)) {
     const isError = 'error' in fleetHealth;
-    const ok = !isError && Boolean(fleetHealth.ok);
+    const workerOk = !isError && Boolean(fleetHealth.ok);
     const uptimeSec = !isError && typeof fleetHealth.uptimeSec === 'number'
       ? fleetHealth.uptimeSec
       : Math.floor((Date.now() - startedAt) / 1000);
 
+    const providerTotal = !isError && fleetHealth.providers ? (fleetHealth.providers.total || 0) : 0;
+    const snapshotError = !isError && fleetHealth.snapshot ? fleetHealth.snapshot.lastError : null;
+    const fleetUpdater = updater ? updater[name] : undefined;
+    const updaterError = fleetUpdater?.lastError || null;
+    const circuitsOpen = !isError && fleetHealth.providers?.circuits ? fleetHealth.providers.circuits.open : 0;
+
+    let status: 'ok' | 'degraded' | 'error';
+    let errorMessage: string | undefined;
+
+    if (isError || !workerOk || providerTotal === 0) {
+      status = 'error';
+      errorMessage = isError
+        ? fleetHealth.error
+        : providerTotal === 0
+          ? 'No providers available'
+          : 'Worker reported error';
+    } else if (updaterError || snapshotError || fleetHealth.status === 'degraded' || (circuitsOpen > 0 && circuitsOpen >= providerTotal)) {
+      status = 'degraded';
+      errorMessage = updaterError
+        ? `Updater: ${updaterError}`
+        : snapshotError
+          ? `Snapshot: ${snapshotError}`
+          : fleetHealth.status === 'degraded'
+            ? 'Fleet degraded'
+            : 'All provider circuits open';
+    } else {
+      status = 'ok';
+    }
+
     components.push({
       name,
       displayName: name.toUpperCase(),
-      ok,
-      latencyMs: null,
+      ok: status === 'ok' || status === 'degraded',
+      status,
+      latencyMs: latencies ? (latencies[name] ?? null) : null,
       health: fleetHealth,
       process: {
-        running: ok,
+        running: !isError && workerOk,
         uptimeSec,
         restarts: 0,
       },
-      error: isError ? fleetHealth.error : undefined,
+      updater: fleetUpdater,
+      error: errorMessage,
     });
 
     if (!isError && fleetHealth.providers) {
@@ -88,19 +122,35 @@ export function aggregateFleetProviders(
 export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: number): Promise<GatewayHealth> {
   const fleetHealthPromises = (['sa7', 'nuvio', 'vega'] as const).map(async (fleet) => {
     const worker = ctx.workers[fleet];
+    const start = Date.now();
     const res = await worker.getHealth(2000);
-    return [fleet, res] as const;
+    const latencyMs = Date.now() - start;
+    return [fleet, res, latencyMs] as const;
   });
 
   const fleetEntries = await Promise.all(fleetHealthPromises);
-  const fleets = Object.fromEntries(fleetEntries);
+  const fleets: Record<string, WorkerHealth | { error: string }> = {};
+  const latencies: Record<string, number> = {};
+  for (const [fleet, res, latencyMs] of fleetEntries) {
+    fleets[fleet] = res;
+    latencies[fleet] = latencyMs;
+  }
 
-  const isDegraded = Object.values(fleets).some((f) => 'error' in f || !f.ok);
+  const updater = ctx.scheduler
+    ? {
+        sa7: ctx.scheduler.getStatus('sa7'),
+        nuvio: ctx.scheduler.getStatus('nuvio'),
+        vega: ctx.scheduler.getStatus('vega'),
+      }
+    : {};
+
+  const { providers, components } = aggregateFleetProviders(fleets, startedAt, latencies, updater);
+
+  const isDegraded = components.some((c) => c.status !== 'ok');
   const status: HealthStatus = isDegraded ? 'degraded' : 'ok';
 
   const cacheStats = ctx.cache.getStats();
   const queueMetrics = logger.getQueueMetrics();
-  const { providers, components } = aggregateFleetProviders(fleets, startedAt);
 
   return {
     ok: !isDegraded,

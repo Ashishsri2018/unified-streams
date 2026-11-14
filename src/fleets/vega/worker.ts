@@ -140,10 +140,13 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
     { open: 0, halfOpen: 0 },
   );
 
+  const ok = activeProviders.length > 0;
+  const status = snapshotState?.lastError ? 'degraded' : (ok ? 'ok' : 'error');
+
   const payload = {
     fleet: 'vega',
-    ok: true,
-    status: 'ok',
+    ok,
+    status,
     startedAt: new Date(startedAt).toISOString(),
     uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
     snapshot: {

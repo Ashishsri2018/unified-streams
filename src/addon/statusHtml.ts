@@ -221,8 +221,9 @@ function render(data) {
     }
   }
 
+  const workingCount = comps.filter((c) => (c.status || (c.ok ? "ok" : "error")) === "ok").length;
   summary.innerHTML =
-    card("Fleets", num(comps.length), comps.filter((c) => c.ok).length + " healthy") +
+    card("Fleets", num(comps.length), workingCount + " of " + comps.length + " working") +
     card("Providers", num(data.providers && data.providers.total ? data.providers.total : cachedStats.length), cachedStats.length + " reporting") +
     card("Cache hits", num(streamCache.hits), num(streamCache.misses) + " misses · size " + num(streamCache.size)) +
     card("Requests", num(data.metrics && data.metrics.requests), num(data.metrics && data.metrics.emptyResults) + " empty results");
@@ -230,19 +231,25 @@ function render(data) {
   components.innerHTML = comps.length === 0 ? '<p class="muted">No fleets enabled.</p>' : comps.map((component) => {
     const health = component.health || {};
     const process = component.process || {};
-    const state = component.ok ? (health.status || "ok") : "error";
+    const state = component.status || (component.ok ? (health.status || "ok") : "error");
+    const stateLabel = state === "ok" ? "WORKING" : state === "degraded" ? "DEGRADED" : "OFFLINE";
+    const updater = component.updater || (data.updater && data.updater[component.name]) || {};
+    const updaterText = updater.lastError ? "Failed" : (updater.fetchedAt ? "Active" : "—");
     return '<div class="component ' + statusClass(state) + '">' +
-      '<div class="component-head"><span class="component-name">' + esc(component.displayName || component.name) + '</span><span class="badge ' + statusClass(state) + '"><span class="dot"></span><span>' + esc(state) + '</span></span></div>' +
+      '<div class="component-head"><span class="component-name">' + esc(component.displayName || component.name) + '</span><span class="badge ' + statusClass(state) + '"><span class="dot"></span><span>' + esc(stateLabel) + '</span></span></div>' +
       '<div class="component-meta">' +
+        '<span>Status <strong class="' + statusClass(state) + '">' + esc(stateLabel) + '</strong></span>' +
         '<span>Latency <strong>' + ms(component.latencyMs) + '</strong></span>' +
         '<span>Providers <strong>' + num(health.providers && health.providers.total) + '</strong></span>' +
+        '<span>Circuits <strong>' + (health.providers && health.providers.circuits ? health.providers.circuits.open + " open" : "0 open") + '</strong></span>' +
         '<span>Process <strong>' + (process.running ? "running" : "stopped") + '</strong></span>' +
-        '<span>Restarts <strong>' + num(process.restarts || 0) + '</strong></span>' +
         '<span>Uptime <strong>' + num(process.uptimeSec) + 's</strong></span>' +
         '<span>Snapshot <strong>' + esc(health.snapshot && health.snapshot.sha ? String(health.snapshot.sha).slice(0, 8) : "—") + '</strong></span>' +
+        '<span>Updater <strong class="' + (updater.lastError ? "error" : "muted") + '">' + esc(updaterText) + '</strong></span>' +
       '</div>' +
       (component.error ? '<div class="error-line">' + esc(component.error) + '</div>' : "") +
-      (health.snapshot && health.snapshot.lastError ? '<div class="error-line">' + esc(health.snapshot.lastError) + '</div>' : "") +
+      (health.snapshot && health.snapshot.lastError && component.error !== health.snapshot.lastError ? '<div class="error-line">Snapshot: ' + esc(health.snapshot.lastError) + '</div>' : "") +
+      (updater.lastError && component.error !== updater.lastError && (!component.error || !component.error.includes(updater.lastError)) ? '<div class="error-line">Updater: ' + esc(updater.lastError) + '</div>' : "") +
     '</div>';
   }).join("");
 

@@ -69,11 +69,14 @@ function handleHealth(req, res, requestId) {
   }
 
   const runtime = getRuntimeStats();
+  const total = getRegistry().length;
+  const status = total > 0 ? 'ok' : 'error';
   const payload = buildStatus({
     addon: 'sa7',
     startedAt: new Date(startedAt).toISOString(),
     uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
-    status: 'ok',
+    status,
+    ok: total > 0,
     snapshot: {
       ...readSnapshotInfo(),
       refreshing: false,

@@ -122,7 +122,8 @@
   - [x] Allow Season 0 (specials) in Nuvio and Vega internal stream parsers (`parseId.ts`)
   - [x] Fix Codeberg branch head resolution in `src/core/updater/fetchers.ts` to stop 5-minute failure retry loop and restore 20-24h schedule
   - [x] Diagnose Nuvio empty streams on *Love, Death & Robots*: confirmed remote Codeberg manifest changes (`https://...` filename) blocked `ensure()` for 12-15s, exhausting the request timeout budget before scrapers ran
-  - [ ] Update Nuvio `SnapshotManager.ensure()` to stale-while-revalidate (serve in-memory snapshot immediately and refresh in background) and support full URL scraper filenames in manifest parsing
+  - [x] Update Nuvio `SnapshotManager.ensure()` to stale-while-revalidate (serve in-memory snapshot immediately and refresh in background) and support full URL scraper filenames in manifest parsing
+  - [x] Reflect fleet working status on status page: prominent `WORKING` / `DEGRADED` / `OFFLINE` badges, real loopback latency, updater error banners, and aggregate working count
 - [ ] Hydrate prefilled configuration in configure page HTML (`src/addon/configureHtml.ts`)
   - [x] Wire `UpdaterScheduler` and `MetadataResolver` into `StreamHandlerContext` and `/health`
   - [ ] Update `scripts/healthcheck.mjs` to avoid terminating container during transient single-worker restarts

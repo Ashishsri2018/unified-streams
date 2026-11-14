@@ -76,12 +76,12 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `stream.ts`: Stream resolution orchestrator.
   - `filters.ts`: Canonical stream filtering (resolution, size); inline `stream.subtitles` pass through unchanged.
   - `merge.ts`: URL classification, deduplication, and sorting.
-  - `health.ts` & `stats.ts`: Observability endpoints with aggregated provider metrics across fleets.
-  - `status.ts` & `statusHtml.ts`: Dark-mode real-time status dashboard with per-provider metrics table, filter search, fleet cards, and 15s auto-refresh.
+  - `health.ts` & `stats.ts`: Observability endpoints with aggregated provider metrics across fleets, real worker roundtrip latency measurements, updater error propagation, and accurate fleet working state (`ok`, `degraded`, `error`).
+  - `status.ts` & `statusHtml.ts`: Dark-mode real-time status dashboard with per-provider metrics table, filter search, prominent fleet working badges (`WORKING`, `DEGRADED`, `OFFLINE`), updater failure banners, and 15s auto-refresh.
 - `src/fleets/`: Worker implementations:
   - `sa7/`: SA7 scraper engine running in isolated CommonJS context.
-  - `nuvio/`: Nuvio scraper engine running in ES context.
-  - `vega/`: Vega scraper engine running in ES context.
+  - `nuvio/`: Nuvio scraper engine running in ES context. Non-blocking snapshot manager serves active in-memory snapshots immediately on incoming requests (stale-while-revalidate), triggering remote updates asynchronously in the background. Scraper manifest parser normalizes both relative `providers/*.js` paths and full remote `https://*.codeberg.page/...` URLs.
+  - `vega/`: Vega scraper engine running in ES context. Preloads baseline providers and state store on startup; all updates execute out-of-band via `/internal/reload`.
 - `cloudflare/`: Optional remote log ingestion Worker and D1 schema.
 - `scripts/`: Dev, policy check, icon verification, and deployment scripts.
 
