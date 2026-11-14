@@ -3,8 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+### Changed
+- Redesigned `/configure` with grouped stream filters, provider fleet cards, a live human-readable filter summary, inline validation, and a clearer install flow.
+- Inline `stream.subtitles` tracks are no longer filtered or rewritten by the gateway; provider subtitle tracks pass through unchanged.
+
 ### Fixed
-- Restrict `externalUrl` classification strictly to HTML pages; extensionless URLs (such as `dash-hls-bridge` or direct CDN endpoints) remain direct playable streams in `url`, and compressed files (`.zip`, `.rar`, etc.) remain in `url` with a `🔲 ` emoji prefix added to their `name`.
+- Automatic provider updates now work for SA7: the scheduler downloads `SA7ANI/cb-providers` into `DATA_DIR/sa7/cb-providers`, seeds that directory from the bundled snapshot, swaps files atomically, and points the worker at the updated manifest. The scheduler also waits for worker readiness before the startup update, treats a failed reload as a failed check without advancing the stored SHA, and retries after 5 minutes.
+- Route archives (`.zip`, `.rar`, `.7z`, etc.) to `externalUrl` because mobile players cannot open them; they keep the `🔲` name prefix and gain the `🖥️` title prefix. Extensionless URLs (such as `dash-hls-bridge` or direct CDN endpoints) remain direct playable streams in `url`.
 - Revert timeout defaults to `GLOBAL_DEADLINE_MS=13000` and `BACKEND_TIMEOUT_MS=12000` (11s worker budget), ensuring cold requests return before Beamup's ~13.2s proxy cutoff and preventing Cloudflare 504 gateway timeouts.
 - Add `🖥️` identification emoji prefix to the title of all `externalUrl` streams during gateway normalization.
 - Nuvio and Vega workers now derive their global deadline from `BACKEND_TIMEOUT_MS` minus a 1s margin, so partial results return before the gateway aborts the worker request.

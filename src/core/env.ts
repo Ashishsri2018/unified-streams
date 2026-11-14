@@ -315,6 +315,14 @@ export function deriveFleetEnv(
     outEnv.BREAKER_FAILURE_THRESHOLD = String(env.CIRCUIT_FAILURE_THRESHOLD);
     outEnv.BREAKER_COOLDOWN_MS = String(env.CIRCUIT_COOLDOWN_MS);
     outEnv.PROVIDER_CONCURRENCY = String(env.SA7_CONCURRENCY);
+
+    const sa7Root = path.join(fleetDataDir, 'cb-providers');
+    const sa7Manifest = path.join(sa7Root, 'manifest.json');
+    if (fs.existsSync(sa7Manifest)) {
+      outEnv.PROVIDER_MANIFEST = sa7Manifest;
+      outEnv.PROVIDER_DIR = path.join(sa7Root, 'providers');
+      outEnv.SA7_SNAPSHOT_FILE = path.join(sa7Root, 'UPSTREAM_COMMIT');
+    }
   } else if (fleet === 'nuvio') {
     const effective = resolveEffectivePolicy(
       basePolicy,

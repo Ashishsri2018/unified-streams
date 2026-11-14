@@ -16,7 +16,7 @@ npm run typecheck
 npm run build        # tsc + copy vendored fleet assets into dist
 npm run verify       # policy -> icon -> lint -> typecheck -> all tests -> build
 ```
-- `npm run verify` is the CI gate; run it before handing off. There is no per-package toolchain.
+- GitHub Actions is the authoritative verification path for `verify`, lint, typecheck, and the Docker build. Local Vitest tests are the exception and may be run for fast iteration; there is no per-package toolchain.
 - ESLint ignores `src/fleets/sa7/**` and vendored fleet snapshots/baselines; `tsc` also excludes SA7 and `tests/`. SA7 edits must be plain JS.
 - `npm run dev` prefers `dist/fleets/*/worker.js` when present, so it can run stale compiled workers. Rebuild or delete `dist/` after changing worker source.
 
@@ -32,11 +32,13 @@ npm run verify       # policy -> icon -> lint -> typecheck -> all tests -> build
 - Public routes support GET/HEAD/OPTIONS. `HEAD /stream/...` returns 200 without worker fan-out; `/subtitles*` is always 404; unsupported methods return 405.
 - Upstream/provider failures must return HTTP 200 with `{ "streams": [] }`, never 5xx.
 - Cache only non-empty gateway results: 180s complete, 30s partial, coalesced. Stream responses themselves are `no-store`.
-- Only HTML pages go in `externalUrl`; extensionless and archive links stay in `url`. Preserve the title/name prefixes applied in `src/addon/merge.ts` for external and archive streams.
+- Only HTML pages and archives (`.zip`, `.rar`, `.7z`, etc.) go in `externalUrl`; direct playable media and extensionless links stay in `url`. Archives carry both the `🔲` name prefix and the `🖥️` title prefix applied in `src/addon/merge.ts`.
+- SA7 reads providers from `DATA_DIR/sa7/cb-providers` (seeded from the bundled vendor snapshot); the updater replaces that copy atomically and then reloads the worker. Do not update bundled assets at runtime.
 - New HTTP/config/env input should pass Zod; `any` is a lint error. Redact secrets and full stream URLs in logs.
 
-## Tests and deploys
+## Tests, CI, and deploys
 - Tests are feature/unit tests under `tests/features/`; they mock workers and do not require Docker or upstream network. Live stream behavior needs real credentials/network.
-- CI runs on non-`**.md` pushes/PRs: verify -> Docker smoke test -> deploy both Beamup and Railway on `main`. A push to `main` is a production deploy; do not push unless asked.
+- The GitHub Actions workflow is the authoritative verification path: `verify` (policy, icon, lint, typecheck, all Vitest tests, build) and the Docker build/smoke test run there. Local Vitest runs are allowed for iteration, but do not treat other local-only checks as sufficient evidence.
+- Do not deploy to Beamup, Railway, or Cloudflare unless explicitly asked. A push to `main` triggers the production deploy workflow, so do not push unless explicitly allowed.
 - `deploy-cloudflare.yml` is manual and only deploys the optional log ingest Worker.
 - Docker runtime needs `config/`, `assets/`, `scripts/`, plus vendored `sa7`, `nuvio/snapshot`, and `vega/providers-baseline` copied into `dist` by `scripts/copy-fleet-assets.mjs`.

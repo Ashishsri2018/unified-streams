@@ -28,9 +28,9 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 |  |      * Gateway Cache: 180s full TTL, 30s partial TTL, non-empty only         |  |
 |  |      * Content ID Parser: tt, tmdb:, mal:                                    |  |
 |  |      * Metadata Resolver: Cinemeta, TMDB, Jikan (rate-limited)               |  |
-|  |      * Stream Merger & Classifier: direct playable vs externalUrl (HTML only) |  |
-|  |      * Stream Tagging: 🖥️ for externalUrl title, 🔲 for zip/archive name     |  |
-|  |      * Filters: Resolution, File Size, Separate Subtitles                    |  |
+|  |      * Stream Merger & Classifier: direct playable vs externalUrl             |  |
+|  |      * Stream Tagging: 🖥️ for externalUrl title, 🔲 for archive name          |  |
+|  |      * Filters: Resolution and File Size; inline subtitles pass through       |  |
 |  |      * Concurrency: Global deadline (12s), Timeout clamp, Request coalescing|  |
 |  |      * Telemetry: Canonical sliding-window health & stats                    |  |
 |  |      * Logger: Structured JSON lines, Redaction, Async queue, Stdout/CF Sink |  |
@@ -63,13 +63,13 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `contentId.ts` & `metadata.ts` & `jikan.ts`: ID parsing and upstream metadata resolution.
   - `policy.ts`: Provider policy enforcement and verification.
   - `workerClient.ts`: Internal HTTP client with deadline management.
-  - `updater/`: In-process snapshot downloaders and installers.
+  - `updater/`: In-process snapshot downloaders and installers. SA7 provider files live under `DATA_DIR/sa7/cb-providers` and are swapped atomically; the scheduler waits for worker readiness, verifies the reload, and retries failed checks after 5 minutes.
 - `src/addon/`: Gateway application layer:
   - `app.ts`: Express application with explicit HTTP method handlers.
   - `manifest.ts`: Stremio manifest generator.
   - `configure.ts`: Accessible, responsive configuration UI.
   - `stream.ts`: Stream resolution orchestrator.
-  - `filters.ts`: Canonical stream filtering (resolution, size, subtitles).
+  - `filters.ts`: Canonical stream filtering (resolution, size); inline `stream.subtitles` pass through unchanged.
   - `merge.ts`: URL classification, deduplication, and sorting.
   - `health.ts` & `stats.ts`: Observability endpoints with aggregated provider metrics across fleets.
   - `status.ts` & `statusHtml.ts`: Dark-mode real-time status dashboard with per-provider metrics table, filter search, fleet cards, and 15s auto-refresh.

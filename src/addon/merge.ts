@@ -31,7 +31,7 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
   };
 
   const isArchive = Boolean(primaryUrl && isArchiveUrl(primaryUrl));
-  const isExternal = Boolean(!isArchive && primaryUrl && isExternalUrl(primaryUrl));
+  const isExternal = Boolean(primaryUrl && isExternalUrl(primaryUrl));
 
   let name = stream.name;
   if (isArchive) {
@@ -43,7 +43,8 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
   let title = stream.title;
   if (isExternal) {
     if (!title || !title.startsWith('🖥️')) {
-      title = title ? `🖥️ ${title}` : '🖥️ External Link';
+      const fallback = isArchive ? 'Archive' : 'External Link';
+      title = title ? `🖥️ ${title}` : `🖥️ ${fallback}`;
     }
     const restHints = { ...behaviorHints };
     delete restHints.proxyHeaders;

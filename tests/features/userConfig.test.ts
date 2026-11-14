@@ -42,4 +42,20 @@ describe('userConfig encoding and decoding', () => {
     expect(decodeUserConfig('invalid-base64-string!@#$')).toEqual(DEFAULT_USER_CONFIG);
     expect(decodeUserConfig(undefined)).toEqual(DEFAULT_USER_CONFIG);
   });
+
+  it('resets both resolution bounds when the minimum exceeds the maximum', () => {
+    const encoded = encodeUserConfig({ minRes: 1080, maxRes: 720 });
+    const decoded = decodeUserConfig(encoded);
+
+    expect(decoded.minRes).toBeNull();
+    expect(decoded.maxRes).toBeNull();
+  });
+
+  it('keeps subtitle fields only for backwards-compatible decoding', () => {
+    const encoded = encodeUserConfig({ subtitleMode: 'none', subtitleLangs: ['en'] });
+    const decoded = decodeUserConfig(encoded);
+
+    expect(decoded.subtitleMode).toBe('none');
+    expect(decoded.subtitleLangs).toEqual(['en']);
+  });
 });

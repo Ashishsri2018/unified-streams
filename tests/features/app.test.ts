@@ -157,6 +157,115 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.text).toContain('const PREFILL_CONFIG = ');
     expect(res.text).toContain('"maxRes":720');
     expect(res.text).toContain('"backends":["vega"]');
+    expect(res.text).toContain('Stream filters');
+    expect(res.text).toContain('Provider fleets');
+    expect(res.text).toContain('passed through unchanged');
+    expect(res.text).not.toContain('name="subMode"');
+  });
+
+  it('GET /stream applies resolution and size filters from the encoded config', async () => {
+    const inlineSubtitles = [
+      { id: 'en', url: 'https://sub.test/en.vtt', lang: 'en' },
+      { id: 'hi', url: 'https://sub.test/hi.vtt', lang: 'hi' },
+    ];
+    const workers = {
+      sa7: {
+        ...mockWorker,
+        fetchStream: vi.fn().mockResolvedValue({
+          streams: [
+            {
+              title: 'SA7 1080p',
+              quality: '1080p',
+              url: 'https://cdn.test/sa7-1080.mp4',
+            },
+            {
+              title: 'SA7 720p',
+              quality: '720p',
+              url: 'https://cdn.test/sa7-720.mp4',
+              size: 1024 * 1024 * 1024,
+              subtitles: inlineSubtitles,
+            },
+          ],
+          outcome: 'ok',
+        }),
+      },
+      nuvio: {
+        ...mockWorker,
+        fetchStream: vi.fn().mockResolvedValue({
+          streams: [
+            {
+              title: 'Nuvio 480p 3 GB',
+              quality: '480p',
+              url: 'https://cdn.test/nuvio-480.mp4',
+              size: 3 * 1024 * 1024 * 1024,
+            },
+          ],
+          outcome: 'ok',
+        }),
+      },
+      vega: {
+        ...mockWorker,
+        fetchStream: vi.fn().mockResolvedValue({
+          streams: [
+            {
+              title: 'Vega unknown resolution',
+              url: 'https://cdn.test/vega-unknown.mp4',
+              size: 1024 * 1024 * 1024,
+            },
+          ],
+          outcome: 'ok',
+        }),
+      },
+    } as unknown as StreamHandlerContext['workers'];
+
+    const filteredApp = createGatewayApp(
+      { ...ctx, cache: new GatewayStreamCache(), workers },
+      Date.now(),
+    );
+    const encoded = encodeUserConfig({
+      maxRes: 720,
+      includeUnknownRes: false,
+      maxSizeGB: 2,
+      includeUnknownSize: false,
+      subtitleMode: 'none',
+      subtitleLangs: ['en'],
+      backends: ['sa7', 'nuvio', 'vega'],
+    });
+
+    const res = await request(filteredApp).get(`/${encoded}/stream/movie/tt0111161.json`);
+    expect(res.status).toBe(200);
+    expect(res.body.streams).toHaveLength(1);
+    expect(res.body.streams[0].title).toBe('SA7 720p');
+    expect(res.body.streams[0].url).toBe('https://cdn.test/sa7-720.mp4');
+    expect(res.body.streams[0].subtitles).toEqual(inlineSubtitles);
+  });
+
+  it('GET /stream only fans out to fleets selected in the config', async () => {
+    const workers = {
+      sa7: { ...mockWorker, fetchStream: vi.fn().mockResolvedValue({ streams: [], outcome: 'empty' }) },
+      nuvio: { ...mockWorker, fetchStream: vi.fn().mockResolvedValue({ streams: [], outcome: 'empty' }) },
+      vega: {
+        ...mockWorker,
+        fetchStream: vi.fn().mockResolvedValue({
+          streams: [{ title: 'Vega only', quality: '1080p', url: 'https://cdn.test/vega.mp4' }],
+          outcome: 'ok',
+        }),
+      },
+    } as unknown as StreamHandlerContext['workers'];
+
+    const fleetApp = createGatewayApp(
+      { ...ctx, cache: new GatewayStreamCache(), workers },
+      Date.now(),
+    );
+    const encoded = encodeUserConfig({ backends: ['vega'] });
+
+    const res = await request(fleetApp).get(`/${encoded}/stream/movie/tt0111161.json`);
+    expect(res.status).toBe(200);
+    expect(res.body.streams).toHaveLength(1);
+    expect(res.body.streams[0].title).toBe('Vega only');
+    expect(workers.sa7.fetchStream).not.toHaveBeenCalled();
+    expect(workers.nuvio.fetchStream).not.toHaveBeenCalled();
+    expect(workers.vega.fetchStream).toHaveBeenCalledTimes(1);
   });
 
   it('GET and HEAD /status render rich status page with table and security headers', async () => {

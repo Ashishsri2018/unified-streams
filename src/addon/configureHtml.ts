@@ -12,270 +12,626 @@ export function renderConfigurePageHtml(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#070b14">
   <title>Unified Streams — Configure</title>
   <link rel="icon" type="image/x-icon" href="${baseUrl}/favicon.ico">
   <style>
     :root {
-      --bg: #0f172a; --surface: #1e293b; --elevated: #334155;
-      --border: #334155; --text: #f8fafc; --text-muted: #94a3b8;
-      --accent: #6366f1; --accent-hover: #4f46e5; --success: #10b981;
+      color-scheme: dark;
+      --bg: #070b14;
+      --panel: #101827;
+      --panel-deep: #0a121f;
+      --line: #243044;
+      --text: #e5edf8;
+      --muted: #93a4bc;
+      --accent: #60a5fa;
+      --accent-strong: #3b82f6;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --bad: #fb7185;
+      --radius: 16px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
-      background: var(--bg); color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 1.5rem 1rem; line-height: 1.5;
+      margin: 0;
+      min-height: 100vh;
+      font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 480px at 8% -10%, #1d2a5a66, transparent),
+        radial-gradient(700px 420px at 100% 0%, #0f2a3a55, transparent),
+        var(--bg);
     }
-    .container { max-width: 680px; margin: 0 auto; }
-    .header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
-    .header img { width: 56px; height: 56px; border-radius: 12px; }
+    a { color: var(--accent); }
+    .container { max-width: 860px; margin: 0 auto; padding: 28px 18px 64px; }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .logo { width: 56px; height: 56px; border-radius: 16px; flex: none; }
+    h1 { margin: 0; font-size: clamp(22px, 3vw, 28px); letter-spacing: -0.03em; }
+    .subtitle { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
     .card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem;
+      background: linear-gradient(180deg, #111b2bdd, #0c1422ee);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 14px 40px #0005;
     }
-    h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #e2e8f0; }
-    .field { margin-bottom: 1rem; }
-    label { display: block; font-size: 0.9rem; margin-bottom: 0.35rem; color: var(--text-muted); }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    @media (max-width: 500px) { .row { grid-template-columns: 1fr; } }
-    select, input[type="number"], input[type="text"] {
-      width: 100%; background: var(--bg); border: 1px solid var(--border);
-      color: var(--text); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.95rem;
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 16px;
     }
-    .checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-top: 0.5rem; }
-    .hint { font-size: 0.8rem; color: #64748b; margin-top: 0.35rem; }
-    .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
-    .chip {
-      background: var(--elevated); padding: 0.3rem 0.6rem; border-radius: 16px;
-      font-size: 0.85rem; cursor: pointer; user-select: none;
+    h2 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+    .card-sub { margin: 3px 0 0; color: var(--muted); font-size: 12.5px; }
+    .step {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 30px;
+      height: 30px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-deep);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
     }
-    .chip.selected { background: var(--accent); color: #fff; }
+    fieldset { border: 0; margin: 0; padding: 0; }
+    fieldset + fieldset { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+    legend, .label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .field-help { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+    select, input[type="number"] {
+      width: 100%;
+      min-height: 42px;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-deep);
+      color: var(--text);
+      font: inherit;
+      outline: none;
+    }
+    select:focus-visible, input:focus-visible, input[type="checkbox"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .check {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-deep);
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .check input { margin: 3px 0 0; accent-color: var(--accent); flex: none; }
+    .check.disabled { opacity: 0.55; cursor: not-allowed; }
+    .fleets { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .fleet {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-deep);
+      cursor: pointer;
+      transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+    }
+    .fleet:hover { border-color: #35507a; }
+    .fleet.selected {
+      border-color: var(--accent);
+      background: linear-gradient(180deg, #172554aa, #0a121fee);
+    }
+    .fleet input { margin: 3px 0 0; accent-color: var(--accent); flex: none; }
+    .fleet-name { display: block; font-weight: 700; color: var(--text); }
+    .fleet-desc { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .summary { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+    .summary li {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .summary li::before {
+      content: "";
+      flex: none;
+      width: 7px;
+      height: 7px;
+      margin-top: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .summary strong { color: var(--text); font-weight: 650; }
     .url-box {
-      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-      padding: 0.6rem; font-family: monospace; font-size: 0.85rem; word-break: break-all;
-      margin: 0.75rem 0;
+      min-height: 46px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-deep);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12.5px;
+      line-height: 1.65;
+      word-break: break-all;
     }
-    .btn-group { display: flex; gap: 0.5rem; }
-    button {
-      flex: 1; padding: 0.65rem 1rem; border-radius: 6px; font-weight: 600;
-      cursor: pointer; border: none; font-size: 0.9rem;
+    .error {
+      margin: 0 0 14px;
+      padding: 10px 12px;
+      border: 1px solid #7f1d3a;
+      border-radius: 10px;
+      background: #3d1620;
+      color: #fecdd3;
+      font-size: 13px;
     }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent-hover); }
-    .btn-secondary { background: var(--elevated); color: var(--text); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    button, .button {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 9px 15px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #162136;
+      color: var(--text);
+      font: inherit;
+      font-weight: 650;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled), .button:hover { border-color: #35507a; }
+    button:focus-visible, .button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .btn-primary {
+      flex: 1 1 200px;
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #04101f;
+    }
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status-text { min-height: 18px; margin: 10px 0 0; color: var(--ok); font-size: 12.5px; }
+    .note {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-deep);
+      color: var(--muted);
+      font-size: 12.5px;
+    }
+    .footer { margin-top: 18px; color: var(--muted); font-size: 12px; text-align: center; }
+    @media (max-width: 620px) {
+      .container { padding: 20px 14px 48px; }
+      .field-grid { grid-template-columns: 1fr; }
+      .card { padding: 17px; }
+      .header-actions .button { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .fleet { transition: none; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <img src="${baseUrl}/logo.png" alt="Unified Streams Logo">
-      <div>
-        <h1>Unified Streams</h1>
-        <p class="hint">One unified Stremio addon combining SA7, Nuvio, and Vega.</p>
-      </div>
-    </div>
-
-    <!-- 1. Stream Quality -->
-    <div class="card">
-      <h2>1. Stream Quality</h2>
-      <div class="row">
-        <div class="field">
-          <label for="minRes">Minimum Resolution</label>
-          <select id="minRes">
-            <option value="">Any</option><option value="240">240p</option>
-            <option value="360">360p</option><option value="480">480p</option>
-            <option value="720">720p</option><option value="1080">1080p</option>
-            <option value="1440">1440p (2K)</option><option value="2160">2160p (4K)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="maxRes">Maximum Resolution</label>
-          <select id="maxRes">
-            <option value="">Any</option><option value="480">480p</option>
-            <option value="720">720p</option><option value="1080">1080p</option>
-            <option value="1440">1440p (2K)</option><option value="2160">2160p (4K)</option>
-          </select>
+  <main class="container">
+    <header class="header">
+      <div class="brand">
+        <img class="logo" src="${baseUrl}/logo.png" alt="">
+        <div>
+          <h1>Unified Streams</h1>
+          <p class="subtitle">Build a Stremio install link for SA7, Nuvio, and Vega streams.</p>
         </div>
       </div>
-      <p class="hint">Selecting 720p max includes 720p and lower; it excludes 1080p and above.</p>
-      <label class="checkbox-label">
-        <input type="checkbox" id="includeUnknownRes" checked>
-        <span>Include streams with unknown resolution</span>
-      </label>
-    </div>
-
-    <!-- 2. File Size -->
-    <div class="card">
-      <h2>2. File Size</h2>
-      <div class="field">
-        <label for="maxSizeGB">Maximum File Size (GB)</label>
-        <input type="number" id="maxSizeGB" step="0.1" min="0.1" max="1024" placeholder="No limit">
+      <div class="header-actions">
+        <a class="button" href="${baseUrl}/status">View status</a>
       </div>
-      <label class="checkbox-label">
-        <input type="checkbox" id="includeUnknownSize" checked>
-        <span>Include streams with unknown file size</span>
-      </label>
-    </div>
+    </header>
 
-    <!-- 3. Subtitles -->
-    <div class="card">
-      <h2>3. Subtitles</h2>
-      <div class="field">
-        <label class="checkbox-label"><input type="radio" name="subMode" value="all" checked> Keep all separate subtitles</label>
-        <label class="checkbox-label"><input type="radio" name="subMode" value="none"> Remove separate subtitles</label>
-        <label class="checkbox-label"><input type="radio" name="subMode" value="languages"> Only selected languages</label>
+    <noscript>
+      <div class="card"><p class="card-sub">JavaScript is required to build and copy the install link.</p></div>
+    </noscript>
+
+    <section class="card" aria-labelledby="filters-heading">
+      <div class="card-head">
+        <div>
+          <h2 id="filters-heading">Stream filters</h2>
+          <p class="card-sub">Optional limits. Leave a field blank to keep every stream for that rule.</p>
+        </div>
+        <span class="step" aria-hidden="true">01</span>
       </div>
-      <div id="subLangsContainer" style="display:none;">
-        <label>Selected Languages</label>
-        <div class="chips" id="langChips"></div>
-        <input type="text" id="extraLangs" placeholder="Other codes (e.g. ja, ko, de)" style="margin-top:0.5rem;">
-        <label class="checkbox-label">
-          <input type="checkbox" id="includeUnknownSubtitleLang">
-          <span>Include subtitle tracks with unknown language</span>
+
+      <fieldset>
+        <legend>Resolution</legend>
+        <div class="field-grid">
+          <div class="field">
+            <label for="minRes">Minimum</label>
+            <select id="minRes">
+              <option value="">Any</option>
+              <option value="240">240p</option>
+              <option value="360">360p</option>
+              <option value="480">480p</option>
+              <option value="576">576p</option>
+              <option value="720">720p</option>
+              <option value="1080">1080p</option>
+              <option value="1440">1440p (2K)</option>
+              <option value="2160">2160p (4K)</option>
+              <option value="4320">4320p (8K)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="maxRes">Maximum</label>
+            <select id="maxRes">
+              <option value="">Any</option>
+              <option value="480">480p</option>
+              <option value="576">576p</option>
+              <option value="720">720p</option>
+              <option value="1080">1080p</option>
+              <option value="1440">1440p (2K)</option>
+              <option value="2160">2160p (4K)</option>
+              <option value="4320">4320p (8K)</option>
+            </select>
+          </div>
+        </div>
+        <p class="field-help">A 720p maximum keeps 720p and lower, and excludes 1080p and above. Set both fields to the same value to allow one resolution only.</p>
+        <label class="check" id="unknownResCheck">
+          <input type="checkbox" id="includeUnknownRes" checked>
+          <span>Include streams when the resolution cannot be detected</span>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>File size</legend>
+        <div class="field">
+          <label for="maxSizeGB">Maximum size (GB)</label>
+          <input type="number" id="maxSizeGB" step="0.1" min="0.1" max="1024" inputmode="decimal" placeholder="No limit">
+        </div>
+        <label class="check" id="unknownSizeCheck">
+          <input type="checkbox" id="includeUnknownSize" checked>
+          <span>Include streams when the file size cannot be detected</span>
+        </label>
+      </fieldset>
+    </section>
+
+    <section class="card" aria-labelledby="fleets-heading">
+      <div class="card-head">
+        <div>
+          <h2 id="fleets-heading">Provider fleets</h2>
+          <p class="card-sub">Choose which provider groups to query. At least one fleet is required.</p>
+        </div>
+        <span class="step" aria-hidden="true">02</span>
+      </div>
+      <div class="fleets">
+        <label class="fleet" id="fleetCard-sa7">
+          <input type="checkbox" id="fleet-sa7" checked>
+          <span><span class="fleet-name">SA7</span><span class="fleet-desc">SA7 provider set</span></span>
+        </label>
+        <label class="fleet" id="fleetCard-nuvio">
+          <input type="checkbox" id="fleet-nuvio" checked>
+          <span><span class="fleet-name">Nuvio</span><span class="fleet-desc">Nuvio provider set</span></span>
+        </label>
+        <label class="fleet" id="fleetCard-vega">
+          <input type="checkbox" id="fleet-vega" checked>
+          <span><span class="fleet-name">Vega</span><span class="fleet-desc">Vega provider set</span></span>
         </label>
       </div>
-      <p class="hint">Filters only separate subtitle tracks. Embedded subtitles are never modified.</p>
-    </div>
+    </section>
 
-    <!-- 4. Fleets -->
-    <div class="card">
-      <h2>4. Provider Fleets</h2>
-      <label class="checkbox-label"><input type="checkbox" id="fleet-sa7" checked> SA7 Providers</label>
-      <label class="checkbox-label"><input type="checkbox" id="fleet-nuvio" checked> Nuvio Providers</label>
-      <label class="checkbox-label"><input type="checkbox" id="fleet-vega" checked> Vega Providers</label>
-    </div>
-
-    <!-- 5. Install -->
-    <div class="card">
-      <h2>5. Install Addon</h2>
-      <div class="url-box" id="manifestUrlBox"></div>
-      <div class="btn-group">
-        <button class="btn-primary" id="btnInstall">Install in Stremio</button>
-        <button class="btn-secondary" id="btnCopy">Copy Link</button>
-        <button class="btn-secondary" id="btnReset">Reset</button>
+    <section class="card" aria-labelledby="install-heading">
+      <div class="card-head">
+        <div>
+          <h2 id="install-heading">Install</h2>
+          <p class="card-sub">Your choices are encoded in the link below. Nothing is saved on the server.</p>
+        </div>
+        <span class="step" aria-hidden="true">03</span>
       </div>
-    </div>
-  </div>
+
+      <ul class="summary" id="summary" aria-live="polite"></ul>
+      <p class="error" id="errorBox" role="alert" hidden></p>
+      <div class="url-box" id="manifestUrlBox" aria-label="Manifest URL"></div>
+
+      <div class="actions">
+        <button type="button" class="btn-primary" id="btnInstall">Install in Stremio</button>
+        <button type="button" id="btnCopy">Copy link</button>
+        <a class="button" id="btnOpen" href="#" target="_blank" rel="noopener noreferrer">Open manifest</a>
+        <button type="button" id="btnReset">Reset defaults</button>
+      </div>
+      <p class="status-text" id="copyStatus" aria-live="polite"></p>
+      <p class="note">Subtitle tracks returned inline with a stream are passed through unchanged. This addon does not provide a separate subtitles resource.</p>
+    </section>
+
+    <footer class="footer">Unified Streams · one addon for three provider fleets</footer>
+  </main>
 
   <script nonce="${scriptNonce}">
     const BASE_URL = "${baseUrl}";
     const PREFILL_CONFIG = ${prefillConfigJson};
-    const COMMON_LANGS = [
-      { code: 'en', name: 'English' }, { code: 'hi', name: 'Hindi' },
-      { code: 'ta', name: 'Tamil' }, { code: 'te', name: 'Telugu' },
-      { code: 'ml', name: 'Malayalam' }, { code: 'kn', name: 'Kannada' },
-      { code: 'ja', name: 'Japanese' }, { code: 'ko', name: 'Korean' },
-      { code: 'es', name: 'Spanish' }, { code: 'fr', name: 'French' },
-      { code: 'multi', name: 'Multi' }
-    ];
     const PREFILL = PREFILL_CONFIG && typeof PREFILL_CONFIG === 'object' ? PREFILL_CONFIG : {};
-    const prefillLangs = Array.isArray(PREFILL.subtitleLangs) ? PREFILL.subtitleLangs : [];
-    let selectedLangs = new Set(prefillLangs.length > 0 ? prefillLangs : ['en']);
+    const FLEETS = ['sa7', 'nuvio', 'vega'];
+    const FLEET_NAMES = { sa7: 'SA7', nuvio: 'Nuvio', vega: 'Vega' };
+    const ALL_FLEETS = FLEETS.slice();
 
-    const chipsContainer = document.getElementById('langChips');
-    COMMON_LANGS.forEach(l => {
-      const chip = document.createElement('div');
-      chip.className = 'chip' + (selectedLangs.has(l.code) ? ' selected' : '');
-      chip.textContent = l.name;
-      chip.onclick = () => {
-        if (selectedLangs.has(l.code)) selectedLangs.delete(l.code);
-        else selectedLangs.add(l.code);
-        chip.className = 'chip' + (selectedLangs.has(l.code) ? ' selected' : '');
-        updateUrl();
-      };
-      chipsContainer.appendChild(chip);
-    });
+    function el(id) {
+      return document.getElementById(id);
+    }
 
-    document.querySelectorAll('input[name="subMode"]').forEach(r => {
-      r.addEventListener('change', (e) => {
-        document.getElementById('subLangsContainer').style.display = e.target.value === 'languages' ? 'block' : 'none';
-        updateUrl();
+    function numberOrNull(id) {
+      const raw = el(id).value;
+      if (raw === '') return null;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : null;
+    }
+
+    function selectedBackends() {
+      return FLEETS.filter(function (fleet) {
+        return el('fleet-' + fleet).checked;
       });
-    });
+    }
 
-    ['minRes', 'maxRes', 'maxSizeGB', 'extraLangs'].forEach(id => {
-      document.getElementById(id).addEventListener('input', updateUrl);
-    });
-    ['includeUnknownRes', 'includeUnknownSize', 'includeUnknownSubtitleLang', 'fleet-sa7', 'fleet-nuvio', 'fleet-vega'].forEach(id => {
-      document.getElementById(id).addEventListener('change', updateUrl);
-    });
+    function setFleetChecked(fleet, checked) {
+      el('fleet-' + fleet).checked = checked;
+      el('fleetCard-' + fleet).classList.toggle('selected', checked);
+    }
 
-    function applyPrefill() {
-      const setValue = (id, value) => {
-        if (value === null || value === undefined) return;
-        document.getElementById(id).value = String(value);
-      };
-      setValue('minRes', PREFILL.minRes);
-      setValue('maxRes', PREFILL.maxRes);
-      setValue('maxSizeGB', PREFILL.maxSizeGB);
-      if (PREFILL.includeUnknownRes === false) document.getElementById('includeUnknownRes').checked = false;
-      if (PREFILL.includeUnknownSize === false) document.getElementById('includeUnknownSize').checked = false;
-      if (PREFILL.includeUnknownSubtitleLang === true) document.getElementById('includeUnknownSubtitleLang').checked = true;
-
-      const mode = ['all', 'none', 'languages'].includes(PREFILL.subtitleMode) ? PREFILL.subtitleMode : 'all';
-      const modeInput = document.querySelector('input[name="subMode"][value="' + mode + '"]');
-      if (modeInput) modeInput.checked = true;
-      document.getElementById('subLangsContainer').style.display = mode === 'languages' ? 'block' : 'none';
-
-      const commonCodes = new Set(COMMON_LANGS.map(l => l.code));
-      const extra = prefillLangs.filter(code => !commonCodes.has(code));
-      document.getElementById('extraLangs').value = extra.join(', ');
-
-      const backends = Array.isArray(PREFILL.backends) && PREFILL.backends.length > 0
-        ? PREFILL.backends
-        : ['sa7', 'nuvio', 'vega'];
-      ['sa7', 'nuvio', 'vega'].forEach(name => {
-        document.getElementById('fleet-' + name).checked = backends.includes(name);
+    function syncFleetStyles() {
+      FLEETS.forEach(function (fleet) {
+        el('fleetCard-' + fleet).classList.toggle('selected', el('fleet-' + fleet).checked);
       });
+    }
+
+    function syncUnknownCheckboxes() {
+      const hasResolutionBound = el('minRes').value !== '' || el('maxRes').value !== '';
+      const hasSizeLimit = el('maxSizeGB').value !== '';
+      el('includeUnknownRes').disabled = !hasResolutionBound;
+      el('includeUnknownSize').disabled = !hasSizeLimit;
+      el('unknownResCheck').classList.toggle('disabled', !hasResolutionBound);
+      el('unknownSizeCheck').classList.toggle('disabled', !hasSizeLimit);
+    }
+
+    function resolutionLabel(height) {
+      const labels = {
+        240: '240p',
+        360: '360p',
+        480: '480p',
+        576: '576p',
+        720: '720p',
+        1080: '1080p',
+        1440: '1440p',
+        2160: '2160p',
+        4320: '4320p'
+      };
+      return labels[height] || height + 'p';
+    }
+
+    function resolutionSummary(minRes, maxRes) {
+      if (minRes === null && maxRes === null) return 'Any resolution';
+      if (minRes !== null && maxRes !== null) {
+        if (minRes === maxRes) return resolutionLabel(minRes) + ' only';
+        return resolutionLabel(minRes) + ' to ' + resolutionLabel(maxRes);
+      }
+      if (minRes !== null) return resolutionLabel(minRes) + ' and above';
+      return resolutionLabel(maxRes) + ' and below';
+    }
+
+    function fleetSummary(backends) {
+      if (backends.length === FLEETS.length) return 'All fleets (SA7, Nuvio, Vega)';
+      return backends.map(function (fleet) { return FLEET_NAMES[fleet]; }).join(', ');
+    }
+
+    function addSummary(label, value) {
+      const item = document.createElement('li');
+      const strong = document.createElement('strong');
+      strong.textContent = label + ': ';
+      item.appendChild(strong);
+      item.appendChild(document.createTextNode(value));
+      el('summary').appendChild(item);
+    }
+
+    function renderSummary(minRes, maxRes, maxSizeGB, backends) {
+      const summary = el('summary');
+      summary.replaceChildren();
+
+      const resolution = resolutionSummary(minRes, maxRes);
+      const hasResolutionBound = minRes !== null || maxRes !== null;
+      const unknownRes = hasResolutionBound
+        ? el('includeUnknownRes').checked ? ' (including unknown)' : ' (excluding unknown)'
+        : '';
+      addSummary('Resolution', resolution + unknownRes);
+
+      const size = maxSizeGB === null ? 'No size limit' : 'Up to ' + maxSizeGB + ' GB';
+      const unknownSize = maxSizeGB !== null
+        ? el('includeUnknownSize').checked ? ' (including unknown)' : ' (excluding unknown)'
+        : '';
+      addSummary('File size', size + unknownSize);
+      addSummary('Fleets', fleetSummary(backends));
+    }
+
+    function validate(minRes, maxRes, maxSizeGB) {
+      const errors = [];
+      if (minRes !== null && maxRes !== null && minRes > maxRes) {
+        errors.push('Minimum resolution cannot be higher than maximum resolution.');
+      }
+      if (maxSizeGB !== null && (maxSizeGB < 0.1 || maxSizeGB > 1024)) {
+        errors.push('Maximum file size must be between 0.1 and 1024 GB.');
+      }
+      return errors;
+    }
+
+    function setInvalid(errors) {
+      const errorBox = el('errorBox');
+      errorBox.textContent = errors.join(' ');
+      errorBox.hidden = errors.length === 0;
+      el('btnInstall').disabled = errors.length > 0;
+      el('btnCopy').disabled = errors.length > 0;
+      el('btnOpen').setAttribute('aria-disabled', errors.length > 0 ? 'true' : 'false');
+      if (errors.length > 0) {
+        el('manifestUrlBox').textContent = 'Fix the settings above to generate an install link.';
+        el('btnOpen').removeAttribute('href');
+      }
     }
 
     function updateUrl() {
-      const minRes = document.getElementById('minRes').value ? parseInt(document.getElementById('minRes').value, 10) : null;
-      const maxRes = document.getElementById('maxRes').value ? parseInt(document.getElementById('maxRes').value, 10) : null;
-      const maxSizeGB = document.getElementById('maxSizeGB').value ? parseFloat(document.getElementById('maxSizeGB').value) : null;
-      const subMode = document.querySelector('input[name="subMode"]:checked').value;
-      const backends = [];
-      if (document.getElementById('fleet-sa7').checked) backends.push('sa7');
-      if (document.getElementById('fleet-nuvio').checked) backends.push('nuvio');
-      if (document.getElementById('fleet-vega').checked) backends.push('vega');
-      if (backends.length === 0) backends.push('sa7', 'nuvio', 'vega');
+      syncUnknownCheckboxes();
 
-      const extra = document.getElementById('extraLangs').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-      const langs = Array.from(new Set([...selectedLangs, ...extra]));
+      const minRes = numberOrNull('minRes');
+      const maxRes = numberOrNull('maxRes');
+      const maxSizeGB = numberOrNull('maxSizeGB');
+      const backends = selectedBackends();
+      const errors = validate(minRes, maxRes, maxSizeGB);
+
+      renderSummary(minRes, maxRes, maxSizeGB, backends.length > 0 ? backends : ALL_FLEETS);
+      setInvalid(errors);
+      if (errors.length > 0) return { valid: false, manifestUrl: '' };
 
       const config = {
-        v: 2, minRes, maxRes,
-        includeUnknownRes: document.getElementById('includeUnknownRes').checked,
-        maxSizeGB,
-        includeUnknownSize: document.getElementById('includeUnknownSize').checked,
-        subtitleMode: subMode,
-        subtitleLangs: langs,
-        includeUnknownSubtitleLang: document.getElementById('includeUnknownSubtitleLang').checked,
-        backends
+        v: 2,
+        minRes: minRes,
+        maxRes: maxRes,
+        includeUnknownRes: el('includeUnknownRes').checked,
+        maxSizeGB: maxSizeGB,
+        includeUnknownSize: el('includeUnknownSize').checked,
+        backends: backends
       };
 
-      const b64 = btoa(JSON.stringify(config)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+      const b64 = btoa(JSON.stringify(config))
+        .replace(/\\+/g, '-')
+        .replace(/\\//g, '_')
+        .replace(/=+$/, '');
       const manifestUrl = BASE_URL + '/' + b64 + '/manifest.json';
-      document.getElementById('manifestUrlBox').textContent = manifestUrl;
-      return { b64, manifestUrl };
+      el('manifestUrlBox').textContent = manifestUrl;
+      el('btnOpen').setAttribute('href', manifestUrl);
+      return { valid: true, manifestUrl: manifestUrl };
     }
 
-    document.getElementById('btnInstall').onclick = () => {
-      const { manifestUrl } = updateUrl();
-      const stremioUrl = manifestUrl.replace(/^https?:\\/\\//, 'stremio://');
-      window.location.href = stremioUrl;
-    };
-    document.getElementById('btnCopy').onclick = () => {
-      const { manifestUrl } = updateUrl();
-      navigator.clipboard.writeText(manifestUrl);
-      document.getElementById('btnCopy').textContent = 'Copied!';
-      setTimeout(() => { document.getElementById('btnCopy').textContent = 'Copy Link'; }, 2000);
-    };
-    document.getElementById('btnReset').onclick = () => {
-      window.location.href = BASE_URL + '/configure';
-    };
+    function setSelectValue(id, value) {
+      if (value === null || value === undefined) return;
+      const text = String(value);
+      const optionExists = Array.prototype.some.call(el(id).options, function (option) {
+        return option.value === text;
+      });
+      if (optionExists) el(id).value = text;
+    }
+
+    function applyPrefill() {
+      setSelectValue('minRes', PREFILL.minRes);
+      setSelectValue('maxRes', PREFILL.maxRes);
+      if (PREFILL.maxSizeGB !== null && PREFILL.maxSizeGB !== undefined) {
+        el('maxSizeGB').value = String(PREFILL.maxSizeGB);
+      }
+      if (PREFILL.includeUnknownRes === false) el('includeUnknownRes').checked = false;
+      if (PREFILL.includeUnknownSize === false) el('includeUnknownSize').checked = false;
+
+      const backends = Array.isArray(PREFILL.backends) && PREFILL.backends.length > 0
+        ? PREFILL.backends
+        : ALL_FLEETS;
+      FLEETS.forEach(function (fleet) {
+        setFleetChecked(fleet, backends.indexOf(fleet) !== -1);
+      });
+    }
+
+    function ensureSelectedFleet(changedFleet) {
+      if (selectedBackends().length === 0) {
+        setFleetChecked(changedFleet, true);
+      }
+      syncFleetStyles();
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const field = document.createElement('textarea');
+      field.value = text;
+      field.setAttribute('readonly', '');
+      field.style.position = 'fixed';
+      field.style.opacity = '0';
+      document.body.appendChild(field);
+      field.select();
+      document.execCommand('copy');
+      document.body.removeChild(field);
+    }
+
+    ['minRes', 'maxRes', 'maxSizeGB'].forEach(function (id) {
+      el(id).addEventListener('input', updateUrl);
+      el(id).addEventListener('change', updateUrl);
+    });
+    ['includeUnknownRes', 'includeUnknownSize'].forEach(function (id) {
+      el(id).addEventListener('change', updateUrl);
+    });
+    FLEETS.forEach(function (fleet) {
+      el('fleet-' + fleet).addEventListener('change', function () {
+        ensureSelectedFleet(fleet);
+        updateUrl();
+      });
+    });
+
+    el('btnInstall').addEventListener('click', function () {
+      const result = updateUrl();
+      if (!result.valid) return;
+      window.location.href = result.manifestUrl.replace(/^https?:\\/\\//, 'stremio://');
+    });
+
+    el('btnCopy').addEventListener('click', async function () {
+      const result = updateUrl();
+      if (!result.valid) return;
+      const status = el('copyStatus');
+      try {
+        await copyText(result.manifestUrl);
+        el('btnCopy').textContent = 'Copied';
+        status.textContent = 'Install link copied to the clipboard.';
+        setTimeout(function () {
+          el('btnCopy').textContent = 'Copy link';
+          status.textContent = '';
+        }, 2000);
+      } catch {
+        status.textContent = 'Copy failed. Select the link and copy it manually.';
+      }
+    });
+
+    el('btnReset').addEventListener('click', function () {
+      el('minRes').value = '';
+      el('maxRes').value = '';
+      el('maxSizeGB').value = '';
+      el('includeUnknownRes').checked = true;
+      el('includeUnknownSize').checked = true;
+      FLEETS.forEach(function (fleet) {
+        setFleetChecked(fleet, true);
+      });
+      el('copyStatus').textContent = '';
+      updateUrl();
+    });
 
     applyPrefill();
+    syncFleetStyles();
     updateUrl();
   </script>
 </body>

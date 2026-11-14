@@ -48,6 +48,18 @@ export class Supervisor {
         fs.cpSync(baseline, vegaTarget, { recursive: true });
       }
     }
+
+    // Seed SA7 providers into the data directory so the updater can replace them atomically.
+    const sa7Target = path.join(this.env.DATA_DIR, 'sa7', 'cb-providers');
+    if (!fs.existsSync(path.join(sa7Target, 'manifest.json'))) {
+      const distSa7 = path.resolve(process.cwd(), 'dist/fleets/sa7/vendor/cb-providers');
+      const srcSa7 = path.resolve(process.cwd(), 'src/fleets/sa7/vendor/cb-providers');
+      const bundled = fs.existsSync(distSa7) ? distSa7 : srcSa7;
+      if (fs.existsSync(bundled)) {
+        fs.mkdirSync(sa7Target, { recursive: true });
+        fs.cpSync(bundled, sa7Target, { recursive: true });
+      }
+    }
   }
 
   start(): void {

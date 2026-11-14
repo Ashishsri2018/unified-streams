@@ -1,4 +1,4 @@
-import { filterSubtitleTracks, SubtitleTrack } from './subtitles.js';
+import { SubtitleTrack } from './subtitles.js';
 
 export interface StremioStream {
   url?: string;
@@ -98,16 +98,6 @@ export function filterStream(stream: StremioStream, config: StreamFilterConfig):
     }
   }
 
-  // 3. Subtitle Filter
-  const filteredSubtitles = filterSubtitleTracks(
-    stream.subtitles,
-    config.subtitleMode,
-    config.subtitleLangs,
-    config.includeUnknownSubtitleLang,
-  );
-
-  return {
-    ...stream,
-    subtitles: filteredSubtitles,
-  };
+  // Inline subtitles belong to the stream object and are passed through as-is.
+  return stream;
 }

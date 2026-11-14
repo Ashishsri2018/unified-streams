@@ -1,4 +1,14 @@
+const fs = require('fs');
 const path = require('path');
+
+const bundledRoot = path.join(__dirname, 'vendor', 'cb-providers');
+
+function resolvePath(candidate, fallback) {
+  if (typeof candidate === 'string' && candidate.length > 0 && fs.existsSync(candidate)) {
+    return candidate;
+  }
+  return fallback;
+}
 
 function envInt(name, fallback, min) {
   const raw = process.env[name];
@@ -13,8 +23,15 @@ module.exports = {
   host: process.env.HOST || '0.0.0.0',
   port: Number(process.env.PORT || 7000),
   addonName: process.env.ADDON_NAME || 'CB Providers',
-  providerManifest: process.env.PROVIDER_MANIFEST || path.join(__dirname, 'vendor', 'cb-providers', 'manifest.json'),
-  providerDir: process.env.PROVIDER_DIR || path.join(__dirname, 'vendor', 'cb-providers', 'providers'),
+  providerManifest: resolvePath(
+    process.env.PROVIDER_MANIFEST,
+    path.join(bundledRoot, 'manifest.json')
+  ),
+  providerDir: resolvePath(
+    process.env.PROVIDER_DIR,
+    path.join(bundledRoot, 'providers')
+  ),
+  snapshotFile: process.env.SA7_SNAPSHOT_FILE || '',
   providerTimeoutMs: Number(process.env.PROVIDER_TIMEOUT_MS || 20000),
   deadlineMs: Number(process.env.ADDON_DEADLINE_MS || 25000),
   breakerFailureThreshold: envInt('BREAKER_FAILURE_THRESHOLD', 3, 1),

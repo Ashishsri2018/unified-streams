@@ -12,6 +12,7 @@ if (!Module._cheerioHooked) {
   };
 }
 
+const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const { getRegistry, reloadProviders } = require('./providers');
@@ -23,6 +24,29 @@ const host = '127.0.0.1';
 const port = Number(process.env.PORT || 7001);
 const internalToken = process.env.INTERNAL_TOKEN || '';
 const startedAt = Date.now();
+
+function readSnapshotInfo() {
+  const fallback = {
+    sha: process.env.SA7_SNAPSHOT_SHA || 'bundled',
+    fetchedAt: new Date(startedAt).toISOString(),
+    ageMs: Date.now() - startedAt,
+  };
+  const file = process.env.SA7_SNAPSHOT_FILE;
+  if (!file) return fallback;
+
+  try {
+    const sha = fs.readFileSync(file, 'utf8').trim();
+    const fetchedAt = fs.statSync(file).mtimeMs;
+    if (!sha) return fallback;
+    return {
+      sha,
+      fetchedAt: new Date(fetchedAt).toISOString(),
+      ageMs: Math.max(0, Date.now() - fetchedAt),
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 function sendJson(res, status, body, requestId) {
   const headers = {
@@ -50,9 +74,7 @@ function handleHealth(req, res, requestId) {
     uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
     status: 'ok',
     snapshot: {
-      sha: process.env.SA7_SNAPSHOT_SHA || 'bundled',
-      fetchedAt: new Date(startedAt).toISOString(),
-      ageMs: Date.now() - startedAt,
+      ...readSnapshotInfo(),
       refreshing: false,
       lastError: null,
     },

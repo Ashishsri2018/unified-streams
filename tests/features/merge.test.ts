@@ -8,9 +8,9 @@ describe('classifier and merger', () => {
     expect(isBlockerUrl('https://example.com/slowdown')).toBe(true);
     expect(isBlockerUrl('https://example.com/stream.mp4')).toBe(false);
 
-    // Compressed archive files are NOT externalUrl
-    expect(isExternalUrl('https://archive.org/download/item.zip')).toBe(false);
-    expect(isExternalUrl('https://example.com/movie.rar')).toBe(false);
+    // Compressed archives are externalUrl because mobile players cannot open them
+    expect(isExternalUrl('https://archive.org/download/item.zip')).toBe(true);
+    expect(isExternalUrl('https://example.com/movie.rar')).toBe(true);
     expect(isArchiveUrl('https://archive.org/download/item.zip')).toBe(true);
     expect(isArchiveUrl('https://example.com/movie.rar')).toBe(true);
     expect(isArchiveUrl('https://example.com/movie.mp4')).toBe(false);
@@ -121,7 +121,7 @@ describe('classifier and merger', () => {
     expect(merged[2].title).toBe('🖥️ External Link');
   });
 
-  it('adds 🔲 emoji to name for zip/archive files and keeps them in url, not externalUrl', () => {
+  it('routes zip/archive files to externalUrl with 🔲 and 🖥️ markers', () => {
     const defaultFilters: StreamFilterConfig = {
       minRes: null,
       maxRes: null,
@@ -158,21 +158,21 @@ describe('classifier and merger', () => {
     expect(bridge?.externalUrl).toBeUndefined();
     expect(bridge?.name).toBe('Bridge Stream');
 
-    // Zip files must have 🔲 in name, be in url, and NOT in externalUrl
-    const zip1 = merged.find((s) => s.title === 'Archive 1');
+    // Archives must carry both markers and be opened as external links
+    const zip1 = merged.find((s) => s.title === '🖥️ Archive 1');
     expect(zip1?.name).toBe('🔲 Nuvio 1080p');
-    expect(zip1?.url).toBe('https://example.com/files/season1.zip');
-    expect(zip1?.externalUrl).toBeUndefined();
+    expect(zip1?.url).toBeUndefined();
+    expect(zip1?.externalUrl).toBe('https://example.com/files/season1.zip');
 
-    const rar = merged.find((s) => s.title === 'Archive 2');
+    const rar = merged.find((s) => s.title === '🖥️ Archive 2');
     expect(rar?.name).toBe('🔲 Already prefixed');
-    expect(rar?.url).toBe('https://example.com/files/season2.rar');
-    expect(rar?.externalUrl).toBeUndefined();
+    expect(rar?.url).toBeUndefined();
+    expect(rar?.externalUrl).toBe('https://example.com/files/season2.rar');
 
-    const archiveNoName = merged.find((s) => s.title === 'No name archive');
+    const archiveNoName = merged.find((s) => s.title === '🖥️ No name archive');
     expect(archiveNoName?.name).toBe('🔲 Archive');
-    expect(archiveNoName?.url).toBe('https://example.com/files/movie.7z');
-    expect(archiveNoName?.externalUrl).toBeUndefined();
+    expect(archiveNoName?.url).toBeUndefined();
+    expect(archiveNoName?.externalUrl).toBe('https://example.com/files/movie.7z');
   });
 
   it('ranks direct containers even when the URL has a hash fragment', () => {

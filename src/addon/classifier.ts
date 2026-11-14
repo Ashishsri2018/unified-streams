@@ -1,7 +1,7 @@
 /**
  * URL Classifier for Stremio streams.
- * Distinguishes direct playable media from external HTML/embed links
- * and filters out blocker/anti-bot endpoints.
+ * Distinguishes direct playable media from external links (HTML/embed pages,
+ * archives that players cannot open) and filters out blocker/anti-bot endpoints.
  */
 
 export const ARCHIVE_EXTENSIONS = /\.(zip|rar|7z|tar|gz|bz2|iso|xz)($|\?|&|#)/i;
@@ -74,8 +74,8 @@ export function isArchiveUrl(rawUrl: string): boolean {
 }
 
 export function isExternalUrl(rawUrl: string): boolean {
-  // Compressed files are NOT externalUrl
-  if (isArchiveUrl(rawUrl)) return false;
+  // Compressed archives cannot be played directly by mobile players.
+  if (isArchiveUrl(rawUrl)) return true;
 
   try {
     const parsed = new URL(rawUrl);
@@ -114,7 +114,7 @@ export function isExternalUrl(rawUrl: string): boolean {
     }
 
     // Links with no extension or unlisted extensions are NOT externalUrl.
-    // Only HTML pages belong in externalUrl.
+    // Only HTML pages and archives belong in externalUrl.
     return false;
   } catch {
     return false;

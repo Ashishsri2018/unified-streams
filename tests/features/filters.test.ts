@@ -61,4 +61,26 @@ describe('stream filters', () => {
     expect(filterStream(large, config)).toBeNull();
     expect(filterStream(unknown, config)).toBeNull();
   });
+
+  it('never filters or rewrites inline stream subtitles', () => {
+    const subtitles = [
+      { id: 'en', url: 'https://sub.test/en.vtt', lang: 'en' },
+      { id: 'hi', url: 'https://sub.test/hi.vtt', lang: 'hi' },
+      { id: 'und', url: 'https://sub.test/und.vtt', lang: 'und' },
+    ];
+    const stream: StremioStream = {
+      title: '1080p',
+      url: 'https://test/movie.mp4',
+      subtitles,
+    };
+
+    const modes: Array<StreamFilterConfig['subtitleMode']> = ['all', 'none', 'languages'];
+
+    for (const subtitleMode of modes) {
+      const result = filterStream(stream, { ...baseConfig, subtitleMode, subtitleLangs: ['en'] });
+      expect(result).not.toBeNull();
+      expect(result?.subtitles).toEqual(subtitles);
+      expect(result?.url).toBe('https://test/movie.mp4');
+    }
+  });
 });
