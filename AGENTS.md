@@ -16,7 +16,6 @@ npm run typecheck
 npm run build        # tsc + copy vendored fleet assets into dist
 npm run verify       # policy -> icon -> lint -> typecheck -> all tests -> build
 ```
-- GitHub Actions is the authoritative verification path for `verify`, lint, typecheck, and the Docker build. Local Vitest tests are the exception and may be run for fast iteration; there is no per-package toolchain.
 - ESLint ignores `src/fleets/sa7/**` and vendored fleet snapshots/baselines; `tsc` also excludes SA7 and `tests/`. SA7 edits must be plain JS.
 - `npm run dev` prefers `dist/fleets/*/worker.js` when present, so it can run stale compiled workers. Rebuild or delete `dist/` after changing worker source.
 
@@ -38,7 +37,7 @@ npm run verify       # policy -> icon -> lint -> typecheck -> all tests -> build
 
 ## Tests, CI, and deploys
 - Tests are feature/unit tests under `tests/features/`; they mock workers and do not require Docker or upstream network. Live stream behavior needs real credentials/network.
-- The GitHub Actions workflow is the authoritative verification path: `verify` (policy, icon, lint, typecheck, all Vitest tests, build) and the Docker build/smoke test run there. Local Vitest runs are allowed for iteration, but do not treat other local-only checks as sufficient evidence.
+- The GitHub Actions workflow is the source of truth for `verify` (policy, icon, lint, typecheck, all Vitest tests, build) and the Docker build/smoke test run there. Local Vitest runs are allowed for iteration, but do not treat other local-only checks as sufficient evidence.
 - Do not deploy to Beamup, Railway, or Cloudflare unless explicitly asked. A push to `main` triggers the production deploy workflow, so do not push unless explicitly allowed.
 - `deploy-cloudflare.yml` is manual and only deploys the optional log ingest Worker.
 - Docker runtime needs `config/`, `assets/`, `scripts/`, plus vendored `sa7`, `nuvio/snapshot`, and `vega/providers-baseline` copied into `dist` by `scripts/copy-fleet-assets.mjs`.
