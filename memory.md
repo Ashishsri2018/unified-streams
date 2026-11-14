@@ -1,5 +1,18 @@
 # Unified Streams Memory Log
 
+- Love, Death & Robots Empty Stream & Nuvio Updater Investigation (Session Nov 14 2026):
+  - Investigated user report of `https://unified-streams-production.up.railway.app/.../stream/series/tt9561862:1:1.json` returning `{"streams":[]}` on Railway production.
+  - Confirmed user hypothesis that Codeberg failure prevented Nuvio providers from returning streams:
+    1. In Nuvio (`src/fleets/nuvio/nuvio/snapshot.ts`), incoming stream requests call `snapshots.ensure()`.
+    2. Because the bundled snapshot is dated Nov 10 (>20h update interval), `ensure()` considers it stale and triggers `refresh(false)`.
+    3. Upstream Codeberg repo (`eclipsia/nuvio-plugin`) recently updated `manifest.json` with full URLs (`https://eclipsia.codeberg.page/nuvio-plugin/providers/...`) rather than relative paths (`providers/...`).
+    4. Nuvio's manifest validator throws `ManifestError: manifest.json scraper brellor has an invalid filename`.
+    5. This remote fetch and validation attempt took ~12-15 seconds before failing and falling back to the bundled snapshot.
+    6. Because the gateway / worker timeout was 12-15 seconds, the request hit `timeout` / `aborted` before any scrapers could run.
+  - Verified with direct scraper execution using the bundled snapshot: Nuvio resolves 9 working streams for `tt9561862:1:1` across providers `esvyl`, `evyrith`, `fyron`, and `soryn`.
+  - Confirmed SA7 providers with streams (`castle`, `moviebox`, `anizen`, `4khdhub`) are explicitly denied on Railway in `config/providers.json`.
+  - Documented that serving in-memory snapshot immediately (stale-while-revalidate) and normalizing full URL filenames in Nuvio manifest resolution will prevent request-blocking on remote refresh failures.
+
 - Fix Codeberg Branch Head Resolution for Nuvio Updater (Session Nov 14 2026):
   - Diagnosed recurring 5-minute failure logs in Railway deployment (`updater.failed: Remote head fetch failed` for Nuvio fleet).
   - Identified root cause in `src/core/updater/fetchers.ts`: `fetchCodebergHead` called `https://codeberg.org/api/v1/repos/${repo}/commits/${branch}` which Codeberg/Forgejo API rejected with HTTP 404 (Forgejo API uses `/branches/:branch` rather than `/commits/:branch`).
