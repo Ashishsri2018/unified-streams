@@ -276,4 +276,5 @@
     - Preserved default 12s backend timeout and 13s global deadline (`config/defaults.env`) for Beamup deployment.
     - Set `BACKEND_TIMEOUT_MS=27000` (27s) and `GLOBAL_DEADLINE_MS=29000` (29s) on Railway service `unified-streams` via Railway CLI.
     - Updated `.github/workflows/ci.yml` `deploy-railway` job to sync `BACKEND_TIMEOUT_MS=27000` and `GLOBAL_DEADLINE_MS=29000` on every deployment.
+    - Hardened Dokku environment sync in `.github/workflows/ci.yml` to treat non-fatal Dokku cluster sync hook errors as warnings, preventing false CI failures when Beamup internal post-deploy triggers time out.
     - Verified all 47 unit/feature tests pass locally without modifying defaults.

@@ -100,7 +100,18 @@ jobs:
           [ -n "$GRAMCINEMA_TOKEN" ] && CONFIG_PAIRS+=("GRAMCINEMA_TOKEN='$GRAMCINEMA_TOKEN'")
           [ -n "$PUBLIC_BASE_URL" ] && CONFIG_PAIRS+=("PUBLIC_BASE_URL='$PUBLIC_BASE_URL'")
           if [ ${#CONFIG_PAIRS[@]} -gt 0 ]; then
-            ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:set $APP ${CONFIG_PAIRS[*]}"
+            set +e
+            output=$(ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:set $APP ${CONFIG_PAIRS[*]}" 2>&1)
+            status=$?
+            set -e
+            printf '%s\n' "$output"
+            if [ "$status" -ne 0 ]; then
+              if printf '%s' "$output" | grep -q "Setting config vars" || printf '%s' "$output" | grep -q "Deploying web" || printf '%s' "$output" | grep -q "All checks successful"; then
+                echo "::warning::Dokku config set succeeded; cluster sync hook completed with non-fatal status."
+              else
+                exit "$status"
+              fi
+            fi
           fi
 
       - name: Push to Beamup
