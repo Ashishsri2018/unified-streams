@@ -120,7 +120,8 @@
   - [x] Fix SA7 unknown resolution dropping bug on configured requests (`src/fleets/sa7/worker.js`)
   - [x] Fix SA7 season pack regex parser (`src/fleets/sa7/content-id.js`)
   - [x] Allow Season 0 (specials) in Nuvio and Vega internal stream parsers (`parseId.ts`)
-  - [ ] Hydrate prefilled configuration in configure page HTML (`src/addon/configureHtml.ts`)
+  - [x] Fix Codeberg branch head resolution in `src/core/updater/fetchers.ts` to stop 5-minute failure retry loop and restore 20-24h schedule
+- [ ] Hydrate prefilled configuration in configure page HTML (`src/addon/configureHtml.ts`)
   - [x] Wire `UpdaterScheduler` and `MetadataResolver` into `StreamHandlerContext` and `/health`
   - [ ] Update `scripts/healthcheck.mjs` to avoid terminating container during transient single-worker restarts
   - [ ] Fix status dashboard 503 crash in `src/addon/statusHtml.ts`

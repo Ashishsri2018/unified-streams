@@ -1,5 +1,17 @@
 # Unified Streams Memory Log
 
+- Fix Codeberg Branch Head Resolution for Nuvio Updater (Session Nov 14 2026):
+  - Diagnosed recurring 5-minute failure logs in Railway deployment (`updater.failed: Remote head fetch failed` for Nuvio fleet).
+  - Identified root cause in `src/core/updater/fetchers.ts`: `fetchCodebergHead` called `https://codeberg.org/api/v1/repos/${repo}/commits/${branch}` which Codeberg/Forgejo API rejected with HTTP 404 (Forgejo API uses `/branches/:branch` rather than `/commits/:branch`).
+  - Explained scheduler timing behavior: successful updates schedule 20-24 hours out (`scheduleNext` using `UPDATE_INTERVAL_MIN_HOURS` to `UPDATE_INTERVAL_MAX_HOURS`), while failed updates trigger the 5-minute retry delay (`scheduleRetry` with `RETRY_DELAY_MS = 5 * 60 * 1000`). Continuous 404 failure trapped Nuvio in the 5-minute retry loop.
+  - Implemented fix in `src/core/updater/fetchers.ts`:
+    - Updated endpoint to `https://codeberg.org/api/v1/repos/${repo}/branches/${encodeURIComponent(branch)}` and parsed `json.commit?.id || json.sha`.
+    - Added fallback query to `https://codeberg.org/api/v1/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&limit=1` parsing `json[0]?.sha`.
+    - Maintained strict TypeScript typings without `any`.
+  - Added comprehensive test suite `tests/features/fetchers.test.ts` (7 tests covering Codeberg branch resolution, commits fallback, error statuses, malformed JSON, timeouts, and GitHub resolution).
+  - Executed tests via `npm run test:feature` (all 24 test files passed, 135/135 tests passing).
+  - Updated `todo.md`, `architecture.md`, and committed changes locally without deploying per user instruction.
+
 - Fleet Runtime Classification Heuristics Implementation (Session Nov 14 2026):
   - Solved misclassification of swallowed network failures, DNS failures, 4xx/5xx responses, and socket timeouts as `'empty'` across all three fleets (SA7, Nuvio, Vega) with ZERO modifications to upstream vendor scrapers.
   - Created canonical core classifier `src/core/networkClassifier.ts`:

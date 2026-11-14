@@ -68,7 +68,7 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `subtitles.ts`: Centralized subtitle track formatting, ISO base code mapping for global and Indic languages, and user preference filtering.
   - `networkClassifier.ts`: Single source of truth for transport attempt tracking and silent error classification heuristics across all three fleets (SA7, Nuvio, Vega), accurately distinguishing genuine catalog misses (`empty`) from swallowed upstream network/API failures (`error` / `timeout`) without touching vendor provider files.
   - `contract.ts` & `workerClient.ts`: Loopback HTTP worker contracts and metadata forwarding (`x-meta-title`, `x-meta-year`, `x-meta-tmdb-id`) eliminating redundant upstream Cinemeta/TMDB requests.
-  - `updater/`: In-process snapshot downloaders and installers. SA7 provider files live under `DATA_DIR/sa7/cb-providers` and are swapped atomically; the scheduler waits for worker readiness, verifies the reload, and retries failed checks after 5 minutes.
+  - `updater/`: In-process snapshot downloaders, fetchers, and installers. Remote head SHA resolution supports GitHub (`/repos/:owner/:repo/commits/:branch`) and Codeberg/Forgejo (`/repos/:owner/:repo/branches/:branch` with `/commits?sha=:branch` fallback). SA7 provider files live under `DATA_DIR/sa7/cb-providers` and are swapped atomically; the scheduler waits for worker readiness, verifies the reload, schedules successful runs on a 20-24h jittered interval, and retries failed checks after 5 minutes.
 - `src/addon/`: Gateway application layer:
   - `app.ts`: Express application with explicit HTTP method handlers.
   - `manifest.ts`: Stremio manifest generator.
