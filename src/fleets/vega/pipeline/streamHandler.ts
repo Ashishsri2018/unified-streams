@@ -29,6 +29,11 @@ import {
 import { extractYear, normalizeTitle, rankCandidates } from "./match.js";
 import { isSeasonPack, matchesEpisode } from "./episodes.js";
 import { mapProviderStreams, sortStreams } from "./mapStreams.js";
+import { vegaNetworkStorage } from "../providers/sdk/context.js";
+import {
+  createNetworkTracker,
+  classifyEmptyResult,
+} from "../../../core/networkClassifier.js";
 
 const MAX_SEARCH_VARIANTS = 6;
 const MAX_CANDIDATES = 3;
@@ -830,66 +835,69 @@ export class StreamPipeline implements StreamHandlerApi {
     let collected = false;
     let finished = false;
     let failure: unknown = undefined;
+    const tracker = createNetworkTracker();
     try {
-      const search = await this.searchProvider(bundle, ctx);
-      if (ctx.stopped) return;
-      if (search.error !== undefined) failure = search.error;
-      if (search.posts.length === 0) {
-        finished = true;
-        return;
-      }
+      await vegaNetworkStorage.run(tracker, async () => {
+        const search = await this.searchProvider(bundle, ctx);
+        if (ctx.stopped) return;
+        if (search.error !== undefined) failure = search.error;
+        if (search.posts.length === 0) {
+          finished = true;
+          return;
+        }
 
-      const ranked = rankCandidates(
-        search.posts,
-        { title: ctx.info.title, year: ctx.info.year, type: ctx.info.request.type },
-        MAX_CANDIDATES,
-      );
-      if (ranked.length === 0) {
-        finished = true;
-        return;
-      }
+        const ranked = rankCandidates(
+          search.posts,
+          { title: ctx.info.title, year: ctx.info.year, type: ctx.info.request.type },
+          MAX_CANDIDATES,
+        );
+        if (ranked.length === 0) {
+          finished = true;
+          return;
+        }
 
-      const mapping = await this.resolveCandidate(bundle, ranked, ctx);
-      if (ctx.stopped) return;
-      if (!mapping.candidate) {
-        finished = true;
-        return;
-      }
+        const mapping = await this.resolveCandidate(bundle, ranked, ctx);
+        if (ctx.stopped) return;
+        if (!mapping.candidate) {
+          finished = true;
+          return;
+        }
 
-      const links = await this.resolveLinks(bundle, mapping.candidate, ctx);
-      if (ctx.stopped) return;
-      if (links.links.length === 0) {
-        finished = true;
-        return;
-      }
+        const links = await this.resolveLinks(bundle, mapping.candidate, ctx);
+        if (ctx.stopped) return;
+        if (links.links.length === 0) {
+          finished = true;
+          return;
+        }
 
-      const streams = await this.fetchStreams(bundle, links.links, ctx);
-      if (ctx.stopped) return;
-      if (streams.streams.length === 0) {
-        this.logger.warn("pipeline.provider_no_streams", {
-          provider: providerValue,
-          stage: "stream",
-          ...requestLogFields(ctx.info.request),
+        const streams = await this.fetchStreams(bundle, links.links, ctx);
+        if (ctx.stopped) return;
+        if (streams.streams.length === 0) {
+          this.logger.warn("pipeline.provider_no_streams", {
+            provider: providerValue,
+            stage: "stream",
+            ...requestLogFields(ctx.info.request),
+          });
+          finished = true;
+          return;
+        }
+
+        const mapped = mapProviderStreams(streams.streams, {
+          providerValue,
+          providerName: trimString(bundle.entry.display_name) || providerValue,
+          includeMagnets: this.config.includeMagnets,
+          perProviderLimit: MAX_STREAMS_PER_PROVIDER,
         });
+        if (ctx.stopped) return;
+        if (mapped.length === 0) {
+          finished = true;
+          return;
+        }
+        ctx.collected.push(...mapped);
+        ctx.lastProgressAt = Date.now();
+        collected = true;
         finished = true;
-        return;
-      }
-
-      const mapped = mapProviderStreams(streams.streams, {
-        providerValue,
-        providerName: trimString(bundle.entry.display_name) || providerValue,
-        includeMagnets: this.config.includeMagnets,
-        perProviderLimit: MAX_STREAMS_PER_PROVIDER,
       });
-      if (ctx.stopped) return;
-      if (mapped.length === 0) {
-        finished = true;
-        return;
-      }
-      ctx.collected.push(...mapped);
-      ctx.lastProgressAt = Date.now();
-      collected = true;
-      finished = true;
     } catch (error) {
       if (!ctx.stopped) {
         failure = error;
@@ -899,6 +907,12 @@ export class StreamPipeline implements StreamHandlerApi {
       if (!finished && ctx.stopped) {
         this.telemetry.record(providerKey, "skipped");
       } else {
+        if (!collected && failure === undefined) {
+          const classified = classifyEmptyResult(tracker, Date.now() - startedAt, this.config.searchTimeoutMs);
+          if (classified.outcome !== "empty") {
+            failure = new Error(classified.lastError ?? "provider failed");
+          }
+        }
         const kind = collected
           ? "ok"
           : failure !== undefined

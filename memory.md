@@ -1,5 +1,28 @@
 # Unified Streams Memory Log
 
+- Fleet Runtime Classification Heuristics Implementation (Session Nov 14 2026):
+  - Solved misclassification of swallowed network failures, DNS failures, 4xx/5xx responses, and socket timeouts as `'empty'` across all three fleets (SA7, Nuvio, Vega) with ZERO modifications to upstream vendor scrapers.
+  - Created canonical core classifier `src/core/networkClassifier.ts`:
+    - Tracks request lifecycle via `NetworkTracker` (`attempts`, status, duration, timeout/abort flags).
+    - `classifyEmptyResult` accurately identifies when all network requests failed (`error` with HTTP status or network error), when requests timed out (`timeout`), when downstream scraper steps failed, and when verified 200 OK responses legitimately had 0 matching titles (`empty`).
+  - Integrated into all 3 fleet runtimes:
+    - **Nuvio**: In `src/fleets/nuvio/nuvio/loader.ts` and `pipeline.ts`, hooked `createProviderFetch` with `AsyncLocalStorage<NetworkTracker>` to observe scraper fetch attempts and classify empty results before telemetry recording.
+    - **Vega**: In `src/fleets/vega/providers/sdk/context.ts` and `pipeline/streamHandler.ts`, hooked `createAxiosAdapter` with `AsyncLocalStorage<NetworkTracker>` to observe axios/httpTransport calls and classify empty results before telemetry recording.
+    - **SA7**: Created `src/fleets/sa7/lib/tracker.js` hooking `globalThis.fetch` and `axios.interceptors` within scoped `AsyncLocalStorage` runs inside `src/fleets/sa7/streams.js`, recording accurate errors and timeouts on circuit breaker and telemetry.
+  - Added test suite `tests/features/networkClassifier.test.ts` (8 tests passing) covering clean empty, 404 failure, DNS failure, timeout/abort, execution timeout budget, downstream pipeline failures, and SA7 CJS integration.
+  - Full verification passed (`npm run verify`): policy check OK, icon check OK, ESLint clean, TypeScript strict typecheck clean, 23/23 Vitest test suites (128/128 tests passed), and TypeScript build successful.
+  - Kept changes strictly local without deploying per AGENTS.md constraint.
+
+- Provider Status Page Empty Results Investigation (Session Nov 14 2026):
+  - Investigated user report of providers showing 100% empty results on Railway status page (`https://unified-streams-production.up.railway.app/status`).
+  - Analyzed `/health` metrics across all 91 active providers in `sa7`, `nuvio`, and `vega`.
+  - Identified 40 providers showing `calls > 0 && empty === calls`, and categorized the root causes:
+    1. Genre / Catalog Specialization with Low Query Sample: Instance had only 8-11 lifetime requests, all mainstream Western titles. Anime (`anikoto`, `kickAssAnime`), Bollywood (`einthusan`), and Asian drama (`dramacool`, `kissKh`) providers naturally return empty for Western media. Verified live: querying *Spirited Away* (`tt0245429`) and *3 Idiots* (`tt1187043`) immediately turned `anikoto`, `kickAssAnime`, and `einthusan` into active successful providers with non-empty results and updated `lastSuccessAt`.
+    2. Dead Upstreams & Silent Catches: Upstream APIs/domains returning 404, DNS NXDOMAIN, SSL handshake errors, or connection timeouts (`playimdb`/`zevran`, `redflix`, `topmovies`, `uhd`, `world4u`, `durnel`, `fastrion`) catch errors internally and return `[]`, which telemetry logs as `empty` rather than `error`.
+    3. Missing Auth/Config: `pynvix` requires user-supplied FebBox `uiToken` to query upstream proxy.
+    4. Live TV Providers: `durbinLive` and `liveTgTv` are live TV channel providers and return empty for VOD movies/series.
+  - Recorded detailed breakdown and verification steps in `scratchpad.md`.
+
 - Subtitle Filtering in Configure Page & Gateway Stream Pipeline (Session Nov 14 2026):
   - Added subtitle language filtering to the `/configure` web UI (`src/addon/configureHtml.ts`):
     - Text input `#subtitleLangs` for comma-separated language tags/names (e.g., `en, es, hi` or `English, Spanish`).

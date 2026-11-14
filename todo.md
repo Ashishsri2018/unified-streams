@@ -115,6 +115,7 @@
   - [x] Add comprehensive automated tests in `tests/features/subtitles.test.ts` and `tests/features/subtitlesFilter.test.ts`
 
   - [x] Unify URL and stream classification in `src/core/urlClassifier.ts`, resolving `/api/watch/m3u8` misclassification as `externalUrl` and centralizing rules across fleets and gateway
+  - [x] Implement fleet runtime classification heuristics (`src/core/networkClassifier.ts`, `src/fleets/sa7/lib/tracker.js`, `nuvio/pipeline.ts`, `vega/streamHandler.ts`) to accurately classify swallowed network/API failures as error/timeout without touching provider code
   - [x] Consolidate all 8 gateway-fleet code duplications and architectural redundancies (`src/core/streamQuality.ts`, `src/core/streamHeaders.ts`, `src/core/subtitles.ts`, `contentId.ts`, metadata forwarding) and prune `docs/gateway-fleet-duplications.md`
   - [x] Fix SA7 unknown resolution dropping bug on configured requests (`src/fleets/sa7/worker.js`)
   - [x] Fix SA7 season pack regex parser (`src/fleets/sa7/content-id.js`)

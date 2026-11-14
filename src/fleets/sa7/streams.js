@@ -11,6 +11,11 @@ const {
 const { createBreaker } = require('./lib/breaker');
 const { createStreamCache } = require('./lib/stream-cache');
 const { TimeoutError, withTimeout } = require('./lib/timeout');
+const {
+  sa7NetworkStorage,
+  createTracker,
+  classifyEmptyResult,
+} = require('./lib/tracker');
 
 const BLOCKER_URL_PATTERN = /\/slowdown\b/i;
 
@@ -129,23 +134,41 @@ function createCollector({
         if (!breaker.attempt(provider.id)) return [];
 
         const started = now();
+        const tracker = createTracker();
         try {
-          const streams = await withTimeout(
-            Promise.resolve().then(() =>
-              provider.getStreams(String(tmdbId), mediaType, season, episode)
-            ),
-            timeoutMs,
-            provider.id
+          const streams = await sa7NetworkStorage.run(tracker, () =>
+            withTimeout(
+              Promise.resolve().then(() =>
+                provider.getStreams(String(tmdbId), mediaType, season, episode)
+              ),
+              timeoutMs,
+              provider.id
+            )
           );
           const list = (Array.isArray(streams) ? streams : [])
             .filter(validStream)
             .slice(0, maxPerProviderStreams)
             .map((stream) => ({ stream, provider }));
-          breaker.record(provider.id, list.length > 0 ? 'ok' : 'empty', {
-            latencyMs: now() - started,
-          });
+          const latencyMs = now() - started;
           if (list.length > 0) {
-            logger.log(`[streams] ${provider.id} -> ${list.length} (${now() - started}ms)`);
+            breaker.record(provider.id, 'ok', {
+              latencyMs,
+            });
+            logger.log(`[streams] ${provider.id} -> ${list.length} (${latencyMs}ms)`);
+          } else {
+            const classified = classifyEmptyResult(tracker, latencyMs, timeoutMs);
+            if (classified.outcome === 'empty') {
+              breaker.record(provider.id, 'empty', {
+                latencyMs,
+              });
+            } else {
+              counters.providerFailures += 1;
+              breaker.record(provider.id, classified.outcome, {
+                latencyMs,
+                error: new Error(classified.lastError || 'provider failed'),
+              });
+              logger.warn(`[streams] ${provider.id} failed (${classified.outcome}): ${classified.lastError}`);
+            }
           }
           return list;
         } catch (err) {

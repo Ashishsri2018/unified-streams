@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import axios, { AxiosError, AxiosHeaders } from "axios";
 import type {
   AxiosAdapter,
@@ -6,6 +7,7 @@ import type {
   InternalAxiosRequestConfig,
 } from "axios";
 import * as cheerio from "cheerio";
+import type { NetworkTracker } from "../../../../core/networkClassifier.js";
 import type {
   CookieJarApi,
   HttpRequestOptions,
@@ -15,6 +17,8 @@ import type {
   ProviderContextLike,
   UrlsSnapshot,
 } from "../../types.js";
+
+export const vegaNetworkStorage = new AsyncLocalStorage<NetworkTracker>();
 
 const COMMON_HEADERS: Record<string, string> = {
   "User-Agent":
@@ -337,10 +341,36 @@ function createAxiosAdapter(transport: HttpTransportApi): AxiosAdapter {
     if (config.timeout && config.timeout > 0) request.timeoutMs = config.timeout;
     if (signal) request.signal = signal;
 
+    const tracker = vegaNetworkStorage.getStore();
+    const startedAt = Date.now();
     let response;
     try {
       response = await transport.request(request);
+      if (tracker) {
+        tracker.record({
+          url,
+          status: response.status,
+          ok: response.status >= 200 && response.status < 400,
+          isTimeout: false,
+          durationMs: Date.now() - startedAt,
+        });
+      }
     } catch (error) {
+      if (tracker) {
+        const isTimeout =
+          error instanceof Error &&
+          (error.name === "TimeoutError" ||
+            error.name === "AbortError" ||
+            error.message.toLowerCase().includes("timeout") ||
+            error.message.toLowerCase().includes("abort"));
+        tracker.record({
+          url,
+          ok: false,
+          isTimeout,
+          error: error instanceof Error ? error.message : String(error),
+          durationMs: Date.now() - startedAt,
+        });
+      }
       const code = axiosErrorCode(error, Boolean((signal as { aborted?: boolean })?.aborted));
       const message = error instanceof Error ? error.message : String(error);
       throw new AxiosError(message, code, config, {}, undefined);

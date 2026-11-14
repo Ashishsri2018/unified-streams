@@ -19,7 +19,11 @@ import type {
   StreamCacheStats,
   TelemetryMetrics,
 } from "../telemetry.js";
-import { scraperSupports } from "./loader.js";
+import { scraperSupports, scraperNetworkStorage } from "./loader.js";
+import {
+  createNetworkTracker,
+  classifyEmptyResult,
+} from "../../../core/networkClassifier.js";
 import {
   ProviderMetrics,
   type ProviderOutcome,
@@ -138,25 +142,49 @@ async function collectStreams(options: {
       attempted.add(index);
       if (attempt && !attempt(scraper.entry.id)) continue;
       const startedAt = Date.now();
+      const tracker = createNetworkTracker();
       try {
         const timeoutMs =
           perProviderTimeoutMs > 0
             ? Math.min(remaining, perProviderTimeoutMs)
             : remaining;
-        const streams = await withTimeout(
-          Promise.resolve(run(scraper)),
-          timeoutMs,
-          scraper.entry.id,
+        const streams = await scraperNetworkStorage.run(tracker, () =>
+          withTimeout(
+            Promise.resolve(run(scraper)),
+            timeoutMs,
+            scraper.entry.id,
+          ),
         );
         const latencyMs = Date.now() - startedAt;
         if (Array.isArray(streams)) {
-          results.push({ scraper, streams });
-          stats.push({
-            id: scraper.entry.id,
-            ok: true,
-            streams: streams.length,
-            latencyMs,
-          });
+          if (streams.length === 0) {
+            const classified = classifyEmptyResult(tracker, latencyMs, timeoutMs);
+            if (classified.outcome === "empty") {
+              stats.push({
+                id: scraper.entry.id,
+                ok: true,
+                streams: 0,
+                latencyMs,
+              });
+            } else {
+              stats.push({
+                id: scraper.entry.id,
+                ok: false,
+                streams: 0,
+                latencyMs,
+                error: classified.outcome,
+                lastError: classified.lastError ?? undefined,
+              });
+            }
+          } else {
+            results.push({ scraper, streams });
+            stats.push({
+              id: scraper.entry.id,
+              ok: true,
+              streams: streams.length,
+              latencyMs,
+            });
+          }
         } else {
           stats.push({
             id: scraper.entry.id,

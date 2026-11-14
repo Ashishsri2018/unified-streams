@@ -1,10 +1,14 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import * as cheerio from "cheerio";
 import CryptoJS from "crypto-js";
 import type { LoadedScraper, LoggerLike, NuvioScraperEntry } from "../types.js";
+import type { NetworkTracker } from "../../../core/networkClassifier.js";
 import { withTimeout } from "../util/concurrency.js";
 import { nativeFetch } from "../util/nativeFetch.js";
 
 const ON_SETTINGS_TIMEOUT_MS = 3000;
+
+export const scraperNetworkStorage = new AsyncLocalStorage<NetworkTracker>();
 
 type EvaluatedModule = Record<string, unknown>;
 
@@ -21,12 +25,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function createProviderFetch(timeoutMs: number): typeof fetch {
-  return ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+  return (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const tracker = scraperNetworkStorage.getStore();
+    const startedAt = Date.now();
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url || "";
     const timeoutSignal = AbortSignal.timeout(Math.max(1, timeoutMs));
     const signal = init?.signal
       ? AbortSignal.any([init.signal, timeoutSignal])
       : timeoutSignal;
-    return nativeFetch(input, { ...init, signal });
+    try {
+      const response = await nativeFetch(input, { ...init, signal });
+      if (tracker) {
+        tracker.record({
+          url,
+          status: response.status,
+          ok: response.ok,
+          isTimeout: false,
+          durationMs: Date.now() - startedAt,
+        });
+      }
+      return response;
+    } catch (error) {
+      if (tracker) {
+        const isTimeout =
+          error instanceof Error &&
+          (error.name === "TimeoutError" ||
+            error.name === "AbortError" ||
+            error.message.toLowerCase().includes("abort") ||
+            error.message.toLowerCase().includes("timeout"));
+        tracker.record({
+          url,
+          ok: false,
+          isTimeout,
+          error: error instanceof Error ? error.message : String(error),
+          durationMs: Date.now() - startedAt,
+        });
+      }
+      throw error;
+    }
   }) as typeof fetch;
 }
 

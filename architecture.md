@@ -66,6 +66,7 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `streamQuality.ts`: Single canonical implementation of resolution inference (8K down to 240p), quality sorting rank, container format ranking (`mp4`/`mkv` > other > `m3u8`/`mpd`), and file size parsing (`parseSizeBytes`, `inferSizeBytes`).
   - `streamHeaders.ts`: Upstream proxy header sanitization (stripping hop-by-hop and `Proxy-*` headers, CRLF injection protection), placeholder host identification (`example.com`, `localhost`, etc.), and safe HTTP URL parsing.
   - `subtitles.ts`: Centralized subtitle track formatting, ISO base code mapping for global and Indic languages, and user preference filtering.
+  - `networkClassifier.ts`: Single source of truth for transport attempt tracking and silent error classification heuristics across all three fleets (SA7, Nuvio, Vega), accurately distinguishing genuine catalog misses (`empty`) from swallowed upstream network/API failures (`error` / `timeout`) without touching vendor provider files.
   - `contract.ts` & `workerClient.ts`: Loopback HTTP worker contracts and metadata forwarding (`x-meta-title`, `x-meta-year`, `x-meta-tmdb-id`) eliminating redundant upstream Cinemeta/TMDB requests.
   - `updater/`: In-process snapshot downloaders and installers. SA7 provider files live under `DATA_DIR/sa7/cb-providers` and are swapped atomically; the scheduler waits for worker readiness, verifies the reload, and retries failed checks after 5 minutes.
 - `src/addon/`: Gateway application layer:
