@@ -86,7 +86,7 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
     const stat = providerStats[id];
     return {
       id,
-      state: 'closed' as const,
+      state: (stat?.state ?? 'closed') as 'closed' | 'open' | 'half-open',
       calls: stat?.calls ?? 0,
       ok: stat?.ok ?? 0,
       empty: stat?.empty ?? 0,
@@ -94,11 +94,20 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
       timeouts: stat?.timeouts ?? 0,
       skipped: stat?.skipped ?? 0,
       successRate: stat?.successRate ?? null,
-      avgMs: stat?.p50Ms ?? null,
+      avgMs: stat?.avgMs ?? null,
       lastError: stat?.lastError ?? null,
-      lastSuccessAt: null,
+      lastSuccessAt: stat?.lastSuccessAt ?? null,
     };
   });
+
+  const circuits = stats.reduce(
+    (counts, stat) => {
+      if (stat.state === 'open') counts.open += 1;
+      else if (stat.state === 'half-open') counts.halfOpen += 1;
+      return counts;
+    },
+    { open: 0, halfOpen: 0 },
+  );
 
   const payload = {
     fleet: 'nuvio',
@@ -115,10 +124,10 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
     },
     providers: {
       total: allIds.length,
-      circuits: { open: 0, halfOpen: 0 },
+      circuits,
       stats,
     },
-    metrics: { requests: 0, successes: 0, empties: 0, timeouts: 0, errors: 0, skipped: 0, successRate: 0, failureRate: 0 },
+    metrics: pipeline.getMetrics(),
   };
 
   sendJson(res, 200, payload, requestId);

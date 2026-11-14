@@ -138,6 +138,8 @@ export interface AppConfig {
   httpTimeoutMs: number;
   streamCacheTtlMs: number;
   streamPartialCacheTtlMs: number;
+  breakerFailureThreshold: number;
+  breakerCooldownMs: number;
   tmdbApiKey: string | null;
   scraperSettings: Record<string, Record<string, unknown>>;
   enabledScrapers: string[];

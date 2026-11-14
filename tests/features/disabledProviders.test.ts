@@ -18,7 +18,7 @@ describe('disabled providers derivation', () => {
     expect(disabled).not.toContain("praxiel'");
     // Baseline deny list must also be preserved
     expect(disabled).toContain('bdix-cf');
-    expect(disabled).toContain('zyrvael');
+    expect(disabled).toContain('sylphera');
   });
 
   it('merges VEGA_DISABLED_PROVIDERS and strips surrounding quotes', () => {
@@ -39,7 +39,7 @@ describe('disabled providers derivation', () => {
     expect(disabled).not.toContain('vega"');
     // Baseline deny list must also be preserved
     expect(disabled).toContain('torrentio');
-    expect(disabled).toContain('disneyMirror');
+    expect(disabled).toContain('internetArchive');
   });
 
   it('merges SA7_DISABLED_PROVIDERS and strips surrounding quotes', () => {

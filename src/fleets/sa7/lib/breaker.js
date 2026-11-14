@@ -110,6 +110,7 @@ function createBreaker({ threshold = 3, cooldownMs = 300000, now = Date.now } = 
       } else {
         state.empty += 1;
       }
+      state.lastError = null;
       close(state);
       return;
     }

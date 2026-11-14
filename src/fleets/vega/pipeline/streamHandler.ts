@@ -18,6 +18,7 @@ import type {
   StremioSubtitle,
 } from "../types.js";
 import { contentIdOf, requestLogFields } from "../addon/parseId.js";
+import { ProviderTelemetry } from "../../../core/providerTelemetry.js";
 import { TtlCache } from "../util/cache.js";
 import {
   mapLimit,
@@ -30,9 +31,6 @@ import { isSeasonPack, matchesEpisode } from "./episodes.js";
 import { mapProviderStreams, sortStreams } from "./mapStreams.js";
 
 const MAX_SEARCH_VARIANTS = 6;
-const BREAKER_WINDOW_MS = 10 * 60 * 1000;
-const BREAKER_OPEN_MS = 10 * 60 * 1000;
-const BREAKER_THRESHOLD = 3;
 const MAX_CANDIDATES = 3;
 const MAX_LINKS_PER_PROVIDER = 100;
 const MAX_STREAMS_PER_PROVIDER = 100;
@@ -86,24 +84,6 @@ interface InternalContext {
   deadlineHit: boolean;
   lastProgressAt: number;
   generation: number;
-}
-
-interface BreakerState {
-  failures: number[];
-  openUntil: number;
-}
-
-interface ProviderStat {
-  calls: number;
-  ok: number;
-  empty: number;
-  errors: number;
-  timeouts: number;
-  skipped: number;
-  avgLatencyMs: number;
-  failures: number;
-  lastMs: number | null;
-  lastError: string | null;
 }
 
 interface InFlightRequest {
@@ -292,8 +272,7 @@ export class StreamPipeline implements StreamHandlerApi {
   private readonly searchCache: TtlCache<string, Post[]>;
   private readonly mappingCache: TtlCache<string, Candidate>;
   private readonly streamCache: TtlCache<string, StremioStream[]>;
-  private readonly breakers = new Map<string, BreakerState>();
-  private readonly providerStats = new Map<string, ProviderStat>();
+  private readonly telemetry: ProviderTelemetry;
   private readonly inFlight = new Map<string, InFlightRequest>();
   private readonly metrics = {
     requests: 0,
@@ -310,6 +289,10 @@ export class StreamPipeline implements StreamHandlerApi {
 
   constructor(deps: PipelineDeps) {
     this.config = deps.config;
+    this.telemetry = new ProviderTelemetry({
+      failureThreshold: deps.config.breakerFailureThreshold,
+      cooldownMs: deps.config.breakerCooldownMs,
+    });
     this.logger = deps.logger;
     this.registry = deps.registry;
     this.cinemeta = deps.cinemeta;
@@ -335,46 +318,27 @@ export class StreamPipeline implements StreamHandlerApi {
   }
 
   getMetrics(): PipelineMetrics {
-    const now = Date.now();
+    const snapshot = this.telemetry.snapshot();
     const breakers: Record<string, "open" | "closed"> = {};
-    for (const [provider, state] of this.breakers) {
-      breakers[provider] = state.openUntil > now ? "open" : "closed";
+    for (const entry of snapshot) {
+      breakers[entry.id] = entry.state === "open" ? "open" : "closed";
     }
-    const breakerByProvider = new Map(
-      Object.entries(breakers).map(([provider, state]) => [
-        provider.toLowerCase(),
-        state,
-      ]),
-    );
-    const providerIds = new Set([
-      ...this.providerStats.keys(),
-      ...breakerByProvider.keys(),
-    ]);
-    const providerStats = [...providerIds]
-      .sort()
-      .map((id) => {
-        const stat = this.providerStats.get(id);
-        const state = breakerByProvider.get(id) ?? "closed";
-        const calls = stat?.calls ?? 0;
-        const ok = stat?.ok ?? 0;
-        const successRate = calls > 0 ? Math.round((ok / calls) * 1000) / 1000 : null;
-        return {
-          id,
-          state,
-          calls,
-          ok,
-          empty: stat?.empty ?? 0,
-          errors: stat ? (stat.errors || stat.failures) : 0,
-          timeouts: stat?.timeouts ?? 0,
-          skipped: stat?.skipped ?? 0,
-          successRate,
-          avgMs: stat && calls > 0 ? stat.avgLatencyMs : null,
-          lastMs: stat ? stat.lastMs : null,
-          maxMs: null,
-          lastError: stat ? stat.lastError : null,
-          lastSuccessAt: null,
-        };
-      });
+    const providerStats = snapshot.map((entry) => ({
+      id: entry.id,
+      state: entry.state,
+      calls: entry.calls,
+      ok: entry.ok,
+      empty: entry.empty,
+      errors: entry.errors,
+      timeouts: entry.timeouts,
+      skipped: entry.skipped,
+      successRate: entry.successRate,
+      avgMs: entry.avgMs,
+      lastMs: entry.lastMs,
+      maxMs: entry.maxMs,
+      lastError: entry.lastError,
+      lastSuccessAt: entry.lastSuccessAt,
+    }));
     const streamCache = this.streamCache.stats();
     return {
       ...this.metrics,
@@ -589,8 +553,7 @@ export class StreamPipeline implements StreamHandlerApi {
     this.searchCache.clear();
     this.mappingCache.clear();
     this.streamCache.clear();
-    this.breakers.clear();
-    this.providerStats.clear();
+    this.telemetry.reset();
   }
 
   dispose(): void {
@@ -826,10 +789,14 @@ export class StreamPipeline implements StreamHandlerApi {
   }
 
   private orderBundles(bundles: ProviderBundle[]): ProviderBundle[] {
+    const stats = new Map(this.telemetry.snapshot().map((entry) => [entry.id, entry]));
     const score = (bundle: ProviderBundle): number => {
-      const stat = this.providerStats.get(bundle.entry.value.toLowerCase());
+      const stat = stats.get(bundle.entry.value.toLowerCase());
       if (!stat) return DEFAULT_PROVIDER_SCORE;
-      return stat.avgLatencyMs + stat.failures * FAILURE_PENALTY_MS;
+      return (
+        (stat.avgMs ?? DEFAULT_PROVIDER_SCORE) +
+        stat.consecutiveFailures * FAILURE_PENALTY_MS
+      );
     };
     return bundles
       .map((bundle, index) => ({ bundle, index, score: score(bundle) }))
@@ -837,83 +804,31 @@ export class StreamPipeline implements StreamHandlerApi {
       .map((entry) => entry.bundle);
   }
 
-  private recordProviderResult(
-    providerValue: string,
-    durationMs: number,
-    collected: boolean,
-    error?: unknown,
-    skipped = false,
-  ): void {
-    const key = providerValue.toLowerCase();
-    const stat: ProviderStat = this.providerStats.get(key) ?? {
-      calls: 0,
-      ok: 0,
-      empty: 0,
-      errors: 0,
-      timeouts: 0,
-      skipped: 0,
-      avgLatencyMs: 0,
-      failures: 0,
-      lastMs: null,
-      lastError: null,
-    };
-    if (skipped) {
-      stat.skipped += 1;
-      this.providerStats.set(key, stat);
-      return;
-    }
-    stat.calls += 1;
-    stat.lastMs = durationMs;
-    stat.avgLatencyMs =
-      stat.avgLatencyMs > 0 ? Math.round(stat.avgLatencyMs * 0.7 + durationMs * 0.3) : durationMs;
-    if (error) {
-      if (error instanceof TimeoutError) {
-        stat.timeouts += 1;
-        stat.lastError = 'timeout';
-      } else {
-        stat.errors += 1;
-        stat.lastError = error instanceof Error ? error.message : 'error';
-      }
-    } else if (collected) {
-      stat.ok += 1;
-      stat.failures = 0;
-    } else {
-      stat.empty += 1;
-      if (stat.failures === 0) {
-        stat.ok += 1;
-      }
-    }
-    this.providerStats.set(key, stat);
-  }
-
   private async runProvider(bundle: ProviderBundle, ctx: InternalContext): Promise<void> {
     const providerValue = trimString(bundle.entry.value);
+    if (!providerValue) return;
+    const providerKey = providerValue.toLowerCase();
     const startedAt = Date.now();
-    let collected = false;
-    let tracked = true;
-    let finished = false;
-    let runError: unknown = undefined;
-    try {
-      if (!providerValue) {
-        tracked = false;
-        return;
-      }
-      if (ctx.stopped) return;
-      if (this.isCircuitOpen(providerValue)) {
-        tracked = false;
-        this.logger.debug("pipeline.provider_circuit_open", { provider: providerValue });
-        return;
-      }
+    if (ctx.stopped) return;
+    if (!this.telemetry.attempt(providerKey)) {
+      this.logger.debug("pipeline.provider_circuit_open", { provider: providerValue });
+      return;
+    }
 
-      const posts = await this.searchProvider(bundle, ctx);
+    let collected = false;
+    let finished = false;
+    let failure: unknown = undefined;
+    try {
+      const search = await this.searchProvider(bundle, ctx);
       if (ctx.stopped) return;
-      if (posts.length === 0) {
+      if (search.error !== undefined) failure = search.error;
+      if (search.posts.length === 0) {
         finished = true;
         return;
       }
 
       const ranked = rankCandidates(
-        posts,
+        search.posts,
         { title: ctx.info.title, year: ctx.info.year, type: ctx.info.request.type },
         MAX_CANDIDATES,
       );
@@ -925,18 +840,12 @@ export class StreamPipeline implements StreamHandlerApi {
       const mapping = await this.resolveCandidate(bundle, ranked, ctx);
       if (ctx.stopped) return;
       if (!mapping.candidate) {
-        if (mapping.failed) this.recordFailure(providerValue, ctx, undefined, 'mapping failed');
         finished = true;
         return;
       }
 
       const links = await this.resolveLinks(bundle, mapping.candidate, ctx);
       if (ctx.stopped) return;
-      if (links.failed && links.links.length === 0) {
-        this.recordFailure(providerValue, ctx, undefined, 'links resolution failed');
-        finished = true;
-        return;
-      }
       if (links.links.length === 0) {
         finished = true;
         return;
@@ -944,17 +853,12 @@ export class StreamPipeline implements StreamHandlerApi {
 
       const streams = await this.fetchStreams(bundle, links.links, ctx);
       if (ctx.stopped) return;
-      if (streams.attempted > 0 && streams.streams.length === 0) {
-        this.recordFailure(providerValue, ctx, undefined, 'no streams found');
+      if (streams.streams.length === 0) {
         this.logger.warn("pipeline.provider_no_streams", {
           provider: providerValue,
           stage: "stream",
           ...requestLogFields(ctx.info.request),
         });
-        finished = true;
-        return;
-      }
-      if (streams.streams.length === 0) {
         finished = true;
         return;
       }
@@ -974,27 +878,37 @@ export class StreamPipeline implements StreamHandlerApi {
       ctx.lastProgressAt = Date.now();
       collected = true;
       finished = true;
-    } catch (err) {
+    } catch (error) {
       if (!ctx.stopped) {
-        runError = err;
+        failure = error;
         finished = true;
-        this.recordFailure(providerValue, ctx, err);
       }
     } finally {
-      if (tracked && providerValue) {
-        const skipped = !finished && runError === undefined;
-        this.recordProviderResult(
-          providerValue,
-          Date.now() - startedAt,
-          collected,
-          runError,
-          skipped,
-        );
+      if (!finished && ctx.stopped) {
+        this.telemetry.record(providerKey, "skipped");
+      } else {
+        const kind = collected
+          ? "ok"
+          : failure !== undefined
+            ? failure instanceof TimeoutError
+              ? "timeout"
+              : "error"
+            : "empty";
+        this.telemetry.record(providerKey, kind, {
+          latencyMs: Date.now() - startedAt,
+          error: kind === "error" || kind === "timeout" ? failure : undefined,
+        });
+        if (kind === "error" || kind === "timeout") {
+          this.metrics.providerFailures += 1;
+        }
       }
     }
   }
 
-  private async searchProvider(bundle: ProviderBundle, ctx: InternalContext): Promise<Post[]> {
+  private async searchProvider(
+    bundle: ProviderBundle,
+    ctx: InternalContext,
+  ): Promise<{ posts: Post[]; error?: unknown }> {
     const providerValue = trimString(bundle.entry.value);
     const deadlineAt = Math.min(
       Date.now() + Math.max(1, this.config.searchTimeoutMs),
@@ -1002,18 +916,17 @@ export class StreamPipeline implements StreamHandlerApi {
     );
 
     for (const query of ctx.info.variants) {
-      if (ctx.stopped) return [];
+      if (ctx.stopped) return { posts: [] };
       const cacheKey = `${providerValue}|${query}|${ctx.info.request.type}`;
       const cached = this.searchCache.get(cacheKey);
       if (cached !== undefined) {
-        if (cached.length > 0) return cached;
+        if (cached.length > 0) return { posts: cached };
         continue;
       }
 
       const remaining = deadlineAt - Date.now();
       if (remaining <= 0) {
-        this.recordFailure(providerValue, ctx, undefined, 'search timeout');
-        return [];
+        return { posts: [], error: new TimeoutError("search timeout") };
       }
 
       try {
@@ -1043,21 +956,20 @@ export class StreamPipeline implements StreamHandlerApi {
         ) {
           this.searchCache.set(cacheKey, posts);
         }
-        if (posts.length > 0) return posts;
+        if (posts.length > 0) return { posts };
       } catch (error) {
         if (!ctx.stopped && Date.now() < ctx.deadlineAt) {
-          this.recordFailure(providerValue, ctx, error);
           this.logger.warn("pipeline.provider_failed", {
             provider: providerValue,
             stage: "search",
             error: errorName(error),
           });
         }
-        return [];
+        return { posts: [], error };
       }
     }
 
-    return [];
+    return { posts: [] };
   }
 
   private async resolveCandidate(
@@ -1373,75 +1285,6 @@ export class StreamPipeline implements StreamHandlerApi {
     } finally {
       clearTimeout(timer);
     }
-  }
-
-  private isCircuitOpen(providerValue: string): boolean {
-    const state = this.breakers.get(providerValue);
-    if (!state) return false;
-    const now = Date.now();
-    if (state.openUntil > now) return true;
-    if (state.openUntil !== 0) {
-      state.openUntil = 0;
-      state.failures = [];
-    }
-    return false;
-  }
-
-  private recordFailure(
-    providerValue: string,
-    ctx: InternalContext,
-    error?: unknown,
-    reason?: string,
-  ): void {
-    if (ctx.stopped || Date.now() >= ctx.deadlineAt) return;
-    if (ctx.generation !== this.generation) return;
-    this.metrics.providerFailures += 1;
-    const providerKey = providerValue.toLowerCase();
-    const stat: ProviderStat = this.providerStats.get(providerKey) ?? {
-      calls: 0,
-      ok: 0,
-      empty: 0,
-      errors: 0,
-      timeouts: 0,
-      skipped: 0,
-      avgLatencyMs: DEFAULT_PROVIDER_SCORE,
-      failures: 0,
-      lastMs: null,
-      lastError: null,
-    };
-    stat.failures += 1;
-    if (error) {
-      if (error instanceof TimeoutError) {
-        stat.timeouts += 1;
-        stat.lastError = 'timeout';
-      } else {
-        stat.errors += 1;
-        stat.lastError = error instanceof Error ? error.message : String(error);
-      }
-    } else if (reason) {
-      stat.errors += 1;
-      stat.lastError = reason;
-    }
-    this.providerStats.set(providerKey, stat);
-    const now = Date.now();
-    const state = this.breakers.get(providerValue) ?? { failures: [], openUntil: 0 };
-    state.failures = state.failures.filter((timestamp) => now - timestamp < BREAKER_WINDOW_MS);
-
-    if (state.openUntil > now) {
-      this.breakers.set(providerValue, state);
-      return;
-    }
-
-    state.failures.push(now);
-    if (state.failures.length >= BREAKER_THRESHOLD) {
-      state.openUntil = now + BREAKER_OPEN_MS;
-      state.failures = [];
-      this.logger.warn("pipeline.provider_circuit_opened", {
-        provider: providerValue,
-        failures: BREAKER_THRESHOLD,
-      });
-    }
-    this.breakers.set(providerValue, state);
   }
 
   private finalize(streams: StremioStream[]): StremioStream[] {

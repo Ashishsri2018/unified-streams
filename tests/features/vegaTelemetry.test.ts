@@ -104,4 +104,103 @@ describe('vega provider telemetry', () => {
 
     pipeline.dispose();
   }, 10000);
+
+  it('treats providers that resolve no streams as empty, not errors', async () => {
+    const config = loadConfig({
+      PORT: '7003',
+      DATA_DIR: '/tmp/vega-telemetry-test',
+      UPDATE_ON_START: 'false',
+      GLOBAL_DEADLINE_MS: '2000',
+      SEARCH_TIMEOUT_MS: '10000',
+      SETTLE_MS: '0',
+      EMPTY_FENCE_MS: '0',
+      STREAM_CACHE_TTL_MS: '0',
+      PROVIDER_CACHE_TTL_MS: '1000',
+    });
+
+    const bundle: ProviderBundle = {
+      entry: {
+        display_name: 'Empty Provider',
+        value: 'empty-provider',
+        version: '1.0.0',
+        disabled: false,
+      },
+      dir: '/tmp/vega-telemetry-test/empty-provider',
+      modules: {
+        posts: {
+          getSearchPosts: async () => [
+            { title: 'Test Movie', link: 'https://example.test/movie' },
+          ],
+        },
+        meta: {
+          getMeta: async () => ({
+            imdbId: 'tt1234567',
+            type: 'movie',
+            title: 'Test Movie',
+            year: '2020',
+            linkList: [
+              {
+                directLinks: [
+                  { link: 'https://example.test/1.mp4', type: 'movie' },
+                ],
+              },
+            ],
+          }),
+        },
+        stream: {
+          getStreams: async () => [],
+        },
+      },
+    };
+
+    const snapshot: ProviderSnapshot = {
+      sha: 'test',
+      rootDir: '/tmp/vega-telemetry-test',
+      urls: {},
+      bundles: new Map([['empty-provider', bundle]]),
+      createdAt: Date.now(),
+    };
+
+    const registry: ProviderRegistryApi = {
+      context: {} as ProviderContextLike,
+      listProviders: () => [bundle],
+      getActiveSnapshot: () => snapshot,
+      acquire: () => ({ snapshot, release: () => {} }),
+      onActivate: () => () => {},
+    };
+
+    const cinemeta: CinemetaApi = {
+      getMeta: async () => ({
+        id: 'tt1234567',
+        type: 'movie',
+        name: 'Test Movie',
+        year: '2020',
+      }),
+    };
+
+    const pipeline = new StreamPipeline({
+      config,
+      logger: logger(),
+      registry,
+      cinemeta,
+    });
+
+    await pipeline.handle({ type: 'movie', imdbId: 'tt1234567' });
+
+    const stat = pipeline
+      .getMetrics()
+      .providerStats?.find((entry) => entry.id === 'empty-provider');
+
+    expect(stat).toBeDefined();
+    expect(stat?.state).toBe('closed');
+    expect(stat?.calls).toBe(1);
+    expect(stat?.ok).toBe(1);
+    expect(stat?.empty).toBe(1);
+    expect(stat?.errors).toBe(0);
+    expect(stat?.timeouts).toBe(0);
+    expect(stat?.successRate).toBe(1);
+    expect(stat?.lastError).toBeNull();
+
+    pipeline.dispose();
+  }, 10000);
 });

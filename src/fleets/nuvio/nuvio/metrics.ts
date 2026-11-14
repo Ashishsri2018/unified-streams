@@ -1,4 +1,15 @@
-export type ProviderError = "timeout" | "error" | "non_array" | "deadline";
+import {
+  ProviderTelemetry,
+  type ProviderOutcomeKind,
+  type ProviderTelemetryEntry,
+} from '../../../core/providerTelemetry.js';
+
+export type ProviderError =
+  | 'timeout'
+  | 'error'
+  | 'non_array'
+  | 'deadline'
+  | 'skipped';
 
 export interface ProviderOutcome {
   id: string;
@@ -10,6 +21,7 @@ export interface ProviderOutcome {
 }
 
 export interface ProviderStats {
+  state: ProviderTelemetryEntry['state'];
   calls: number;
   ok: number;
   responded: number;
@@ -18,24 +30,14 @@ export interface ProviderStats {
   timeouts: number;
   skipped: number;
   successRate: number | null;
+  avgMs: number | null;
   p50Ms: number | null;
   p95Ms: number | null;
-  lastError?: string | null;
+  lastError: string | null;
+  lastSuccessAt: string | null;
 }
 
 export type ProviderStatsReport = Record<string, ProviderStats>;
-
-interface ProviderState {
-  calls: number;
-  ok: number;
-  responded: number;
-  empty: number;
-  errors: number;
-  timeouts: number;
-  skipped: number;
-  latencies: number[];
-  lastError: string | null;
-}
 
 const DEFAULT_CAPACITY = 100;
 
@@ -50,76 +52,81 @@ export function percentile(
   return sorted[index] as number;
 }
 
+export interface ProviderMetricsOptions {
+  failureThreshold?: number;
+  cooldownMs?: number;
+}
+
 export class ProviderMetrics {
   private readonly capacity: number;
-  private readonly providers = new Map<string, ProviderState>();
+  private readonly telemetry: ProviderTelemetry;
+  private readonly latencies = new Map<string, number[]>();
 
-  constructor(capacity = DEFAULT_CAPACITY) {
+  constructor(capacity = DEFAULT_CAPACITY, options: ProviderMetricsOptions = {}) {
     this.capacity = Math.max(1, capacity);
+    this.telemetry = new ProviderTelemetry({
+      failureThreshold: options.failureThreshold,
+      cooldownMs: options.cooldownMs,
+    });
+  }
+
+  attempt(id: string): boolean {
+    return this.telemetry.attempt(id);
   }
 
   record(outcome: ProviderOutcome): void {
-    const state = this.stateFor(outcome.id);
-    if (outcome.error === "deadline") {
-      state.skipped += 1;
+    const id = outcome.id;
+    if (outcome.error === 'deadline' || outcome.error === 'skipped') {
+      this.telemetry.record(id, 'skipped');
       return;
     }
 
-    state.calls += 1;
-    if (outcome.ok) {
-      state.ok += 1;
-      if (outcome.streams > 0) state.responded += 1;
-      else state.empty += 1;
-    } else if (outcome.error === "timeout") {
-      state.timeouts += 1;
-      state.lastError = outcome.lastError || "timeout";
-    } else {
-      state.errors += 1;
-      state.lastError = outcome.lastError || "error";
-    }
+    const kind: ProviderOutcomeKind = outcome.ok
+      ? outcome.streams > 0
+        ? 'ok'
+        : 'empty'
+      : outcome.error === 'timeout'
+        ? 'timeout'
+        : 'error';
 
-    state.latencies.push(outcome.latencyMs);
-    if (state.latencies.length > this.capacity) state.latencies.shift();
+    const samples = this.latencies.get(id) ?? [];
+    samples.push(outcome.latencyMs);
+    if (samples.length > this.capacity) samples.shift();
+    this.latencies.set(id, samples);
+
+    this.telemetry.record(id, kind, {
+      latencyMs: outcome.latencyMs,
+      error: outcome.lastError ?? outcome.error,
+    });
   }
 
   report(): ProviderStatsReport {
     const report: ProviderStatsReport = {};
-    for (const id of [...this.providers.keys()].sort()) {
-      const state = this.providers.get(id) as ProviderState;
-      if (state.calls === 0) continue;
-      report[id] = {
-        calls: state.calls,
-        ok: state.ok,
-        responded: state.responded,
-        empty: state.empty,
-        errors: state.errors,
-        timeouts: state.timeouts,
-        skipped: state.skipped,
-        successRate: Math.round((state.ok / state.calls) * 1000) / 1000,
-        p50Ms: percentile(state.latencies, 50),
-        p95Ms: percentile(state.latencies, 95),
-        lastError: state.lastError,
+    for (const entry of this.telemetry.snapshot()) {
+      if (entry.calls === 0 && entry.skipped === 0) continue;
+      const samples = this.latencies.get(entry.id) ?? [];
+      report[entry.id] = {
+        state: entry.state,
+        calls: entry.calls,
+        ok: entry.ok,
+        responded: entry.responded,
+        empty: entry.empty,
+        errors: entry.errors,
+        timeouts: entry.timeouts,
+        skipped: entry.skipped,
+        successRate: entry.successRate,
+        avgMs: entry.avgMs,
+        p50Ms: percentile(samples, 50),
+        p95Ms: percentile(samples, 95),
+        lastError: entry.lastError,
+        lastSuccessAt: entry.lastSuccessAt,
       };
     }
     return report;
   }
 
-  private stateFor(id: string): ProviderState {
-    let state = this.providers.get(id);
-    if (!state) {
-      state = {
-        calls: 0,
-        ok: 0,
-        responded: 0,
-        empty: 0,
-        errors: 0,
-        timeouts: 0,
-        skipped: 0,
-        latencies: [],
-        lastError: null,
-      };
-      this.providers.set(id, state);
-    }
-    return state;
+  reset(): void {
+    this.telemetry.reset();
+    this.latencies.clear();
   }
 }

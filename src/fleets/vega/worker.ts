@@ -114,9 +114,18 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
       successRate: stat?.successRate ?? null,
       avgMs: stat?.avgMs ?? null,
       lastError: stat?.lastError ?? null,
-      lastSuccessAt: null,
+      lastSuccessAt: stat?.lastSuccessAt ?? null,
     };
   });
+
+  const circuits = stats.reduce(
+    (counts, stat) => {
+      if (stat.state === 'open') counts.open += 1;
+      else if (stat.state === 'half-open') counts.halfOpen += 1;
+      return counts;
+    },
+    { open: 0, halfOpen: 0 },
+  );
 
   const payload = {
     fleet: 'vega',
@@ -131,16 +140,15 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
       refreshing: false,
       lastError: snapshotState?.lastError || null,
     },
-    providers: { total: activeProviders.length, circuits: { open: 0, halfOpen: 0 }, stats },
+    providers: { total: activeProviders.length, circuits, stats },
     metrics: {
       requests: pipelineMetrics?.requests ?? 0,
-      successes: 0,
-      empties: pipelineMetrics?.emptyResults ?? 0,
-      timeouts: 0,
-      errors: pipelineMetrics?.providerFailures ?? 0,
-      skipped: 0,
-      successRate: 0,
-      failureRate: 0,
+      cacheHits: pipelineMetrics?.cacheHits ?? 0,
+      cacheMisses: pipelineMetrics?.cacheMisses ?? 0,
+      emptyResults: pipelineMetrics?.emptyResults ?? 0,
+      deadlineHits: pipelineMetrics?.deadlineHits ?? 0,
+      settleHits: pipelineMetrics?.settleHits ?? 0,
+      providerFailures: pipelineMetrics?.providerFailures ?? 0,
     },
   };
 

@@ -99,6 +99,7 @@ async function collectStreams(options: {
   deadlineMs: number;
   perProviderTimeoutMs: number;
   logger: LoggerLike;
+  attempt?: (id: string) => boolean;
   run: (scraper: LoadedScraper) => Promise<unknown[]>;
 }): Promise<CollectResult> {
   const {
@@ -107,6 +108,7 @@ async function collectStreams(options: {
     deadlineMs,
     perProviderTimeoutMs,
     logger,
+    attempt,
     run,
   } = options;
   const results: CollectedStreams[] = [];
@@ -128,6 +130,7 @@ async function collectStreams(options: {
         return;
       }
       attempted.add(index);
+      if (attempt && !attempt(scraper.entry.id)) continue;
       const startedAt = Date.now();
       try {
         const timeoutMs =
@@ -204,7 +207,7 @@ export class StreamPipeline {
   private readonly cinemeta: CinemetaClient;
   private readonly cache = new Map<string, CacheEntry>();
   private readonly inflight = new Map<string, Promise<ProduceResult>>();
-  private readonly metrics = new ProviderMetrics();
+  private readonly metrics: ProviderMetrics;
   private readonly requestMetrics = {
     requests: 0,
     emptyResults: 0,
@@ -226,6 +229,10 @@ export class StreamPipeline {
     this.logger = options.logger;
     this.snapshots = options.snapshots;
     this.cinemeta = options.cinemeta;
+    this.metrics = new ProviderMetrics(100, {
+      failureThreshold: options.config.breakerFailureThreshold,
+      cooldownMs: options.config.breakerCooldownMs,
+    });
   }
 
   getProviderStats(): ProviderStatsReport {
@@ -419,6 +426,7 @@ export class StreamPipeline {
         deadlineMs: Math.max(1, deadlineAt - Date.now()),
         perProviderTimeoutMs: this.config.scraperTimeoutMs,
         logger: this.logger,
+        attempt: (id) => this.metrics.attempt(id),
         run: (scraper) =>
           scraper.getStreams(
             tmdbId,

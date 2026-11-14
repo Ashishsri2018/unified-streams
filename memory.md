@@ -343,3 +343,24 @@
 - One-Time Legacy Env Cleanup:
   - Added `.github/workflows/cleanup-env.yml` (`workflow_dispatch`, requires typing `CLEAN`). Beamup's deploy key permits only `config:set` (both `config:unset` and `config:show`/`config:keys` return `001cERR unsupported command`), so the workflow sets all six legacy provider vars to empty values. `src/core/env.ts` treats empty values as no override, which neutralizes the old lists and restarts the app onto the profile.
   - Run it once after the instance-profile Beamup deploy finishes. Normal pushes still sync only `INSTANCE_PROFILE` and credentials, so later runtime overrides are preserved.
+
+- Comprehensive Code Review & Logic Bug Inspection (Session Nov 14 2026):
+  - Completed deep inspection of gateway, workers (`sa7`, `nuvio`, `vega`), environment & profile logic, updaters, telemetry, and CI/CD pipelines.
+  - Identified and documented 15 findings across the codebase in artifact `code-review.md`:
+    1. Critical bug: SA7 drops streams with unknown resolution when query config is passed (`sa7/worker.js`, `streams.js`, `filters.js`).
+    2. High bug: SA7 content ID parser regex fails on single-suffix season pack IDs (`tt...:season`, `tmdb:...:season`) in `sa7/content-id.js`.
+    3. High bug: Nuvio and Vega internal parsers reject season 0 specials (`season < 1`) in `parseId.ts`.
+    4. Medium bug: Configure UI ignores prefilled configuration string (`prefillJson`), resetting form on edit (`configureHtml.ts`).
+    5. Medium flaw: `healthcheck.mjs` exits 1 on transient single-worker degradation, killing container unnecessarily.
+    6. Medium bug: Status dashboard crashes on HTTP 503 instead of rendering failure diagnostics (`statusHtml.ts`).
+    7. Medium bug: Telemetry type mismatch for SA7 `lastError` object assigned to string field (`breaker.js`, `health.ts`).
+    8. Medium race condition: `JikanClient` concurrent rate limiter race condition causing upstream HTTP 429 (`jikan.ts`).
+    9. Low gap: `/health` reports empty updater state because `UpdaterScheduler` is not wired into `StreamHandlerContext`.
+    10. Low edge case: Nuvio worker health reports 30 scrapers when 0 are active due to falsy `allIds.length || 30`.
+    11. Low security: Content-Security-Policy uses `'unsafe-inline'` on `/configure` and `/status`.
+    12. Low bug: Container rank regex misses URLs with `#` hash fragments (`merge.ts`).
+    13. Low hygiene: Dead legacy SA7 standalone server files (`server.js`, `run.js`).
+    14. Low contract: Internal token header `x-internal-token` never verified by workers.
+    15. Low gap: `Logger` never configures or instantiates `CloudflareSink` when `LOG_SINK=cloudflare`.
+  - All findings verified against runtime code and documented with exact root causes and proposed remedies.
+  - Saved full bug report to `docs/bugs.md` and added `docs/bugs.md` to `.gitignore`.

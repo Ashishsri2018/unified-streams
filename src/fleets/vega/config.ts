@@ -39,6 +39,8 @@ export interface AppConfig {
   providerCacheTtlMs: number;
   streamCacheTtlMs: number;
   streamPartialCacheTtlMs: number;
+  breakerFailureThreshold: number;
+  breakerCooldownMs: number;
   streamRateLimitPerMin: number;
   streamGlobalRateLimitPerMin: number;
   streamMaxConcurrent: number;
@@ -145,6 +147,8 @@ const schema = z.object({
   PROVIDER_CACHE_TTL_MS: envInt(21600000, 1000, 604800000),
   STREAM_CACHE_TTL_MS: envInt(60000, 0, 3600000),
   STREAM_PARTIAL_CACHE_TTL_MS: envInt(30000, 0, 3600000),
+  BREAKER_FAILURE_THRESHOLD: envInt(3, 1, 100),
+  BREAKER_COOLDOWN_MS: envInt(300000, 0, 3600000),
   STREAM_RATE_LIMIT_PER_MIN: envInt(120, 0, 100000),
   STREAM_GLOBAL_RATE_LIMIT_PER_MIN: envInt(600, 0, 100000),
   STREAM_MAX_CONCURRENT: envInt(64, 0, 10000),
@@ -242,6 +246,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     providerCacheTtlMs: value.PROVIDER_CACHE_TTL_MS,
     streamCacheTtlMs: value.STREAM_CACHE_TTL_MS,
     streamPartialCacheTtlMs: value.STREAM_PARTIAL_CACHE_TTL_MS,
+    breakerFailureThreshold: value.BREAKER_FAILURE_THRESHOLD,
+    breakerCooldownMs: value.BREAKER_COOLDOWN_MS,
     streamRateLimitPerMin: value.STREAM_RATE_LIMIT_PER_MIN,
     streamGlobalRateLimitPerMin: value.STREAM_GLOBAL_RATE_LIMIT_PER_MIN,
     streamMaxConcurrent: value.STREAM_MAX_CONCURRENT,

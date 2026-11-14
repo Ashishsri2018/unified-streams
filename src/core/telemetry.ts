@@ -8,17 +8,18 @@ export interface ProviderMetrics {
   state: CircuitState;
   calls: number;
   ok: number;
+  responded?: number;
   empty: number;
   errors: number;
   timeouts: number;
   skipped: number;
-  successRate: number;
-  failureRate: number;
-  avgMs: number;
-  lastMs: number;
+  successRate: number | null;
+  avgMs: number | null;
+  lastMs: number | null;
+  maxMs?: number | null;
   lastError: string | null;
   lastSuccessAt: string | null;
-  consecutiveFailures: number;
+  consecutiveFailures?: number;
 }
 
 export interface WorkerSnapshot {
@@ -43,13 +44,12 @@ export interface WorkerHealth {
   };
   metrics: {
     requests: number;
-    successes: number;
-    empties: number;
-    timeouts: number;
-    errors: number;
-    skipped: number;
-    successRate: number;
-    failureRate: number;
+    cacheHits: number;
+    cacheMisses: number;
+    emptyResults: number;
+    deadlineHits: number;
+    settleHits: number;
+    providerFailures: number;
   };
 }
 
