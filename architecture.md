@@ -91,12 +91,26 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
 
 ## 4. Live Deployment & Credentials
 - **Repository**: `https://github.com/Ashishsri2018/unified-streams`
-- **Beamup Remote**: `dokku@a.baby-beamup.club:a38b6dd4fcd1/unified-streams-docker`
-- **Public Base URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`
-- **Manifest URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json`
-- **Configure URL**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/configure`
-- **Health Endpoint**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/health`
-- **Status Dashboard**: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/status`
+- **Beamup Deployment**:
+  - Remote: `dokku@a.baby-beamup.club:a38b6dd4fcd1/unified-streams-docker`
+  - Public Base URL: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club`
+  - Manifest URL: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json`
+  - Configure URL: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/configure`
+  - Health Endpoint: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/health`
+  - Status Dashboard: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/status`
+- **Railway Deployment**:
+  - Project: `melodious-tranquility` (ID: `bfb0020e-4e61-4f42-9feb-115a06a38be2`)
+  - Environment: `production` (ID: `fbfbc17f-875f-4af5-8759-31780c7314a6`)
+  - Service: `unified-streams` (ID: `02132873-33e4-47cf-986f-15ef3f6050da`)
+  - Public URL: `https://unified-streams-production.up.railway.app`
+- **Dual CI/CD Deployment Pipeline (`.github/workflows/ci.yml`)**:
+  - Runs on `main` push and manual `workflow_dispatch`.
+  - Stages:
+    1. `Verify`: Policy check, icon check, ESLint, TypeScript typecheck, Vitest feature tests, build.
+    2. `Docker`: Docker build & container smoke test.
+    3. Concurrently deploys to:
+       - `deploy-beamup`: Syncs Dokku environment (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `PUBLIC_BASE_URL`) and pushes to Beamup Dokku.
+       - `deploy-railway`: Installs Railway CLI, syncs environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and triggers `railway up --service unified-streams --detach`.
 - **Active Fleets & Providers**: Canonical duplicate-excluded provider fleet enforced via `config/providers.json` and `config/provider-audit.csv` (SA7: 12-13, Nuvio: 31, Vega: 36-40) with redundant duplicate scrapers, torrent scrapers, and Internet Archive excluded.
 - **Provider Credentials Pipeline**:
   - `FEBBOX_UI_COOKIE`: Ingested by gateway from environment / GitHub Actions secrets, formatted as `ui=<token>`, and passed to Vega worker via `PROVIDER_SETTINGS_JSON.kv.febboxCookie` for authenticated Showbox streams.

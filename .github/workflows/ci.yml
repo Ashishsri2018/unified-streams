@@ -64,7 +64,7 @@ jobs:
           curl -f http://127.0.0.1:7000/logo.png -o /dev/null || exit 1
           docker stop streams-smoke
 
-  deploy:
+  deploy-beamup:
     name: Deploy to Beamup
     needs: [verify, docker]
     runs-on: ubuntu-latest
@@ -121,4 +121,49 @@ jobs:
               exit "$status"
             fi
           fi
+
+  deploy-railway:
+    name: Deploy to Railway
+    needs: [verify, docker]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Sync Railway Environment
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          FEBBOX_UI_COOKIE: ${{ secrets.FEBBOX_UI_COOKIE }}
+          GRAMCINEMA_TOKEN: ${{ secrets.GRAMCINEMA_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set in GitHub repository secrets."
+            exit 1
+          fi
+          if [ -n "$TMDB_API_KEY" ]; then
+            railway variable set "TMDB_API_KEY=$TMDB_API_KEY" --service unified-streams --skip-deploys || true
+          fi
+          if [ -n "$FEBBOX_UI_COOKIE" ]; then
+            railway variable set "FEBBOX_UI_COOKIE=$FEBBOX_UI_COOKIE" --service unified-streams --skip-deploys || true
+          fi
+          if [ -n "$GRAMCINEMA_TOKEN" ]; then
+            railway variable set "GRAMCINEMA_TOKEN=$GRAMCINEMA_TOKEN" --service unified-streams --skip-deploys || true
+          fi
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service unified-streams --detach
 

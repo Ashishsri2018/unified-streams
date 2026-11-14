@@ -222,9 +222,50 @@
     3. Compressed archive files (`.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.bz2`, `.iso`, `.xz`) are NOT `externalUrl`: they remain in `url` and have their `name` property prefixed with the `🔲 ` emoji.
   - Updated all unit tests in `tests/features/merge.test.ts` to cover extensionless bridge URLs, compressed files with `🔲` emoji in `name`, and HTML embed pages with `🖥️` in `title`. All 47 tests, ESLint, and TypeScript checks pass.
 
+- Codebase Logic & Protocol Issues Audit:
+  - Conducted full audit of all subsystems across gateway, workers (SA7, Nuvio, Vega), config, updaters, and health endpoints.
+  - Documented findings in `docs/audit-findings.md` covering:
+    1. Critical bug: SA7 drops streams with unknown resolution when user config string is passed.
+    2. Critical bug: SA7 content ID parser regex fails on single-suffix season pack IDs (`tt...:season`).
+    3. Bug: Nuvio and Vega internal parsers reject season 0 specials (`season < 1`).
+    4. Bug: Configure UI ignores prefilled configuration string (`prefillJson`), resetting form on edit.
+    5. Gap: `/health` reports empty updater state and zeroed metadata cache because instances are not wired into `StreamHandlerContext`.
+    6. Flaw: `healthcheck.mjs` exits 1 on transient single-worker degradation, killing container unnecessarily.
+    7. Bug: Status dashboard crashes on HTTP 503 instead of rendering failure diagnostics.
+    8. Edge cases: Jikan concurrent rate limiting race condition, CSP `'unsafe-inline'`, container rank regex on `#hash`, and legacy SA7 dead code (`server.js`, `run.js`).
+
 ## Key Decisions & Conventions
 - TypeScript with strict mode for all gateway and shared core code.
 - Zero `any` usage.
 - Standardized error handling: all stream requests return `{ "streams": [] }` on failure/empty.
 - Strict HTTP compatibility: `GET`, `HEAD`, `OPTIONS` supported explicitly; `HEAD` never invokes upstream provider fan-out.
 - Documentation commits must always contain `[skip ci]` to prevent redundant CI/CD builds.
+
+- Live Instance Cross-Comparison (Railway Production vs Docker Beamup):
+  - Queried identical movie requests across both live deployments:
+    - Railway: `https://unified-streams-production.up.railway.app/`
+    - Beamup: `https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/`
+  - Compared responses for *Fight Club* (`tt0137523`) and *The Shawshank Redemption* (`tt0111161`):
+    1. Stream Counts:
+       - *Fight Club*: Railway returned 115 streams (97 direct, 18 externalUrl); Beamup returned 71 streams (53 direct, 18 externalUrl). 50 URLs were identical.
+       - *The Shawshank Redemption*: Railway returned 85 streams (71 direct, 14 externalUrl); Beamup returned 60 streams (46 direct, 14 externalUrl). 41 URLs were identical.
+    2. Fleet & Provider Breakdown:
+       - SA7 Fleet: 100% parity across all SA7 providers (DesiFlix, Movix VF, MultiMovies, NetMirror, RedFlix, VidRock).
+       - Vega & Nuvio Fleets: Discrepancies driven by network egress IP blocks, Cloudflare protection, and timeout differences on Beamup for aggressive scrapers (`4khdHub`, `MoviesMod`, `HdHub4u`, `Maelith`, `Quinox`).
+       - Beamup exclusive provider: `Sylphera.` returned 2 streams on Beamup while returning 0 on Railway.
+    3. Protocol & Specification Verification:
+       - Direct-before-externalUrl sorting: Confirmed compliant on both instances.
+       - External URL emoji prefix: 100% of external links tagged with `🖥️` prefix in `title` on both instances.
+       - Compressed archive emoji prefix: Tagged with `🔲 ` in `name` on both instances (e.g., `🔲 MoviesMod`).
+       - Cache headers: Both instances send `cache-control: no-store` on `/stream` endpoints with internal 30s partial / 180s full cache TTLs.
+       - Manifest differences: Beamup includes `"tmdb:"` in `idPrefixes` (`["tt", "tmdb:"]`), whereas Railway exposes `["tt"]`.
+    4. Report Artifact:
+       - Generated and saved full comparison report to `docs/instance-comparison-report.md`.
+
+- Environment & Tooling:
+  - Installed official Railway CLI (`@railway/cli` v5.74.0) into the environment. Verified binary location (`/root/node-v22.14.0-linux-arm64/bin/railway`) and confirmed operational readiness via `railway --version` and `railway --help`.
+  - Configured Dual-Target CI/CD in `.github/workflows/ci.yml`:
+    - Updated pipeline to run `deploy-beamup` and `deploy-railway` in parallel upon successful completion of `verify` and `docker` smoke test.
+    - `deploy-railway` installs Railway CLI, syncs environment secrets (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and initiates deployment via `railway up --service unified-streams --detach`.
+    - Enabled `checkSuites: true` on the Railway GitHub deployment trigger so Railway adheres to GitHub Actions verification gates.
+    - Updated `architecture.md` to document the dual Beamup + Railway production deployment architecture.

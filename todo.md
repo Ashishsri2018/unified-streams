@@ -72,6 +72,7 @@
   - [x] Create multi-stage `Dockerfile` and `docker-entrypoint.sh`
   - [x] Create `.github/workflows/ci.yml`, `release.yml`, `rollback.yml`
   - [x] Create `scripts/apply-env.mjs` for one-shot bulk env import
+  - [x] Configure dual Beamup + Railway CI/CD pipeline in `.github/workflows/ci.yml`
   - [x] Verify end-to-end tests, lint, typecheck, build
   - [x] Verify live runtime smoke test (Gateway on 7000, SA7 on 7001, Nuvio on 7002, Vega on 7003 — 89 active providers)
 
@@ -97,3 +98,17 @@
   - [ ] Monitor provider success/timeout rates via `/stats`
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs
+
+- [ ] **Phase 11: Logic Bug Fixes & Codebase Hardening**
+  - [ ] Fix SA7 unknown resolution dropping bug on configured requests (`src/fleets/sa7/worker.js`)
+  - [ ] Fix SA7 season pack regex parser (`src/fleets/sa7/content-id.js`)
+  - [ ] Allow Season 0 (specials) in Nuvio and Vega internal stream parsers (`parseId.ts`)
+  - [ ] Hydrate prefilled configuration in configure page HTML (`src/addon/configureHtml.ts`)
+  - [ ] Wire `UpdaterScheduler` and `MetadataResolver` into `StreamHandlerContext` and `/health`
+  - [ ] Update `scripts/healthcheck.mjs` to avoid terminating container during transient single-worker restarts
+  - [ ] Fix status dashboard 503 crash in `src/addon/statusHtml.ts`
+  - [ ] Add request queue serialization to `src/core/jikan.ts` to prevent race conditions on upstream limits
+  - [ ] Generate CSP nonces for HTML pages and remove `'unsafe-inline'`
+  - [ ] Remove unused legacy dead code in SA7 (`server.js`, `run.js`)
+  - [ ] Fix container rank regex for URLs with `#` hash fragments (`src/addon/merge.ts`)
+  - [ ] Normalize SA7 `lastError` object into string in `src/addon/health.ts`
