@@ -32,16 +32,10 @@ jobs:
           set -euo pipefail
           APP="a38b6dd4fcd1/unified-streams-docker"
 
-          # Best-effort removal of optional enable-lists. These were not set by
-          # the old CI, so ignore failures for keys that do not exist.
-          for key in SA7_ENABLED_PROVIDERS NUVIO_ENABLED_SCRAPERS VEGA_ENABLED_PROVIDERS; do
-            ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:unset --no-restart $APP $key" >/dev/null 2>&1 || true
-          done
-
-          # These three were set by the old Beamup deploy on every run.
-          # Run this after the profile-based deploy has finished. The unset
-          # restarts the app so the current release reads
-          # config/instances/beamup.env and the instances.beamup policy.
+          # Beamup's deploy key permits config:set but rejects config:unset and
+          # config:show. Empty values are treated as "no override" by
+          # src/core/env.ts, so this neutralizes the legacy lists and restarts
+          # the app onto config/instances/beamup.env + instances.beamup policy.
           ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club \
-            "config:unset $APP SA7_DISABLED_PROVIDERS NUVIO_DISABLED_SCRAPERS VEGA_DISABLED_PROVIDERS"
+            "config:set $APP SA7_ENABLED_PROVIDERS= SA7_DISABLED_PROVIDERS= NUVIO_ENABLED_SCRAPERS= NUVIO_DISABLED_SCRAPERS= VEGA_ENABLED_PROVIDERS= VEGA_DISABLED_PROVIDERS="
           echo "Done. Beamup now uses config/instances/beamup.env and instances.beamup policy."

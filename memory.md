@@ -341,5 +341,5 @@
   - Added profile, override, wildcard, hard-disable, and merge-priority tests; all 58 Vitest tests and `npm run verify` pass 100%.
 
 - One-Time Legacy Env Cleanup:
-  - Added `.github/workflows/cleanup-env.yml` (`workflow_dispatch`, requires typing `CLEAN`). It unsets the three legacy disabled lists (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`) directly, with best-effort removal of the matching enabled lists; the unset restarts the app so the current release uses the profile. It does not use `config:show`/`config:keys`, which Beamup rejects for the deploy key.
+  - Added `.github/workflows/cleanup-env.yml` (`workflow_dispatch`, requires typing `CLEAN`). Beamup's deploy key permits only `config:set` (both `config:unset` and `config:show`/`config:keys` return `001cERR unsupported command`), so the workflow sets all six legacy provider vars to empty values. `src/core/env.ts` treats empty values as no override, which neutralizes the old lists and restarts the app onto the profile.
   - Run it once after the instance-profile Beamup deploy finishes. Normal pushes still sync only `INSTANCE_PROFILE` and credentials, so later runtime overrides are preserved.
