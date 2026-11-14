@@ -1,6 +1,6 @@
 const CONTENT_PATTERNS = [
-  { source: 'imdb', pattern: /^(tt\d+)(?::(\d+):(\d+))?$/ },
-  { source: 'tmdb', pattern: /^tmdb:(\d+)(?::(\d+):(\d+))?$/ },
+  { source: 'imdb', pattern: /^(tt\d+)(?::(\d+)(?::(\d+))?)?$/ },
+  { source: 'tmdb', pattern: /^tmdb:(\d+)(?::(\d+)(?::(\d+))?)?$/ },
 ];
 
 const TMDB_CONTENT_ID = /^tmdb:(\d+)$/;

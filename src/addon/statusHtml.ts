@@ -2,6 +2,7 @@ export interface StatusPageOptions {
   addonName: string;
   logoUrl: string;
   configureUrl: string;
+  scriptNonce: string;
 }
 
 export function getStatusCss(): string {
@@ -323,7 +324,7 @@ export function renderStatusPage(options: StatusPageOptions): string {
 
   <p class="footer">JSON: <a href="/health">/health</a> · <a href="/stats">/stats</a> · This page refreshes every 15 seconds.</p>
 </main>
-<script>${scripts}</script>
+<script nonce="${options.scriptNonce}">${scripts}</script>
 </body>
 </html>`;
 }

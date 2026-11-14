@@ -175,6 +175,32 @@ describe('classifier and merger', () => {
     expect(archiveNoName?.externalUrl).toBeUndefined();
   });
 
+  it('ranks direct containers even when the URL has a hash fragment', () => {
+    const defaultFilters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: null,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+
+    const inputs: FleetStreamsInput[] = [
+      {
+        fleet: 'vega',
+        streams: [
+          { title: 'Hash MP4', url: 'https://cdn.test/video.mp4#t=10' },
+          { title: 'HLS', url: 'https://cdn.test/video/master.m3u8' },
+        ],
+      },
+    ];
+
+    const merged = mergeAndFilterStreams(inputs, defaultFilters, 10);
+    expect(merged[0].title).toBe('Hash MP4');
+  });
+
   it('keeps duplicate URLs from the highest-priority fleet (vega > nuvio > sa7)', () => {
     const defaultFilters: StreamFilterConfig = {
       minRes: null,

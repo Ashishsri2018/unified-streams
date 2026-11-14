@@ -10,6 +10,7 @@ import { StremioStream } from './types.js';
 
 const host = '127.0.0.1';
 const port = Number(process.env.PORT || 7002);
+const internalToken = process.env.INTERNAL_TOKEN || '';
 const startedAt = Date.now();
 
 const config = loadConfig(process.env);
@@ -113,7 +114,7 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
       lastError: null,
     },
     providers: {
-      total: allIds.length || 30,
+      total: allIds.length,
       circuits: { open: 0, halfOpen: 0 },
       stats,
     },
@@ -127,6 +128,11 @@ void snapshots.ensure();
 
 const server = http.createServer((req, res) => {
   const requestId = (req.headers['x-request-id'] as string) || '';
+
+  if (internalToken && req.headers['x-internal-token'] !== internalToken) {
+    return sendJson(res, 401, { error: 'Unauthorized' }, requestId);
+  }
+
   const parsedUrl = new URL(req.url || '/', `http://${host}:${port}`);
   const pathname = parsedUrl.pathname;
 

@@ -83,9 +83,9 @@ function getStreamDedupeKey(stream: StremioStream): string {
 function getContainerRank(url: string | undefined): number {
   if (!url) return 3;
   const lower = url.toLowerCase();
-  if (/\.(mp4|mkv)($|\?)/.test(lower)) return 0;
-  if (/\.(webm|mov|m4v)($|\?)/.test(lower)) return 1;
-  if (/\.(m3u8|mpd)($|\?)/.test(lower)) return 2;
+  if (/\.(mp4|mkv)($|[?&#])/i.test(lower)) return 0;
+  if (/\.(webm|mov|m4v)($|[?&#])/i.test(lower)) return 1;
+  if (/\.(m3u8|mpd)($|[?&#])/i.test(lower)) return 2;
   return 3;
 }
 

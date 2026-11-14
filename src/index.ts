@@ -50,6 +50,7 @@ async function main(): Promise<void> {
     maxStreams: env.MAX_STREAMS,
     globalDeadlineMs: env.GLOBAL_DEADLINE_MS,
     workerTimeoutMs: env.BACKEND_TIMEOUT_MS,
+    scheduler,
   };
 
   const app = createGatewayApp(ctx, startedAt);

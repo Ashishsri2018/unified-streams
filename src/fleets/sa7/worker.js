@@ -21,6 +21,7 @@ const { buildStatus } = require('./telemetry');
 
 const host = '127.0.0.1';
 const port = Number(process.env.PORT || 7001);
+const internalToken = process.env.INTERNAL_TOKEN || '';
 const startedAt = Date.now();
 
 function sendJson(res, status, body, requestId) {
@@ -70,7 +71,7 @@ function handleHealth(req, res, requestId) {
   sendJson(res, 200, payload, requestId);
 }
 
-async function handleStream(req, res, urlPath, query, requestId) {
+async function handleStream(req, res, urlPath, requestId) {
   // /internal/stream/:type/:id.json
   const match = /^\/internal\/stream\/(movie|series)\/([^/]+)\.json$/.exec(urlPath);
   if (!match) {
@@ -94,13 +95,7 @@ async function handleStream(req, res, urlPath, query, requestId) {
   const episode = parsed && parsed.episode != null ? parsed.episode : undefined;
 
   try {
-    const rawStreams = await collectStreams(
-      contentId,
-      type,
-      season,
-      episode,
-      query.get('config') || '',
-    );
+    const rawStreams = await collectStreams(contentId, type, season, episode);
 
     const streams = Array.isArray(rawStreams) ? rawStreams : [];
     sendJson(res, 200, { streams }, requestId);
@@ -120,6 +115,11 @@ function handleReload(req, res, requestId) {
 
 const server = http.createServer((req, res) => {
   const requestId = req.headers['x-request-id'] || '';
+
+  if (internalToken && req.headers['x-internal-token'] !== internalToken) {
+    return sendJson(res, 401, { error: 'Unauthorized' }, requestId);
+  }
+
   const parsedUrl = new URL(req.url, `http://${host}:${port}`);
   const pathname = parsedUrl.pathname;
 
@@ -137,7 +137,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname.startsWith('/internal/stream/')) {
-    return handleStream(req, res, pathname, parsedUrl.searchParams, requestId);
+    return handleStream(req, res, pathname, requestId);
   }
 
   if (pathname === '/internal/reload' && req.method === 'POST') {

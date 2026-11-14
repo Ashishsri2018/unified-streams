@@ -6,6 +6,7 @@ import { WorkerClient } from '../core/workerClient.js';
 import { mergeAndFilterStreams, FleetStreamsInput } from './merge.js';
 import { StremioStream } from './filters.js';
 import { logger } from '../core/logger.js';
+import type { WorkerSnapshot } from '../core/telemetry.js';
 
 export interface StreamHandlerContext {
   cache: GatewayStreamCache<{ streams: StremioStream[] }>;
@@ -15,6 +16,9 @@ export interface StreamHandlerContext {
   maxStreams: number;
   globalDeadlineMs: number;
   workerTimeoutMs: number;
+  scheduler?: {
+    getStatus(fleet: 'sa7' | 'nuvio' | 'vega'): WorkerSnapshot;
+  };
 }
 
 // Stream responses must not be cached by Cloudflare or browsers. Cloudflare is

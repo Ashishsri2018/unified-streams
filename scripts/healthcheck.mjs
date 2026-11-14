@@ -10,7 +10,7 @@ try {
   const res = await fetch(url, { signal: controller.signal });
   if (res.ok) {
     const json = await res.json();
-    if (json.ok) {
+    if (json.status !== 'error') {
       process.exit(0);
     }
   }

@@ -118,7 +118,13 @@ export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: nu
     fleets,
     providers,
     components,
-    updater: {},
+    updater: ctx.scheduler
+      ? {
+          sa7: ctx.scheduler.getStatus('sa7'),
+          nuvio: ctx.scheduler.getStatus('nuvio'),
+          vega: ctx.scheduler.getStatus('vega'),
+        }
+      : {},
     sink: {
       queueDepth: logger.getQueueDepth(),
       dropped: queueMetrics.dropped,

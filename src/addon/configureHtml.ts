@@ -2,7 +2,11 @@
  * Server-rendered HTML and client JS for the Unified Streams /configure page.
  */
 
-export function renderConfigurePageHtml(baseUrl: string, _prefillConfigJson: string): string {
+export function renderConfigurePageHtml(
+  baseUrl: string,
+  prefillConfigJson: string,
+  scriptNonce: string,
+): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -153,8 +157,9 @@ export function renderConfigurePageHtml(baseUrl: string, _prefillConfigJson: str
     </div>
   </div>
 
-  <script>
+  <script nonce="${scriptNonce}">
     const BASE_URL = "${baseUrl}";
+    const PREFILL_CONFIG = ${prefillConfigJson};
     const COMMON_LANGS = [
       { code: 'en', name: 'English' }, { code: 'hi', name: 'Hindi' },
       { code: 'ta', name: 'Tamil' }, { code: 'te', name: 'Telugu' },
@@ -163,7 +168,9 @@ export function renderConfigurePageHtml(baseUrl: string, _prefillConfigJson: str
       { code: 'es', name: 'Spanish' }, { code: 'fr', name: 'French' },
       { code: 'multi', name: 'Multi' }
     ];
-    let selectedLangs = new Set(['en']);
+    const PREFILL = PREFILL_CONFIG && typeof PREFILL_CONFIG === 'object' ? PREFILL_CONFIG : {};
+    const prefillLangs = Array.isArray(PREFILL.subtitleLangs) ? PREFILL.subtitleLangs : [];
+    let selectedLangs = new Set(prefillLangs.length > 0 ? prefillLangs : ['en']);
 
     const chipsContainer = document.getElementById('langChips');
     COMMON_LANGS.forEach(l => {
@@ -192,6 +199,35 @@ export function renderConfigurePageHtml(baseUrl: string, _prefillConfigJson: str
     ['includeUnknownRes', 'includeUnknownSize', 'includeUnknownSubtitleLang', 'fleet-sa7', 'fleet-nuvio', 'fleet-vega'].forEach(id => {
       document.getElementById(id).addEventListener('change', updateUrl);
     });
+
+    function applyPrefill() {
+      const setValue = (id, value) => {
+        if (value === null || value === undefined) return;
+        document.getElementById(id).value = String(value);
+      };
+      setValue('minRes', PREFILL.minRes);
+      setValue('maxRes', PREFILL.maxRes);
+      setValue('maxSizeGB', PREFILL.maxSizeGB);
+      if (PREFILL.includeUnknownRes === false) document.getElementById('includeUnknownRes').checked = false;
+      if (PREFILL.includeUnknownSize === false) document.getElementById('includeUnknownSize').checked = false;
+      if (PREFILL.includeUnknownSubtitleLang === true) document.getElementById('includeUnknownSubtitleLang').checked = true;
+
+      const mode = ['all', 'none', 'languages'].includes(PREFILL.subtitleMode) ? PREFILL.subtitleMode : 'all';
+      const modeInput = document.querySelector('input[name="subMode"][value="' + mode + '"]');
+      if (modeInput) modeInput.checked = true;
+      document.getElementById('subLangsContainer').style.display = mode === 'languages' ? 'block' : 'none';
+
+      const commonCodes = new Set(COMMON_LANGS.map(l => l.code));
+      const extra = prefillLangs.filter(code => !commonCodes.has(code));
+      document.getElementById('extraLangs').value = extra.join(', ');
+
+      const backends = Array.isArray(PREFILL.backends) && PREFILL.backends.length > 0
+        ? PREFILL.backends
+        : ['sa7', 'nuvio', 'vega'];
+      ['sa7', 'nuvio', 'vega'].forEach(name => {
+        document.getElementById('fleet-' + name).checked = backends.includes(name);
+      });
+    }
 
     function updateUrl() {
       const minRes = document.getElementById('minRes').value ? parseInt(document.getElementById('minRes').value, 10) : null;
@@ -239,6 +275,7 @@ export function renderConfigurePageHtml(baseUrl: string, _prefillConfigJson: str
       window.location.href = BASE_URL + '/configure';
     };
 
+    applyPrefill();
     updateUrl();
   </script>
 </body>

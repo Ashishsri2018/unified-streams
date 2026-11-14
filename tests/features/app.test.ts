@@ -4,6 +4,7 @@ import { createGatewayApp } from '../../src/addon/app.js';
 import { GatewayStreamCache } from '../../src/core/cache.js';
 import { WorkerClient } from '../../src/core/workerClient.js';
 import { StreamHandlerContext } from '../../src/addon/stream.js';
+import { encodeUserConfig } from '../../src/addon/userConfig.js';
 
 describe('gateway HTTP endpoints and contract', () => {
   const mockWorker = {
@@ -141,6 +142,21 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.headers['content-type']).toContain('text/html');
     expect(res.headers['x-frame-options']).toBe('DENY');
     expect(res.text).toContain('Unified Streams');
+
+    const csp = res.headers['content-security-policy'];
+    const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
+    expect(nonce).toBeTruthy();
+    expect(csp).not.toContain("default-src 'self' 'unsafe-inline'");
+    expect(res.text).toContain(`<script nonce="${nonce}">`);
+  });
+
+  it('GET /:config/configure prefills the saved configuration', async () => {
+    const encoded = encodeUserConfig({ maxRes: 720, backends: ['vega'] });
+    const res = await request(app).get(`/${encoded}/configure`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('const PREFILL_CONFIG = ');
+    expect(res.text).toContain('"maxRes":720');
+    expect(res.text).toContain('"backends":["vega"]');
   });
 
   it('GET and HEAD /status render rich status page with table and security headers', async () => {
@@ -157,6 +173,12 @@ describe('gateway HTTP endpoints and contract', () => {
     const resHead = await request(app).head('/status');
     expect(resHead.status).toBe(200);
     expect(resHead.text).toBeFalsy();
+
+    const csp = resGet.headers['content-security-policy'];
+    const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
+    expect(nonce).toBeTruthy();
+    expect(csp).not.toContain("default-src 'self' 'unsafe-inline'");
+    expect(resGet.text).toContain(`<script nonce="${nonce}">`);
   });
 
   it('GET /health aggregates providers and components across all fleets', async () => {

@@ -32,7 +32,7 @@ export function parseStreamId(type: string, rawId: string): StreamRequest | null
 
   if (seasonText !== undefined) {
     const season = Number(seasonText);
-    if (!Number.isSafeInteger(season) || season < 1 || season > MAX_SEASON) return null;
+    if (!Number.isSafeInteger(season) || season < 0 || season > MAX_SEASON) return null;
     request.season = season;
   }
 
