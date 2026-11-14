@@ -4,7 +4,6 @@ const { tmdbIdOf } = require('./content-id');
 const cinemeta = require('./cinemeta');
 const { isWebPage, isExternalUrl, qualityRank, toStremioStream } = require('./format');
 const {
-  DEFAULT_CONFIG,
   normalizeSubtitles,
   streamPassesFilters,
   subtitleMatchesConfig,
@@ -181,7 +180,7 @@ function createCollector({
     return { value: dedupe(results), partial: partial || deadlineHit };
   }
 
-  async function collectStreams(contentId, type, season, episode, userConfig = DEFAULT_CONFIG) {
+  async function collectStreams(contentId, type, season, episode, userConfig = null) {
     counters.requests += 1;
     const key = streamKey(type, contentId, season, episode);
     const raw = await cache.getOrLoad(key, () =>
@@ -212,7 +211,7 @@ function createCollector({
     return streams;
   }
 
-  async function collectSubtitles(contentId, type, season, episode, userConfig = DEFAULT_CONFIG) {
+  async function collectSubtitles(contentId, type, season, episode, userConfig = null) {
     counters.requests += 1;
     const key = streamKey(type, contentId, season, episode);
     const raw = await cache.getOrLoad(key, () =>

@@ -189,6 +189,13 @@ export class UpdaterScheduler {
       throw new Error(`${fleet} worker reload failed`);
     }
 
+    const health = await this.workers[fleet].getHealth(2000);
+    if (!('error' in health) && health.snapshot?.sha && health.snapshot.sha !== sha) {
+      throw new Error(
+        `${fleet} worker still reports snapshot ${health.snapshot.sha}, expected ${sha}`,
+      );
+    }
+
     logger.info('updater.reload.completed', { fleet, sha });
   }
 

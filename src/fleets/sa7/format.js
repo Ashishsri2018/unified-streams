@@ -1,21 +1,6 @@
-const { normalizeSubtitles, sizeBytesOf } = require('./filters');
+const { normalizeSubtitles } = require('./filters');
 const { isBlockerUrl, isArchiveUrl, isWebPage, isExternalUrl } = require('./lib/url-classifier');
-
-const QUALITY_PATTERNS = [
-  [/\b(4k|uhd|2160p?)\b/i, 0],
-  [/\b1080p?\b/i, 1],
-  [/\b720p?\b/i, 2],
-  [/\b(480p?|360p?|sd)\b/i, 3],
-  [/(\bcam\b|hdcam|\bcamrip\b|\bts\b|telesync)/i, 5],
-];
-
-function qualityRank(stream) {
-  const text = `${stream.quality || ''} ${stream.title || ''} ${stream.name || ''}`;
-  for (const [pattern, rank] of QUALITY_PATTERNS) {
-    if (pattern.test(text)) return rank;
-  }
-  return 4;
-}
+const { qualityRank, sizeBytesOf } = require('./lib/stream-quality');
 
 function toStremioStream(stream, provider) {
   if (!stream) return null;

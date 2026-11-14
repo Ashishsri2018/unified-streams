@@ -21,6 +21,7 @@ config.streamPartialCacheTtlMs = 0;
 
 const logger = createLogger(config.logLevel);
 
+let cinemeta: CinemetaClient | null = null;
 let pipeline: StreamPipeline | null = null;
 let runtime: Awaited<ReturnType<typeof createRuntime>> | null = null;
 
@@ -28,7 +29,7 @@ async function initVega() {
   runtime = await createRuntime(config, logger);
   await runtime.stateStore.load();
   await runtime.updater.preloadFromDisk();
-  const cinemeta = new CinemetaClient({ baseUrl: config.cinemetaUrl, logger, fetchImpl: nativeFetch, timeoutMs: config.httpTimeoutMs });
+  cinemeta = new CinemetaClient({ baseUrl: config.cinemetaUrl, logger, fetchImpl: nativeFetch, timeoutMs: config.httpTimeoutMs });
   const tmdb = config.tmdbApiKey ? new TmdbClient({ apiKey: config.tmdbApiKey, baseUrl: config.tmdbUrl, logger, fetchImpl: nativeFetch, timeoutMs: config.httpTimeoutMs }) : null;
   pipeline = new StreamPipeline({ config, logger, registry: runtime.registry, cinemeta, tmdb });
 }
@@ -54,6 +55,18 @@ async function handleStream(req: http.IncomingMessage, res: http.ServerResponse,
   const streamRequest = parseStreamId(type, id);
   if (!streamRequest || !pipeline) {
     return sendJson(res, 200, { streams: [] }, requestId);
+  }
+
+  const rawTitle = req.headers['x-meta-title'];
+  const metaTitle = typeof rawTitle === 'string' && rawTitle ? decodeURIComponent(rawTitle) : undefined;
+  const metaYear = req.headers['x-meta-year'] ? Number(req.headers['x-meta-year']) : undefined;
+  if (cinemeta && metaTitle && 'imdbId' in streamRequest) {
+    cinemeta.prime(streamRequest.type, streamRequest.imdbId, {
+      id: streamRequest.imdbId,
+      type: streamRequest.type,
+      name: metaTitle,
+      ...(Number.isFinite(metaYear) ? { year: metaYear } : {}),
+    });
   }
 
   const controller = new AbortController();
@@ -155,7 +168,7 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
   sendJson(res, 200, payload, requestId);
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const requestId = (req.headers['x-request-id'] as string) || '';
 
   if (internalToken && req.headers['x-internal-token'] !== internalToken) {
@@ -173,17 +186,36 @@ const server = http.createServer((req, res) => {
   if (pathname === '/internal/health') return handleHealth(req, res, requestId);
   if (pathname.startsWith('/internal/stream/')) return handleStream(req, res, pathname, requestId);
   if (pathname === '/internal/reload' && req.method === 'POST') {
-    void runtime?.updater?.runOnce('manual');
+    if (!runtime?.updater) {
+      return sendJson(res, 503, { ok: false, error: 'updater unavailable' }, requestId);
+    }
+    try {
+      await runtime.updater.runOnce('manual');
+    } catch (error) {
+      return sendJson(
+        res,
+        500,
+        { ok: false, error: error instanceof Error ? error.message : String(error) },
+        requestId,
+      );
+    }
     return sendJson(res, 200, { ok: true, reloadedAt: new Date().toISOString() }, requestId);
   }
 
   sendJson(res, 404, { error: 'Not Found' }, requestId);
 });
 
-void initVega().then(() => {
-  server.listen(port, host, () => {
-    console.log(`[vega-worker] listening on http://${host}:${port}`);
+void initVega()
+  .then(() => {
+    server.listen(port, host, () => {
+      console.log(`[vega-worker] listening on http://${host}:${port}`);
+    });
+  })
+  .catch((error: unknown) => {
+    logger.error('vega.worker_init_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    process.exit(1);
   });
-});
 
 export { server };

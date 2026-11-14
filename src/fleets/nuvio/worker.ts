@@ -50,9 +50,15 @@ async function handleStream(req: http.IncomingMessage, res: http.ServerResponse,
 
   const type = match[1];
   const id = decodeURIComponent(match[2]);
-  const streamRequest = parseStreamId(type, id);
+  let streamRequest = parseStreamId(type, id);
   if (!streamRequest) {
     return sendJson(res, 200, { streams: [] }, requestId);
+  }
+
+  const metaTmdb = Number(req.headers['x-meta-tmdb-id']);
+  if (Number.isSafeInteger(metaTmdb) && metaTmdb > 0 && 'imdbId' in streamRequest) {
+    cinemeta.prime(streamRequest.type, streamRequest.imdbId, metaTmdb);
+    streamRequest = { ...streamRequest, tmdbId: metaTmdb };
   }
 
   const controller = new AbortController();
@@ -135,7 +141,7 @@ function handleHealth(req: http.IncomingMessage, res: http.ServerResponse, reque
 
 void snapshots.ensure();
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const requestId = (req.headers['x-request-id'] as string) || '';
 
   if (internalToken && req.headers['x-internal-token'] !== internalToken) {
@@ -153,7 +159,20 @@ const server = http.createServer((req, res) => {
   if (pathname === '/internal/health') return handleHealth(req, res, requestId);
   if (pathname.startsWith('/internal/stream/')) return handleStream(req, res, pathname, requestId);
   if (pathname === '/internal/reload' && req.method === 'POST') {
-    void snapshots.refresh(true);
+    let refreshed: Awaited<ReturnType<typeof snapshots.refresh>> = null;
+    try {
+      refreshed = await snapshots.refresh(true);
+    } catch (error) {
+      return sendJson(
+        res,
+        500,
+        { ok: false, error: error instanceof Error ? error.message : String(error) },
+        requestId,
+      );
+    }
+    if (!refreshed) {
+      return sendJson(res, 500, { ok: false, error: 'snapshot refresh failed' }, requestId);
+    }
     return sendJson(res, 200, { ok: true, reloadedAt: new Date().toISOString() }, requestId);
   }
 

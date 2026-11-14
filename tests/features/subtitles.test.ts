@@ -1,7 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeSubtitleLanguage, filterSubtitleTracks, SubtitleTrack } from '../../src/addon/subtitles.js';
+import {
+  normalizeSubtitleLanguage,
+  filterSubtitleTracks,
+  normalizeSubtitlesTrackList,
+  SubtitleTrack,
+} from '../../src/addon/subtitles.js';
 
 describe('subtitle normalization and filtering', () => {
+  it('normalizes subtitle track lists from heterogeneous inputs', () => {
+    const raw = [
+      { uri: 'https://sub.test/en.vtt', language: 'English' },
+      { url: 'https://sub.test/hi.vtt', lang: 'hin' },
+      { src: 'https://sub.test/es.vtt', label: 'Spanish', title: 'Full Spanish' },
+      { url: 'https://sub.test/dup.vtt', lang: 'en' },
+      { url: 'https://sub.test/dup.vtt', lang: 'en' }, // duplicate url
+      { url: 'invalid-url', lang: 'en' },
+    ];
+
+    const tracks = normalizeSubtitlesTrackList(raw, 'sub-prefix');
+    expect(tracks).toHaveLength(4);
+    expect(tracks[0]).toEqual({ id: 'sub-prefix', url: 'https://sub.test/en.vtt', lang: 'en' });
+    expect(tracks[1]).toEqual({ id: 'sub-prefix-1', url: 'https://sub.test/hi.vtt', lang: 'hi' });
+    expect(tracks[2]).toEqual({
+      id: 'sub-prefix-2',
+      url: 'https://sub.test/es.vtt',
+      lang: 'es',
+      title: 'Full Spanish',
+    });
+    expect(tracks[3]).toEqual({ id: 'sub-prefix-3', url: 'https://sub.test/dup.vtt', lang: 'en' });
+  });
+
   it('normalizes various language aliases and codes', () => {
     expect(normalizeSubtitleLanguage('English')).toBe('en');
     expect(normalizeSubtitleLanguage('eng')).toBe('en');

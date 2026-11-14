@@ -1,4 +1,4 @@
-import { INTERNAL_HEADERS, InternalStreamResponse } from './contract.js';
+import { INTERNAL_HEADERS, InternalStreamResponse, ForwardedMetadata } from './contract.js';
 import { WORKER_DEADLINE_MARGIN_MS } from './env.js';
 import { WorkerHealth } from './telemetry.js';
 import { StremioStream } from '../addon/filters.js';
@@ -20,13 +20,21 @@ export class WorkerClient {
     this.internalToken = options.internalToken || '';
   }
 
-  private buildHeaders(requestId?: string, deadlineMs?: number): Record<string, string> {
+  private buildHeaders(
+    requestId?: string,
+    deadlineMs?: number,
+    metadata?: ForwardedMetadata,
+  ): Record<string, string> {
     const headers: Record<string, string> = {
       'accept': 'application/json',
     };
     if (requestId) headers[INTERNAL_HEADERS.REQUEST_ID] = requestId;
     if (this.internalToken) headers[INTERNAL_HEADERS.INTERNAL_TOKEN] = this.internalToken;
     if (deadlineMs) headers[INTERNAL_HEADERS.DEADLINE_MS] = String(deadlineMs);
+    if (metadata?.title) headers[INTERNAL_HEADERS.META_TITLE] = encodeURIComponent(metadata.title);
+    if (metadata?.year) headers[INTERNAL_HEADERS.META_YEAR] = String(metadata.year);
+    if (metadata?.tmdbId) headers[INTERNAL_HEADERS.META_TMDB_ID] = String(metadata.tmdbId);
+    if (metadata?.imdbId) headers[INTERNAL_HEADERS.META_IMDB_ID] = metadata.imdbId;
     return headers;
   }
 
@@ -56,6 +64,7 @@ export class WorkerClient {
     encodedConfig: string,
     timeoutMs: number,
     requestId?: string,
+    metadata?: ForwardedMetadata,
   ): Promise<InternalStreamResponse> {
     const startTime = Date.now();
     const controller = new AbortController();
@@ -66,7 +75,7 @@ export class WorkerClient {
     try {
       const res = await fetch(url, {
         signal: controller.signal,
-        headers: this.buildHeaders(requestId, timeoutMs),
+        headers: this.buildHeaders(requestId, timeoutMs, metadata),
       });
 
       const durationMs = Date.now() - startTime;
@@ -106,7 +115,7 @@ export class WorkerClient {
     }
   }
 
-  async reload(timeoutMs = 10000): Promise<boolean> {
+  async reload(timeoutMs = 60000): Promise<boolean> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 

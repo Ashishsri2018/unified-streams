@@ -10,6 +10,19 @@ import {
   isExternalUrl,
   normalizeStreamKey,
 } from "./urlClassifier.js";
+import {
+  inferQuality,
+  inferFileSizeBytes,
+  getContainerRank as formatRank,
+} from "../../../core/streamQuality.js";
+import {
+  sanitizeProxyHeaders as filterHeaders,
+  isPlaceholderHost,
+  parseHttpUrl,
+} from "../../../core/streamHeaders.js";
+import { normalizeSubtitlesTrackList } from "../../../core/subtitles.js";
+
+export { inferQuality, inferFileSizeBytes };
 
 export interface MapStreamsOptions {
   providerValue: string;
@@ -20,75 +33,12 @@ export interface MapStreamsOptions {
 
 const DEFAULT_PER_PROVIDER_LIMIT = 100;
 
-const BLOCKED_HEADERS = new Set([
-  "connection",
-  "keep-alive",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-  "host",
-  "content-length",
-  "content-type",
-  "accept-encoding",
-]);
-
-const PLACEHOLDER_HOSTS = new Set([
-  "example.com",
-  "www.example.com",
-  "example.org",
-  "example.net",
-  "localhost",
-  "localhost.localdomain",
-  "127.0.0.1",
-  "0.0.0.0",
-  "[::1]",
-]);
-
 function trimString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function parseHttpUrl(value: string): URL | null {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" ? url : null;
-  } catch {
-    return null;
-  }
-}
-
-function isPlaceholderHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/\.$/, "");
-  if (PLACEHOLDER_HOSTS.has(host)) return true;
-  return (
-    host.endsWith(".example.com") ||
-    host.endsWith(".example.org") ||
-    host.endsWith(".example.net")
-  );
-}
-
 function isMagnet(value: string): boolean {
   return /^magnet:\?/i.test(value);
-}
-
-function filterHeaders(headers: Record<string, string> | undefined): Record<string, string> {
-  const result: Record<string, string> = {};
-  if (!headers || typeof headers !== "object") return result;
-
-  for (const [rawName, rawValue] of Object.entries(headers)) {
-    if (typeof rawName !== "string" || typeof rawValue !== "string") continue;
-    const name = rawName.trim();
-    const value = rawValue.trim();
-    if (!name || !value) continue;
-    if (!/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(name)) continue;
-    if (/[\r\n]/.test(value)) continue;
-    const lower = name.toLowerCase();
-    if (BLOCKED_HEADERS.has(lower) || lower.startsWith("proxy-")) continue;
-    result[name] = value;
-  }
-
-  return result;
 }
 
 function normalizeSubtitles(
@@ -96,31 +46,7 @@ function normalizeSubtitles(
   providerValue: string,
   streamIndex: number,
 ): StremioSubtitle[] {
-  if (!Array.isArray(subtitles)) return [];
-  const result: StremioSubtitle[] = [];
-  const seenUrls = new Set<string>();
-
-  subtitles.forEach((track) => {
-    if (!track || typeof track !== "object") return;
-    const uri = trimString(track.uri);
-    if (!parseHttpUrl(uri) || seenUrls.has(uri)) return;
-    seenUrls.add(uri);
-    const language =
-      trimString(track.language).toLowerCase().replace(/_/g, "-") || "en";
-    const title = trimString(track.title);
-    const id =
-      result.length === 0
-        ? `${providerValue}-${streamIndex}`
-        : `${providerValue}-${streamIndex}-${result.length}`;
-    result.push({
-      id,
-      url: uri,
-      lang: language,
-      ...(title ? { title } : {}),
-    });
-  });
-
-  return result;
+  return normalizeSubtitlesTrackList(subtitles, `${providerValue}-${streamIndex}`) as StremioSubtitle[];
 }
 
 function collectTags(stream: ProviderStream): string[] {
@@ -244,82 +170,6 @@ export function mapProviderStreams(
   });
 
   return sortStreams(mapped).slice(0, limit);
-}
-
-const QUALITY_LABELS: Array<[RegExp, number]> = [
-  [/(?<![\p{L}\p{N}])8k(?![\p{L}\p{N}])/u, 4320],
-  [/(?<![\p{L}\p{N}])4k(?![\p{L}\p{N}])/u, 2160],
-  [/(?<![\p{L}\p{N}])uhd(?![\p{L}\p{N}])/u, 2160],
-  [/(?<![\p{L}\p{N}])qhd(?![\p{L}\p{N}])/u, 1440],
-  [/(?<![\p{L}\p{N}])fhd(?![\p{L}\p{N}])/u, 1080],
-];
-
-function qualityValue(value: string): number {
-  const lower = value.toLowerCase();
-  const pMatch = /(?<!\d)(\d{3,4})p(?:\d{1,3})?(?:fps)?(?![\p{L}\p{N}])/u.exec(lower);
-  if (pMatch) return Number(pMatch[1]);
-  const bare = /(?<!\d)(4320|2160|1440|1080|720|576|480|360|240)(?![\d\p{L}])/u.exec(
-    lower,
-  );
-  if (bare) return Number(bare[1]);
-  for (const [pattern, resolution] of QUALITY_LABELS) {
-    if (pattern.test(lower)) return resolution;
-  }
-  return 0;
-}
-
-export function inferQuality(stream: StremioStream): number {
-  const sources: string[] = [];
-  if (typeof stream.title === "string") {
-    sources.push(...stream.title.split("\u2022"));
-  }
-  if (stream.behaviorHints?.bingeGroup) sources.push(stream.behaviorHints.bingeGroup);
-  if (typeof stream.url === "string") sources.push(stream.url);
-  if (typeof stream.externalUrl === "string") sources.push(stream.externalUrl);
-
-  let best = 0;
-  for (const source of sources) {
-    best = Math.max(best, qualityValue(source));
-  }
-  return best;
-}
-
-const FILE_SIZE_UNITS: Record<string, number> = {
-  tib: 1024 ** 4,
-  tb: 1024 ** 4,
-  gib: 1024 ** 3,
-  gb: 1024 ** 3,
-  mib: 1024 ** 2,
-  mb: 1024 ** 2,
-};
-
-const FILE_SIZE_PATTERN =
-  /(\d+(?:[.,]\d+)?)\s*(TiB|GiB|MiB|TB|GB|MB)(?![a-z0-9]|\s*\/\s*s)/gi;
-
-export function inferFileSizeBytes(stream: StremioStream): number {
-  if (typeof stream.title !== "string" || !stream.title) return 0;
-
-  let best = 0;
-  for (const match of stream.title.matchAll(FILE_SIZE_PATTERN)) {
-    const value = Number.parseFloat(match[1].replace(",", "."));
-    if (!Number.isFinite(value)) continue;
-    const bytes = value * (FILE_SIZE_UNITS[match[2].toLowerCase()] ?? 0);
-    if (bytes > best) best = bytes;
-  }
-  return Math.round(best);
-}
-
-function formatRank(url: string | undefined): number {
-  if (!url) return 3;
-  let pathname: string;
-  try {
-    pathname = new URL(url).pathname.toLowerCase();
-  } catch {
-    return 1;
-  }
-  if (/\.(?:mp4|mkv|m4v|webm|avi|mov|flv)$/.test(pathname)) return 0;
-  if (/\.(?:m3u8|mpd)$/.test(pathname)) return 2;
-  return 1;
 }
 
 export function sortStreams(streams: StremioStream[]): StremioStream[] {

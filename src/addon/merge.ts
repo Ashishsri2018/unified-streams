@@ -1,5 +1,6 @@
 import { StremioStream, StreamFilterConfig, filterStream, inferResolution } from './filters.js';
 import { isBlockerUrl, isArchiveUrl, isExternalUrl, canonicalizeStreamKey } from './classifier.js';
+import { getContainerRank } from '../core/streamQuality.js';
 
 export interface FleetStreamsInput {
   fleet: string;
@@ -79,15 +80,6 @@ function getStreamDedupeKey(stream: StremioStream): string {
     return `infohash:${stream.infoHash.toLowerCase()}:${stream.fileIdx ?? 0}`;
   }
   return '';
-}
-
-function getContainerRank(url: string | undefined): number {
-  if (!url) return 3;
-  const lower = url.toLowerCase();
-  if (/\.(mp4|mkv)($|[?&#])/i.test(lower)) return 0;
-  if (/\.(webm|mov|m4v)($|[?&#])/i.test(lower)) return 1;
-  if (/\.(m3u8|mpd)($|[?&#])/i.test(lower)) return 2;
-  return 3;
 }
 
 export function mergeAndFilterStreams(

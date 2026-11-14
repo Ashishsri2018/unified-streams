@@ -1,5 +1,25 @@
 # Unified Streams Memory Log
 
+- Full Resolution and Pruning of Gateway-Fleet Duplications (Session Nov 14 2026):
+  - Addressed all 8 audited code duplications and architectural redundancies from `docs/gateway-fleet-duplications.md`:
+    1. **Content ID Parsing**: Refactored Nuvio and Vega `parseId.ts` and SA7 `content-id.js` to delegate to `src/core/contentId.ts`, harmonizing Season 0 specials, season packs, and anime IDs across all workers.
+    2. **Metadata Resolution & Amplification**: Added `ForwardedMetadata` and metadata header support (`x-meta-title`, `x-meta-year`, `x-meta-tmdb-id`) to `contract.ts` and `workerClient.ts`. The gateway resolves canonical metadata once via `MetadataResolver` and forwards headers to loopback workers over `/internal/stream`. Workers (Nuvio, Vega, SA7) prime local Cinemeta caches and bypass redundant upstream network requests.
+    3. **Quality & Resolution Inference**: Created `src/core/streamQuality.ts` exporting canonical `inferResolution` (8K down to 240p) and `inferQualityRank`. Replaced disparate regex mappings in Gateway `filters.ts`, Nuvio `mapStreams.ts`, Vega `mapStreams.ts`, and SA7 `filters.js`/`format.js`.
+    4. **Container Format Ranking**: Consolidated `getContainerRank` (`mp4`/`mkv` > other direct media > `m3u8`/`mpd`) into `src/core/streamQuality.ts`, replacing duplicate sorting implementations in Gateway `merge.ts` and Nuvio/Vega `mapStreams.ts`.
+    5. **Subtitle Normalization**: Created `src/core/subtitles.ts` with comprehensive language alias dictionaries (covering Indic, European, Asian aliases) and `normalizeSubtitlesTrackList`, unifying subtitle track parsing across Gateway, Nuvio, Vega, and SA7.
+    6. **File Size Parsing**: Created `parseSizeBytes` and `inferSizeBytes` in `src/core/streamQuality.ts` handling metric/binary units (TB, GB, MB, KB, TiB, GiB, MiB) with comma or dot decimals across all tiers.
+    7. **Hop-by-Hop Headers & Host Checks**: Created `src/core/streamHeaders.ts` with `sanitizeProxyHeaders`, `isPlaceholderHost`, and `parseHttpUrl`, replacing copy-pasted sets and filters in Nuvio and Vega.
+    8. **User Config Filtering**: Removed dead v1 configuration decoding and redundant local filter evaluation in SA7; Gateway performs canonical v2 user configuration filtering uniformly.
+  - Added new automated test suites:
+    - `tests/features/streamQuality.test.ts` (5 tests)
+    - `tests/features/streamHeaders.test.ts` (6 tests)
+    - `tests/features/metadataForwarding.test.ts` (1 test)
+    - Expanded `tests/features/subtitles.test.ts` (3 tests) and `tests/features/parseId.test.ts` (14 tests).
+  - Pruned all 8 resolved findings from `docs/gateway-fleet-duplications.md`.
+  - Full verification passed (`npm run verify`): provider policy OK, icon checks OK, ESLint clean, TypeScript strict typecheck clean, 21 Vitest test suites (115/115 tests passed), and production build successful.
+  - Kept changes local without remote deployment per user constraint.
+
+
 - Unified URL & Stream Classification Architecture (Session Nov 14 2026):
   - Solved misclassification of API streaming endpoints like `https://c.toroplay.cymru/api/watch/m3u8?url=...` which were previously marked as `externalUrl` due to `/watch/` matching embed patterns and direct media regexes requiring a leading dot.
   - Created single source of truth in `src/core/urlClassifier.ts` for all URL classification logic:
@@ -16,6 +36,7 @@
   - Cleaned up gateway `src/addon/merge.ts` (`normalizeStreamItem`) to trust fleet `url` vs `externalUrl` classifications without re-running conflicting embed regexes, while retaining archive safety net and blocker drops.
   - Added full test coverage in `tests/features/urlClassifier.test.ts` (6 tests) and updated `tests/features/merge.test.ts`.
   - All 18 test suites passing (92/92 Vitest tests); `npm run verify` passed cleanly (policy, icon, lint, typecheck, tests, build).
+  - Audited remaining code duplications across gateway and fleets; documented the 8 redundant subsystems with file locations, impact analysis, and consolidation roadmap in `docs/gateway-fleet-duplications.md`.
   - Kept changes local without deploying, per user request.
 
 - Completed Provider Allocation & Deployment Separation (Session Nov 14 2026):

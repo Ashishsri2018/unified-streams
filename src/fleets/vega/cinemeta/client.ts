@@ -68,6 +68,11 @@ export class CinemetaClient implements CinemetaApi {
     this.cache.clear();
   }
 
+  prime(type: MediaType, imdbId: string, meta: CinemetaMeta): void {
+    const key = `${type}:${imdbId}`;
+    this.cache.set(key, meta);
+  }
+
   private async fetchMeta(type: MediaType, imdbId: string): Promise<CinemetaMeta | null> {
     const url = `${this.baseUrl}/meta/${type}/${encodeURIComponent(imdbId)}.json`;
     for (let attempt = 0; attempt < 2; attempt += 1) {

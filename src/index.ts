@@ -2,6 +2,7 @@ import http from 'node:http';
 import { loadAppEnv } from './core/env.js';
 import { GatewayStreamCache } from './core/cache.js';
 import { WorkerClient } from './core/workerClient.js';
+import { MetadataResolver } from './core/metadata.js';
 import { createGatewayApp } from './addon/app.js';
 import { UpdaterScheduler } from './core/updater/scheduler.js';
 import { Supervisor } from './supervisor.js';
@@ -42,6 +43,8 @@ async function main(): Promise<void> {
   supervisor.start();
   scheduler.start();
 
+  const metadataResolver = new MetadataResolver(env.CINEMETA_URL, env.TMDB_API_KEY);
+
   const ctx = {
     cache,
     workers,
@@ -50,6 +53,7 @@ async function main(): Promise<void> {
     maxStreams: env.MAX_STREAMS,
     globalDeadlineMs: env.GLOBAL_DEADLINE_MS,
     workerTimeoutMs: env.BACKEND_TIMEOUT_MS,
+    metadataResolver,
     scheduler,
   };
 

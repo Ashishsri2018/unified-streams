@@ -110,15 +110,16 @@
 
 - [ ] **Phase 11: Logic Bug Fixes & Codebase Hardening**
   - [x] Unify URL and stream classification in `src/core/urlClassifier.ts`, resolving `/api/watch/m3u8` misclassification as `externalUrl` and centralizing rules across fleets and gateway
-  - [ ] Fix SA7 unknown resolution dropping bug on configured requests (`src/fleets/sa7/worker.js`)
-  - [ ] Fix SA7 season pack regex parser (`src/fleets/sa7/content-id.js`)
-  - [ ] Allow Season 0 (specials) in Nuvio and Vega internal stream parsers (`parseId.ts`)
+  - [x] Consolidate all 8 gateway-fleet code duplications and architectural redundancies (`src/core/streamQuality.ts`, `src/core/streamHeaders.ts`, `src/core/subtitles.ts`, `contentId.ts`, metadata forwarding) and prune `docs/gateway-fleet-duplications.md`
+  - [x] Fix SA7 unknown resolution dropping bug on configured requests (`src/fleets/sa7/worker.js`)
+  - [x] Fix SA7 season pack regex parser (`src/fleets/sa7/content-id.js`)
+  - [x] Allow Season 0 (specials) in Nuvio and Vega internal stream parsers (`parseId.ts`)
   - [ ] Hydrate prefilled configuration in configure page HTML (`src/addon/configureHtml.ts`)
-  - [ ] Wire `UpdaterScheduler` and `MetadataResolver` into `StreamHandlerContext` and `/health`
+  - [x] Wire `UpdaterScheduler` and `MetadataResolver` into `StreamHandlerContext` and `/health`
   - [ ] Update `scripts/healthcheck.mjs` to avoid terminating container during transient single-worker restarts
   - [ ] Fix status dashboard 503 crash in `src/addon/statusHtml.ts`
   - [ ] Add request queue serialization to `src/core/jikan.ts` to prevent race conditions on upstream limits
   - [ ] Generate CSP nonces for HTML pages and remove `'unsafe-inline'`
   - [ ] Remove unused legacy dead code in SA7 (`server.js`, `run.js`)
-  - [ ] Fix container rank regex for URLs with `#` hash fragments (`src/addon/merge.ts`)
+  - [x] Fix container rank regex for URLs with `#` hash fragments (`src/addon/merge.ts`)
   - [ ] Normalize SA7 `lastError` object into string in `src/addon/health.ts`

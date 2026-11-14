@@ -18,6 +18,7 @@ const path = require('node:path');
 const { getRegistry, reloadProviders } = require('./providers');
 const { collectStreams, getRuntimeStats } = require('./streams');
 const { parseContentId, toContentId } = require('./content-id');
+const { prime } = require('./cinemeta');
 const { buildStatus } = require('./telemetry');
 
 const host = '127.0.0.1';
@@ -111,10 +112,15 @@ async function handleStream(req, res, urlPath, requestId) {
 
   const type = match[1];
   const rawId = decodeURIComponent(match[2]);
-  const parsed = parseContentId(rawId);
+  const parsed = parseContentId(rawId, type);
   const contentId = parsed ? toContentId(parsed) : rawId;
   const season = parsed && parsed.season != null ? parsed.season : undefined;
   const episode = parsed && parsed.episode != null ? parsed.episode : undefined;
+
+  const metaTmdb = Number(req.headers['x-meta-tmdb-id']);
+  if (Number.isSafeInteger(metaTmdb) && metaTmdb > 0 && typeof contentId === 'string' && contentId.startsWith('tt')) {
+    prime(contentId, type, metaTmdb);
+  }
 
   try {
     const rawStreams = await collectStreams(contentId, type, season, episode);

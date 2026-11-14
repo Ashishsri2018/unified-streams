@@ -1,3 +1,15 @@
+'use strict';
+
+const path = require('node:path');
+
+let core = null;
+try {
+  const corePath = path.resolve(process.cwd(), 'dist/core/contentId.js');
+  core = require(corePath);
+} catch {
+  core = null;
+}
+
 const CONTENT_PATTERNS = [
   { source: 'imdb', pattern: /^(tt\d+)(?::(\d+)(?::(\d+))?)?$/ },
   { source: 'tmdb', pattern: /^tmdb:(\d+)(?::(\d+)(?::(\d+))?)?$/ },
@@ -5,8 +17,23 @@ const CONTENT_PATTERNS = [
 
 const TMDB_CONTENT_ID = /^tmdb:(\d+)$/;
 
-function parseContentId(raw) {
+function parseContentId(raw, type) {
   if (typeof raw !== 'string') return null;
+
+  if (core && typeof core.parseContentId === 'function') {
+    const mediaType = type === 'movie' ? 'movie' : 'series';
+    const parsed = core.parseContentId(mediaType, raw);
+    if (parsed) {
+      const source = parsed.family === 'tmdb' ? 'tmdb' : 'imdb';
+      const id = source === 'tmdb' ? Number(parsed.cleanId.slice('tmdb:'.length)) : parsed.cleanId;
+      return {
+        source,
+        id,
+        season: parsed.season != null ? parsed.season : null,
+        episode: parsed.episode != null ? parsed.episode : null,
+      };
+    }
+  }
 
   for (const { source, pattern } of CONTENT_PATTERNS) {
     const match = pattern.exec(raw);

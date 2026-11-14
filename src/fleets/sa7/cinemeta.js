@@ -97,7 +97,12 @@ function createMetadataResolver({
     return cache.stats();
   }
 
-  return { resolveTmdbId, cacheStats };
+  function prime(imdbId, type, tmdbId) {
+    const key = `${type}:${imdbId}`;
+    cache.set(key, tmdbId, now() + CACHE_TTL_MS);
+  }
+
+  return { resolveTmdbId, cacheStats, prime };
 }
 
 const defaultResolver = createMetadataResolver();
@@ -106,4 +111,5 @@ module.exports = {
   createMetadataResolver,
   resolveTmdbId: defaultResolver.resolveTmdbId,
   cacheStats: defaultResolver.cacheStats,
+  prime: defaultResolver.prime,
 };

@@ -1,6 +1,5 @@
 import type { StreamRequest } from "../types.js";
-
-const STREAM_ID = /^(tt[0-9]+|tmdb:[0-9]+)(?::([0-9]+)(?::([0-9]+))?)?$/;
+import { parseContentId } from "../../../core/contentId.js";
 
 const MAX_SEASON = 1000;
 const MAX_EPISODE = 10000;
@@ -9,42 +8,38 @@ export function parseStreamId(type: string, rawId: string): StreamRequest | null
   if (type !== "movie" && type !== "series") return null;
 
   const id = rawId.endsWith(".json") ? rawId.slice(0, -".json".length) : rawId;
-  const match = STREAM_ID.exec(id);
-  if (!match) return null;
+  const parsed = parseContentId(type, id);
+  if (!parsed) return null;
 
-  const contentId = match[1];
-  if (!contentId) return null;
+  if (type === "series" && parsed.season === undefined) return null;
+  if (parsed.season !== undefined && (parsed.season < 0 || parsed.season > MAX_SEASON)) {
+    return null;
+  }
+  if (parsed.episode !== undefined && (parsed.episode < 1 || parsed.episode > MAX_EPISODE)) {
+    return null;
+  }
 
-  const seasonText = match[2];
-  const episodeText = match[3];
-
-  if (type === "movie" && seasonText !== undefined) return null;
-  if (type === "series" && seasonText === undefined) return null;
-
-  let request: StreamRequest;
-  if (contentId.startsWith("tmdb:")) {
-    const tmdbId = Number(contentId.slice("tmdb:".length));
+  if (parsed.family === "tmdb") {
+    const tmdbId = Number(parsed.cleanId.slice("tmdb:".length));
     if (!Number.isSafeInteger(tmdbId) || tmdbId < 1) return null;
-    request = { type, tmdbId };
-  } else {
-    request = { type, imdbId: contentId };
+    return {
+      type,
+      tmdbId,
+      ...(parsed.season !== undefined ? { season: parsed.season } : {}),
+      ...(parsed.episode !== undefined ? { episode: parsed.episode } : {}),
+    };
   }
 
-  if (seasonText !== undefined) {
-    const season = Number(seasonText);
-    if (!Number.isSafeInteger(season) || season < 0 || season > MAX_SEASON) return null;
-    request.season = season;
+  if (parsed.family === "tt") {
+    return {
+      type,
+      imdbId: parsed.cleanId,
+      ...(parsed.season !== undefined ? { season: parsed.season } : {}),
+      ...(parsed.episode !== undefined ? { episode: parsed.episode } : {}),
+    };
   }
 
-  if (episodeText !== undefined) {
-    const episode = Number(episodeText);
-    if (!Number.isSafeInteger(episode) || episode < 1 || episode > MAX_EPISODE) {
-      return null;
-    }
-    request.episode = episode;
-  }
-
-  return request;
+  return null;
 }
 
 export function contentIdOf(request: StreamRequest): string {

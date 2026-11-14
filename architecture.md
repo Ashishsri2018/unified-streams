@@ -63,7 +63,10 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `contentId.ts` & `metadata.ts` & `jikan.ts`: ID parsing and upstream metadata resolution.
   - `policy.ts`: Provider policy enforcement and verification.
   - `urlClassifier.ts`: Single source of truth for URL & stream classification (direct media pattern matching, streaming API endpoints like `/api/watch/m3u8`, web embed/player detection, archive detection, blocker URL drops, and stream key canonicalization).
-  - `workerClient.ts`: Internal HTTP client with deadline management.
+  - `streamQuality.ts`: Single canonical implementation of resolution inference (8K down to 240p), quality sorting rank, container format ranking (`mp4`/`mkv` > other > `m3u8`/`mpd`), and file size parsing (`parseSizeBytes`, `inferSizeBytes`).
+  - `streamHeaders.ts`: Upstream proxy header sanitization (stripping hop-by-hop and `Proxy-*` headers, CRLF injection protection), placeholder host identification (`example.com`, `localhost`, etc.), and safe HTTP URL parsing.
+  - `subtitles.ts`: Centralized subtitle track formatting, ISO base code mapping for global and Indic languages, and user preference filtering.
+  - `contract.ts` & `workerClient.ts`: Loopback HTTP worker contracts and metadata forwarding (`x-meta-title`, `x-meta-year`, `x-meta-tmdb-id`) eliminating redundant upstream Cinemeta/TMDB requests.
   - `updater/`: In-process snapshot downloaders and installers. SA7 provider files live under `DATA_DIR/sa7/cb-providers` and are swapped atomically; the scheduler waits for worker readiness, verifies the reload, and retries failed checks after 5 minutes.
 - `src/addon/`: Gateway application layer:
   - `app.ts`: Express application with explicit HTTP method handlers.

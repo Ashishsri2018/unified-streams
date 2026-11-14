@@ -144,6 +144,21 @@ export class MetadataResolver {
     return meta;
   }
 
+  async resolveContent(type: 'movie' | 'series', parsed: { family: string; cleanId: string }): Promise<CanonicalMetadata | null> {
+    if (parsed.family === 'tt') {
+      return this.resolveImdb(type, parsed.cleanId);
+    }
+    if (parsed.family === 'tmdb') {
+      const id = Number(parsed.cleanId.slice('tmdb:'.length));
+      return this.resolveTmdb(type, id);
+    }
+    if (parsed.family === 'mal') {
+      const id = Number(parsed.cleanId.slice('mal:'.length));
+      return this.resolveMal(type, id);
+    }
+    return null;
+  }
+
   getStats() {
     return {
       hits: this.hits,

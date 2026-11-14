@@ -79,6 +79,11 @@ export class CinemetaClient {
     return null;
   }
 
+  prime(type: "movie" | "series", imdbId: string, tmdbId: number): void {
+    const key = `${type}:${imdbId}`;
+    this.store(key, tmdbId, SUCCESS_TTL_MS);
+  }
+
   private async fromCinemeta(
     type: "movie" | "series",
     imdbId: string,

@@ -7,6 +7,8 @@ import { mergeAndFilterStreams, FleetStreamsInput } from './merge.js';
 import { StremioStream } from './filters.js';
 import { logger } from '../core/logger.js';
 import type { WorkerSnapshot } from '../core/telemetry.js';
+import type { MetadataResolver } from '../core/metadata.js';
+import type { ForwardedMetadata } from '../core/contract.js';
 
 export interface StreamHandlerContext {
   cache: GatewayStreamCache<{ streams: StremioStream[] }>;
@@ -16,6 +18,7 @@ export interface StreamHandlerContext {
   maxStreams: number;
   globalDeadlineMs: number;
   workerTimeoutMs: number;
+  metadataResolver?: MetadataResolver;
   scheduler?: {
     getStatus(fleet: 'sa7' | 'nuvio' | 'vega'): WorkerSnapshot;
   };
@@ -71,11 +74,45 @@ export async function handleStreamRoute(
 
   try {
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {
+      // Resolve canonical metadata once in the gateway to eliminate redundant upstream calls
+      let forwardedMeta: ForwardedMetadata | undefined;
+      if (parsedId.family === 'tmdb') {
+        const numericTmdb = Number(parsedId.cleanId.slice('tmdb:'.length));
+        if (Number.isSafeInteger(numericTmdb) && numericTmdb > 0) {
+          forwardedMeta = { tmdbId: numericTmdb };
+        }
+      } else if (parsedId.family === 'tt') {
+        forwardedMeta = { imdbId: parsedId.cleanId };
+      }
+
+      if (ctx.metadataResolver) {
+        try {
+          const resolved = await ctx.metadataResolver.resolveContent(rawType, parsedId);
+          if (resolved) {
+            forwardedMeta = {
+              title: resolved.title,
+              year: resolved.year,
+              tmdbId: resolved.tmdbId ?? forwardedMeta?.tmdbId,
+              imdbId: resolved.imdbId ?? forwardedMeta?.imdbId,
+            };
+          }
+        } catch {
+          // Proceed with existing metadata on resolver error
+        }
+      }
+
       const selectedFleets = userConfig.backends.filter((b) => ctx.workers[b]);
       const workerTimeoutMs = Math.min(ctx.workerTimeoutMs, ctx.globalDeadlineMs);
       const fleetPromises = selectedFleets.map(async (fleetName) => {
         const worker = ctx.workers[fleetName];
-        const resStream = await worker.fetchStream(rawType, rawId, rawConfig, workerTimeoutMs, requestId);
+        const resStream = await worker.fetchStream(
+          rawType,
+          rawId,
+          rawConfig,
+          workerTimeoutMs,
+          requestId,
+          forwardedMeta,
+        );
         return { fleet: fleetName, streams: resStream.streams, outcome: resStream.outcome };
       });
 

@@ -99,15 +99,32 @@ export class Supervisor {
     this.children.set(spec.name, child);
     logger.info('worker.started', { fleet: spec.name, pid: child.pid, port: spec.port });
 
+    let restartScheduled = false;
+    const scheduleRestart = (): void => {
+      if (restartScheduled || this.shuttingDown) return;
+      restartScheduled = true;
+      // Restart after 2 seconds
+      setTimeout(() => {
+        if (this.shuttingDown) return;
+        if (this.children.has(spec.name)) return;
+        this.spawnWorker(spec);
+      }, 2000);
+    };
+
+    child.on('error', (err) => {
+      this.children.delete(spec.name);
+      if (this.shuttingDown) return;
+
+      logger.error('worker.spawn_failed', err, { fleet: spec.name, port: spec.port });
+      scheduleRestart();
+    });
+
     child.on('exit', (code, signal) => {
       this.children.delete(spec.name);
       if (this.shuttingDown) return;
 
       logger.warn('worker.exited', { fleet: spec.name, code, signal });
-      // Restart after 2 seconds
-      setTimeout(() => {
-        this.spawnWorker(spec);
-      }, 2000);
+      scheduleRestart();
     });
   }
 

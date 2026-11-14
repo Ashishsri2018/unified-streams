@@ -69,6 +69,12 @@ interface ProduceResult {
   meta: StreamsMeta | null;
 }
 
+interface InFlightEntry {
+  promise: Promise<ProduceResult>;
+  controller: AbortController;
+  waiters: number;
+}
+
 export interface StreamPipelineOptions {
   config: AppConfig;
   logger: LoggerLike;
@@ -206,7 +212,7 @@ export class StreamPipeline {
   private readonly snapshots: SnapshotManager;
   private readonly cinemeta: CinemetaClient;
   private readonly cache = new Map<string, CacheEntry>();
-  private readonly inflight = new Map<string, Promise<ProduceResult>>();
+  private readonly inflight = new Map<string, InFlightEntry>();
   private readonly metrics: ProviderMetrics;
   private readonly requestMetrics = {
     requests: 0,
@@ -315,45 +321,71 @@ export class StreamPipeline {
     }
     this.cacheStats.misses += 1;
 
-    const existing = this.inflight.get(cacheKey);
-    if (existing) this.cacheStats.coalesced += 1;
-    if (existing) {
-      try {
-        const result = await existing;
-        if (result.streams.length === 0) this.requestMetrics.emptyResults += 1;
-        this.logSummary(request, startedAt, "miss", true, result);
-        return result.streams;
-      } catch (error) {
-        this.requestMetrics.emptyResults += 1;
-        this.logRequestFailure(request, error);
-        this.logSummary(request, startedAt, "miss", true, {
-          streams: [],
-          outcome: "error",
-          meta: null,
-        });
-        return [];
-      }
+    let entry = this.inflight.get(cacheKey);
+    const shared = Boolean(entry);
+    if (entry) {
+      this.cacheStats.coalesced += 1;
+    } else {
+      const controller = new AbortController();
+      const created: InFlightEntry = {
+        controller,
+        waiters: 0,
+        promise: Promise.resolve({ streams: [], outcome: "aborted", meta: null }),
+      };
+      created.promise = this.produce(request, controller.signal, cacheKey).finally(() => {
+        if (this.inflight.get(cacheKey) === created) this.inflight.delete(cacheKey);
+      });
+      this.inflight.set(cacheKey, created);
+      entry = created;
     }
 
-    const task = this.produce(request, signal, cacheKey);
-    this.inflight.set(cacheKey, task);
+    entry.waiters += 1;
     try {
-      const result = await task;
+      const result = await this.awaitShared(entry.promise, signal);
       if (result.streams.length === 0) this.requestMetrics.emptyResults += 1;
-      this.logSummary(request, startedAt, "miss", false, result);
+      this.logSummary(request, startedAt, "miss", shared, result);
       return result.streams;
     } catch (error) {
       this.requestMetrics.emptyResults += 1;
       this.logRequestFailure(request, error);
-      this.logSummary(request, startedAt, "miss", false, {
+      this.logSummary(request, startedAt, "miss", shared, {
         streams: [],
         outcome: "error",
         meta: null,
       });
       return [];
     } finally {
-      this.inflight.delete(cacheKey);
+      entry.waiters -= 1;
+      if (entry.waiters <= 0) {
+        if (this.inflight.get(cacheKey) === entry) this.inflight.delete(cacheKey);
+        entry.controller.abort(new Error("all callers aborted"));
+      }
     }
+  }
+
+  private awaitShared(
+    promise: Promise<ProduceResult>,
+    signal?: AbortSignal,
+  ): Promise<ProduceResult> {
+    if (!signal) return promise;
+    if (signal.aborted) {
+      return Promise.resolve({ streams: [], outcome: "aborted", meta: null });
+    }
+
+    return new Promise<ProduceResult>((resolve, reject) => {
+      const onAbort = (): void => resolve({ streams: [], outcome: "aborted", meta: null });
+      signal.addEventListener("abort", onAbort, { once: true });
+      promise.then(
+        (result) => {
+          signal.removeEventListener("abort", onAbort);
+          resolve(result);
+        },
+        (error: unknown) => {
+          signal.removeEventListener("abort", onAbort);
+          reject(error);
+        },
+      );
+    });
   }
 
   private async produce(
