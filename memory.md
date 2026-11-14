@@ -272,3 +272,8 @@
     - Synced credentials directly to Railway service `unified-streams` and Dokku on Beamup.
     - Pushed commit `5247b9f` to `main` and verified end-to-end GitHub Actions workflow execution (run `43538995079`): `Verify` (17s), `Docker Build & Smoke Test` (30s), `Deploy to Railway` (15s), and `Deploy to Beamup` (3m2s) all passed successfully.
     - Verified live HTTP 200 responses on both Railway (`https://unified-streams-production.up.railway.app/manifest.json`) and Beamup (`https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json`).
+  - Configured Platform-Differentiated Timeouts:
+    - Preserved default 12s backend timeout and 13s global deadline (`config/defaults.env`) for Beamup deployment.
+    - Set `BACKEND_TIMEOUT_MS=27000` (27s) and `GLOBAL_DEADLINE_MS=29000` (29s) on Railway service `unified-streams` via Railway CLI.
+    - Updated `.github/workflows/ci.yml` `deploy-railway` job to sync `BACKEND_TIMEOUT_MS=27000` and `GLOBAL_DEADLINE_MS=29000` on every deployment.
+    - Verified all 47 unit/feature tests pass locally without modifying defaults.

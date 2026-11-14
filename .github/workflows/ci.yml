@@ -151,6 +151,11 @@ jobs:
             echo "::error::RAILWAY_TOKEN secret is not set in GitHub repository secrets."
             exit 1
           fi
+
+          # Set Railway-specific extended timeout budgets (27s backend / 29s global)
+          railway variable set "BACKEND_TIMEOUT_MS=27000" --service unified-streams --skip-deploys || true
+          railway variable set "GLOBAL_DEADLINE_MS=29000" --service unified-streams --skip-deploys || true
+
           if [ -n "$TMDB_API_KEY" ]; then
             railway variable set "TMDB_API_KEY=$TMDB_API_KEY" --service unified-streams --skip-deploys || true
           fi

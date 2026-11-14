@@ -103,6 +103,9 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - Environment: `production` (ID: `fbfbc17f-875f-4af5-8759-31780c7314a6`)
   - Service: `unified-streams` (ID: `02132873-33e4-47cf-986f-15ef3f6050da`)
   - Public URL: `https://unified-streams-production.up.railway.app`
+- **Platform-Differentiated Timeout Strategy**:
+  - **Beamup Deployment**: Uses default settings (`config/defaults.env`) with `BACKEND_TIMEOUT_MS=12000` (12s), `GLOBAL_DEADLINE_MS=13000` (13s), and derived worker deadline `11000` (11s) to fit strictly within Beamup's ~14s reverse proxy cut-off.
+  - **Railway Deployment**: Uses service-level environment overrides with `BACKEND_TIMEOUT_MS=27000` (27s), `GLOBAL_DEADLINE_MS=29000` (29s), and derived worker deadline `26000` (26s), taking advantage of Railway's support for extended connection durations to yield streams from slower scrapers (e.g. `4khdHub`, `Maelith`).
 - **Dual CI/CD Deployment Pipeline (`.github/workflows/ci.yml`)**:
   - Runs on `main` push and manual `workflow_dispatch`.
   - Stages:
