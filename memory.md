@@ -290,4 +290,11 @@
     2. Tier 2 (Railway-Advantaged / Railway-Only - 17 providers): Vega scrapers (`4khdHub` +123, `MultiStream` +28, `ShowBox` +23, `HdHub4u` +20, `VMovies` +9) and Nuvio scrapers (`Fjoral.` +32, `Xylos.` +18, `Maelith.` +10, `Xandril.` +14, `Vitrix.` +8, `Ozeris.` +7, `Ilvyrel.` +6, `Solunix.` +5, `Qorva.` +3, `Lenyr.` +2, `Phraxis.` +2, `Praxiel.` +2) which are challenged by Cloudflare/IP bans or 11s deadline on Beamup.
     3. Tier 3 (Beamup-Advantaged - 4 providers): Providers that resolved more or exclusively on Beamup (`AnimeWorld` +35, `Movies4U` +10, `Sylphera.` +8, `RogMovies` +7).
     4. Tier 4 (Inactive / 0 Streams across both): Documented 34 enabled providers that yielded 0 streams across these 6 targets.
-  - Documented findings in `docs/instance-comparison-report.md`.
+  - Documented findings in `docs/instance-comparison-report.md` and `docs/provider-compatibility.md`.
+  - Disabled the 17 Railway-only scrapers exclusively on Beamup:
+    - Nuvio scrapers (12): `fjoral,xylos,maelith,xandril,vitrix,ozeris,ilvyrel,solunix,qorva,lenyr,phraxis,praxiel`.
+    - Vega providers (5): `4khdhub,autoEmbed,showbox,hdhub4u,vega`.
+    - Hardened `src/core/env.ts` to sanitize single/double quotes around env lists and merge with base policy.
+    - Updated `.github/workflows/ci.yml` Dokku env sync to maintain disabled lists on Beamup deployments.
+    - Added unit test `tests/features/disabledProviders.test.ts` testing quote stripping and list merging for both fleets.
+    - Verified all 49 Vitest feature tests and full verification pipeline (`npm run verify`) pass.

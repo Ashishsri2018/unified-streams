@@ -115,6 +115,11 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
        - `deploy-beamup`: Syncs Dokku environment (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `PUBLIC_BASE_URL`) and pushes to Beamup Dokku.
        - `deploy-railway`: Installs Railway CLI, syncs environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and triggers `railway up --service unified-streams --detach`.
 - **Active Fleets & Providers**: Canonical duplicate-excluded provider fleet enforced via `config/providers.json` and `config/provider-audit.csv` (SA7: 12-13, Nuvio: 31, Vega: 36-40) with redundant duplicate scrapers, torrent scrapers, and Internet Archive excluded.
+- **Platform Provider Compatibility & Beamup-Disabled Scrapers**:
+  Targeted 6-title benchmark across both platforms identified 17 scrapers that work only on Railway (due to Beamup's ~14s reverse proxy cut-off and datacenter IP blocks) while succeeding on Railway:
+  - **Vega (5)**: `4khdhub`, `autoEmbed`, `showbox`, `hdhub4u`, `vega`.
+  - **Nuvio (12)**: `fjoral`, `xylos`, `maelith`, `xandril`, `vitrix`, `ozeris`, `ilvyrel`, `solunix`, `qorva`, `lenyr`, `phraxis`, `praxiel`.
+  - Configured exclusively on Beamup via Dokku environment variables `NUVIO_DISABLED_SCRAPERS` and `VEGA_DISABLED_PROVIDERS`, keeping Railway enabled for all available providers.
 - **Provider Credentials Pipeline**:
   - `FEBBOX_UI_COOKIE`: Ingested by gateway from environment / GitHub Actions secrets, formatted as `ui=<token>`, and passed to Vega worker via `PROVIDER_SETTINGS_JSON.kv.febboxCookie` for authenticated Showbox streams.
   - `GRAMCINEMA_TOKEN`: Ingested by gateway from environment / GitHub Actions secrets, stripped of `gc_session=` or `Bearer ` prefixes, and forwarded to Nuvio worker via `SCRAPER_SETTINGS_JSON.fjoral.cinemaTvToken` for authenticated GramCinema (`bollywood.eu.org`) streams. `fjoral` resolution settings default `enable720p`, `enable1080p`, and `enable2160p` to true.
