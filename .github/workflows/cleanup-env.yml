@@ -31,32 +31,17 @@ jobs:
         run: |
           set -euo pipefail
           APP="a38b6dd4fcd1/unified-streams-docker"
-          LEGACY_KEYS=(
-            SA7_ENABLED_PROVIDERS
-            SA7_DISABLED_PROVIDERS
-            NUVIO_ENABLED_SCRAPERS
-            NUVIO_DISABLED_SCRAPERS
-            VEGA_ENABLED_PROVIDERS
-            VEGA_DISABLED_PROVIDERS
-          )
 
-          # config:keys lists names only, so no secret values enter the runner.
-          existing=$(ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:keys $APP" 2>/dev/null | sed -n 's/^\([A-Z0-9_]*\).*/\1/p')
-          present=()
-          for key in "${LEGACY_KEYS[@]}"; do
-            if printf '%s\n' "$existing" | grep -qx "$key"; then
-              present+=("$key")
-            fi
+          # Best-effort removal of optional enable-lists. These were not set by
+          # the old CI, so ignore failures for keys that do not exist.
+          for key in SA7_ENABLED_PROVIDERS NUVIO_ENABLED_SCRAPERS VEGA_ENABLED_PROVIDERS; do
+            ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:unset --no-restart $APP $key" >/dev/null 2>&1 || true
           done
 
-          if [ ${#present[@]} -eq 0 ]; then
-            echo "No legacy provider env vars are set on Beamup."
-            exit 0
-          fi
-
-          echo "Unsetting: ${present[*]}"
-          # Run this after the profile-based deploy has finished. The restart
-          # makes the current release read config/instances/beamup.env and the
-          # instances.beamup policy without the legacy overrides.
-          ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:unset $APP ${present[*]}"
+          # These three were set by the old Beamup deploy on every run.
+          # Run this after the profile-based deploy has finished. The unset
+          # restarts the app so the current release reads
+          # config/instances/beamup.env and the instances.beamup policy.
+          ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club \
+            "config:unset $APP SA7_DISABLED_PROVIDERS NUVIO_DISABLED_SCRAPERS VEGA_DISABLED_PROVIDERS"
           echo "Done. Beamup now uses config/instances/beamup.env and instances.beamup policy."

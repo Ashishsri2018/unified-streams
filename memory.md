@@ -341,5 +341,5 @@
   - Added profile, override, wildcard, hard-disable, and merge-priority tests; all 58 Vitest tests and `npm run verify` pass 100%.
 
 - One-Time Legacy Env Cleanup:
-  - Added `.github/workflows/cleanup-env.yml` (`workflow_dispatch`, requires typing `CLEAN`). It lists existing Dokku config keys without printing values and unsets legacy `SA7_ENABLED_PROVIDERS`, `SA7_DISABLED_PROVIDERS`, `NUVIO_ENABLED_SCRAPERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_ENABLED_PROVIDERS`, and `VEGA_DISABLED_PROVIDERS`; the unset restarts the app so the current release uses the profile.
+  - Added `.github/workflows/cleanup-env.yml` (`workflow_dispatch`, requires typing `CLEAN`). It unsets the three legacy disabled lists (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`) directly, with best-effort removal of the matching enabled lists; the unset restarts the app so the current release uses the profile. It does not use `config:show`/`config:keys`, which Beamup rejects for the deploy key.
   - Run it once after the instance-profile Beamup deploy finishes. Normal pushes still sync only `INSTANCE_PROFILE` and credentials, so later runtime overrides are preserved.
