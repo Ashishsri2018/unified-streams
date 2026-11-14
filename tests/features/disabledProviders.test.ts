@@ -87,7 +87,7 @@ describe('disabled providers derivation', () => {
     expect(disabled).toContain('luxMovies');
   });
 
-  it('applies the Beamup profile with only its four providers and 40-way concurrency', () => {
+  it('applies the Beamup profile with duplicate scrapers enabled in SA7 and 40-way concurrency', () => {
     const appEnv = loadAppEnv({ INSTANCE_PROFILE: 'beamup' });
     expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(12000);
     expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(13000);
@@ -96,7 +96,21 @@ describe('disabled providers derivation', () => {
     expect(Number(appEnv.SA7_CONCURRENCY)).toBe(40);
 
     const sa7Env = deriveFleetEnv(appEnv, 'sa7', 7001);
-    expect(sa7Env.DISABLED_PROVIDERS.split(',')).toContain('*');
+    const sa7Enabled = sa7Env.ENABLED_PROVIDERS.split(',');
+    expect(sa7Enabled).toContain('moviesdrive');
+    expect(sa7Enabled).toContain('4khdhub');
+    expect(sa7Enabled).toContain('hdhub4u');
+    expect(sa7Enabled).toContain('vegamovies');
+    expect(sa7Enabled).toContain('castle');
+    expect(sa7Enabled).toContain('anizone');
+    expect(sa7Enabled).toContain('moviebox');
+    expect(sa7Enabled).toContain('moviesmod');
+    expect(sa7Enabled).toContain('reanime');
+    expect(sa7Enabled).toContain('animeworld');
+    expect(sa7Enabled).toContain('animesalt');
+    expect(sa7Enabled).toContain('anizen');
+    expect(sa7Enabled).toContain('anikage');
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).not.toContain('*');
     expect(Number(sa7Env.PROVIDER_CONCURRENCY)).toBe(40);
 
     const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
@@ -109,6 +123,7 @@ describe('disabled providers derivation', () => {
     expect(enabled).toContain('animeworld');
     expect(enabled).toContain('movies4u');
     expect(enabled).toContain('luxMovies');
+    expect(enabled).toContain('mod');
     expect(vegaEnv.SEARCH_CONCURRENCY).toBe('40');
   });
 
@@ -117,6 +132,7 @@ describe('disabled providers derivation', () => {
     expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(27000);
     expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(29000);
     expect(Number(appEnv.SEARCH_CONCURRENCY)).toBe(40);
+    expect(Number(appEnv.SEARCH_TIMEOUT_MS)).toBe(15000);
 
     const sa7Env = deriveFleetEnv(appEnv, 'sa7', 7001);
     expect(sa7Env.DISABLED_PROVIDERS.split(',')).toContain('moviesdrive');

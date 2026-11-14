@@ -125,19 +125,22 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
     - Nuvio (30 active): Baseline 20 duplicates/BDIX/dead scrapers + `sylphera` disabled (21 disabled), leaving 30 active scrapers.
     - Vega (25 active): Baseline 13 torrent/IA/youtube/duplicate scrapers + `animeworld, movies4u, luxMovies` (and `rogmovies`) disabled (16 disabled), leaving 25 active scrapers.
     - Total active providers on Railway = **69 providers**.
-  - **Beamup Instance Routing (4 Exclusive Providers)**:
-    - To eliminate Beamup proxy timeouts (~14s cut-off) and IP blocks while preserving high-yield Beamup-exclusive scrapers, Beamup runs **strictly 4 active providers**:
-      - `nuvio`: `sylphera` (1 active).
-      - `vega`: `animeworld`, `movies4u`, `luxMovies` (RogMovies) (3 active).
-      - `sa7`: All 28 providers disabled (0 active).
-    - Enforced by `instances.beamup` in `config/providers.json` (SA7 `*` deny, Nuvio `sylphera` allow, Vega `animeworld`/`movies4u`/`luxMovies` allow). Runtime `*_ENABLED_*` and `*_DISABLED_*` env vars can override this per instance without a code change.
+  - **Beamup Instance Routing (Duplicate & Exclusive Scrapers)**:
+    - Beamup runs the duplicate scrapers disabled in Railway along with its exclusive scrapers:
+      - `sa7` (13 active): `moviesdrive`, `4khdhub`, `hdhub4u`, `vegamovies`, `castle`, `anizone`, `moviebox`, `moviesmod`, `reanime`, `animeworld`, `animesalt`, `anizen`, `anikage` (the 13 redundant duplicate scrapers disabled on Railway).
+      - `nuvio` (1 active): `sylphera` (Beamup-exclusive).
+      - `vega` (4 active): `animeworld`, `movies4u`, `luxMovies` (RogMovies), `mod` (MoviesMod).
+    - Enforced by `instances.beamup` in `config/providers.json` (SA7 allowlist mode for the 13 duplicates, Nuvio `sylphera` allow, Vega `animeworld`/`movies4u`/`luxMovies`/`mod` allow). Runtime `*_ENABLED_*` and `*_DISABLED_*` env vars can override this per instance without a code change.
+  - **Search Timeout per Instance**:
+    - `SEARCH_TIMEOUT_MS` defaults to 10s (`config/defaults.env`), and `src/core/env.ts` clamps it to the worker deadline. `config/instances/railway.env` raises it to 15s to accommodate slower scrapers within the 27s backend budget.
   - **Instance-Level Environment Overrides & Alias Mapping**:
     - Any deployment instance can selectively customize scrapers purely via environment variables without requiring code changes.
     - In `src/core/env.ts`, `deriveVegaEnv` automatically aliases `rogmovies` / `rogmovie` to `luxMovies` (and vice-versa), ensuring consistent scraper targeting across fleets. Quotes are stripped and lists are merged with base canonical policy.
 - **Provider Credentials Pipeline**:
   - `FEBBOX_UI_COOKIE`: Ingested by gateway from environment / GitHub Actions secrets, formatted as `ui=<token>`, and passed to Vega worker via `PROVIDER_SETTINGS_JSON.kv.febboxCookie` for authenticated Showbox streams.
   - `GRAMCINEMA_TOKEN`: Ingested by gateway from environment / GitHub Actions secrets, stripped of `gc_session=` or `Bearer ` prefixes, and forwarded to Nuvio worker via `SCRAPER_SETTINGS_JSON.fjoral.cinemaTvToken` for authenticated GramCinema (`bollywood.eu.org`) streams. `fjoral` resolution settings default `enable720p`, `enable1080p`, and `enable2160p` to true.
-  - CI/CD Deployment Sync: GitHub Actions CI syncs Dokku environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `PUBLIC_BASE_URL`) directly before deploying code to Beamup.
+  - `KARTOONS_TOKEN`: Ingested by gateway from environment / GitHub Actions secrets, stripped of `token=` or `Bearer ` prefixes, and forwarded to Vega worker via `PROVIDER_SETTINGS_JSON.kv.kartoons_device_session.token` for authenticated Kartoons (`kartoon.to`) streams.
+  - CI/CD Deployment Sync: GitHub Actions CI syncs Dokku environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `KARTOONS_TOKEN`, `PUBLIC_BASE_URL`) directly before deploying code to Beamup.
 - **Provider Observability & Upstream Constraints**:
   - Both Vega and Nuvio track per-provider outcomes and populate `lastError` (including network timeouts, HTTP errors, and failure stages) so the `/status` dashboard provides real-time diagnostics for failing or degraded scrapers.
   - Showbox two-tier architecture: Showbox requires Tier 1 metadata discovery on `showbox.media` before utilizing the FebBox direct stream cookie in Tier 2. When `showbox.media` resets connections from datacenter IPs, discovery fails gracefully without crashing.

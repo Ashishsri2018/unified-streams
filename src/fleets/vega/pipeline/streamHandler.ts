@@ -104,6 +104,18 @@ function errorName(error: unknown): string {
   return error instanceof Error ? error.name : "UnknownError";
 }
 
+function isTimeoutFailure(error: unknown): boolean {
+  if (error instanceof TimeoutError) return true;
+  const candidate = error as { name?: string; code?: string } | null;
+  if (!candidate) return false;
+  return (
+    candidate.name === "AbortError" ||
+    candidate.name === "CanceledError" ||
+    candidate.code === "ABORT_ERR" ||
+    candidate.code === "ERR_CANCELED"
+  );
+}
+
 function readMetaField(meta: ProviderMeta, key: string): unknown {
   const value = (meta as Record<string, unknown>)[key];
   return value;
@@ -890,7 +902,7 @@ export class StreamPipeline implements StreamHandlerApi {
         const kind = collected
           ? "ok"
           : failure !== undefined
-            ? failure instanceof TimeoutError
+            ? isTimeoutFailure(failure)
               ? "timeout"
               : "error"
             : "empty";

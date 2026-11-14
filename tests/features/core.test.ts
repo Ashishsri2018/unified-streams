@@ -79,6 +79,32 @@ describe('provider policy and concurrency', () => {
     expect(parsed2.kv.febboxCookie).toBe('ui=raw_jwt_cookie_token_456');
   });
 
+  it('derives vega env with kartoons session from KARTOONS_TOKEN', () => {
+    const appEnv = loadAppEnv({
+      KARTOONS_TOKEN: 'test_kartoons_jwt_token_123',
+    });
+    const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
+    const parsed = JSON.parse(vegaEnv.PROVIDER_SETTINGS_JSON);
+    expect(parsed.kv.kartoons_device_session).toEqual({
+      token: 'test_kartoons_jwt_token_123',
+    });
+
+    // Also handles Bearer and token= prefixes
+    const appEnv2 = loadAppEnv({
+      KARTOONS_TOKEN: 'Bearer test_kartoons_jwt_bearer',
+    });
+    const vegaEnv2 = deriveFleetEnv(appEnv2, 'vega', 7003);
+    const parsed2 = JSON.parse(vegaEnv2.PROVIDER_SETTINGS_JSON);
+    expect(parsed2.kv.kartoons_device_session.token).toBe('test_kartoons_jwt_bearer');
+
+    const appEnv3 = loadAppEnv({
+      KARTOONS_TOKEN: 'token=test_kartoons_jwt_prefixed',
+    });
+    const vegaEnv3 = deriveFleetEnv(appEnv3, 'vega', 7003);
+    const parsed3 = JSON.parse(vegaEnv3.PROVIDER_SETTINGS_JSON);
+    expect(parsed3.kv.kartoons_device_session.token).toBe('test_kartoons_jwt_prefixed');
+  });
+
   it('derives nuvio env with cinemaTvToken from GRAMCINEMA_TOKEN', () => {
     const appEnv = loadAppEnv({
       GRAMCINEMA_TOKEN: 'gc_session=test_jwt_session_789',

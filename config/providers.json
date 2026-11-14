@@ -36,14 +36,32 @@
       "youtube",
       "animeworld",
       "movies4u",
+      "1cinevood",
+      "disneyMirror",
+      "netflixMirror",
+      "primeMirror",
       "luxMovies"
     ]
   },
   "instances": {
     "beamup": {
       "sa7": {
-        "mode": "deny",
-        "ids": ["*"]
+        "mode": "allow",
+        "ids": [
+          "moviesdrive",
+          "4khdhub",
+          "hdhub4u",
+          "vegamovies",
+          "castle",
+          "anizone",
+          "moviebox",
+          "moviesmod",
+          "reanime",
+          "animeworld",
+          "animesalt",
+          "anizen",
+          "anikage"
+        ]
       },
       "nuvio": {
         "mode": "allow",
@@ -51,7 +69,7 @@
       },
       "vega": {
         "mode": "allow",
-        "ids": ["animeworld", "movies4u", "luxMovies"]
+        "ids": ["animeworld", "movies4u", "luxMovies", "mod"]
       }
     }
   }

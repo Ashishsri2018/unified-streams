@@ -203,4 +203,91 @@ describe('vega provider telemetry', () => {
 
     pipeline.dispose();
   }, 10000);
+
+  it('classifies abort/cancel errors as timeouts, not provider errors', async () => {
+    const config = loadConfig({
+      PORT: '7003',
+      DATA_DIR: '/tmp/vega-telemetry-test',
+      UPDATE_ON_START: 'false',
+      GLOBAL_DEADLINE_MS: '2000',
+      SEARCH_TIMEOUT_MS: '10000',
+      SETTLE_MS: '0',
+      EMPTY_FENCE_MS: '0',
+      STREAM_CACHE_TTL_MS: '0',
+      PROVIDER_CACHE_TTL_MS: '1000',
+    });
+
+    const canceled = new Error('canceled') as Error & { code?: string };
+    canceled.name = 'CanceledError';
+    canceled.code = 'ERR_CANCELED';
+
+    const bundle: ProviderBundle = {
+      entry: {
+        display_name: 'Canceled Provider',
+        value: 'canceled-provider',
+        version: '1.0.0',
+        disabled: false,
+      },
+      dir: '/tmp/vega-telemetry-test/canceled-provider',
+      modules: {
+        posts: {
+          getSearchPosts: async () => {
+            throw canceled;
+          },
+        },
+        meta: {
+          getMeta: () => ({}),
+        },
+        stream: {
+          getStreams: () => [],
+        },
+      },
+    };
+
+    const snapshot: ProviderSnapshot = {
+      sha: 'test',
+      rootDir: '/tmp/vega-telemetry-test',
+      urls: {},
+      bundles: new Map([['canceled-provider', bundle]]),
+      createdAt: Date.now(),
+    };
+
+    const registry: ProviderRegistryApi = {
+      context: {} as ProviderContextLike,
+      listProviders: () => [bundle],
+      getActiveSnapshot: () => snapshot,
+      acquire: () => ({ snapshot, release: () => {} }),
+      onActivate: () => () => {},
+    };
+
+    const cinemeta: CinemetaApi = {
+      getMeta: async () => ({
+        id: 'tt1234567',
+        type: 'movie',
+        name: 'Test Movie',
+        year: '2020',
+      }),
+    };
+
+    const pipeline = new StreamPipeline({
+      config,
+      logger: logger(),
+      registry,
+      cinemeta,
+    });
+
+    await pipeline.handle({ type: 'movie', imdbId: 'tt1234567' });
+
+    const stat = pipeline
+      .getMetrics()
+      .providerStats.find((entry) => entry.id === 'canceled-provider');
+
+    expect(stat).toBeDefined();
+    expect(stat?.calls).toBe(1);
+    expect(stat?.timeouts).toBe(1);
+    expect(stat?.errors).toBe(0);
+    expect(stat?.lastError).toBe('canceled');
+
+    pipeline.dispose();
+  }, 10000);
 });

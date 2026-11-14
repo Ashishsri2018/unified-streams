@@ -90,6 +90,7 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           FEBBOX_UI_COOKIE: ${{ secrets.FEBBOX_UI_COOKIE }}
           GRAMCINEMA_TOKEN: ${{ secrets.GRAMCINEMA_TOKEN }}
+          KARTOONS_TOKEN: ${{ secrets.KARTOONS_TOKEN }}
           PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
         run: |
           set -e
@@ -102,6 +103,7 @@ jobs:
           [ -n "$TMDB_API_KEY" ] && CONFIG_PAIRS+=("TMDB_API_KEY='$TMDB_API_KEY'")
           [ -n "$FEBBOX_UI_COOKIE" ] && CONFIG_PAIRS+=("FEBBOX_UI_COOKIE='$FEBBOX_UI_COOKIE'")
           [ -n "$GRAMCINEMA_TOKEN" ] && CONFIG_PAIRS+=("GRAMCINEMA_TOKEN='$GRAMCINEMA_TOKEN'")
+          [ -n "$KARTOONS_TOKEN" ] && CONFIG_PAIRS+=("KARTOONS_TOKEN='$KARTOONS_TOKEN'")
           [ -n "$PUBLIC_BASE_URL" ] && CONFIG_PAIRS+=("PUBLIC_BASE_URL='$PUBLIC_BASE_URL'")
           if [ ${#CONFIG_PAIRS[@]} -gt 0 ]; then
             set +e
@@ -160,6 +162,7 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           FEBBOX_UI_COOKIE: ${{ secrets.FEBBOX_UI_COOKIE }}
           GRAMCINEMA_TOKEN: ${{ secrets.GRAMCINEMA_TOKEN }}
+          KARTOONS_TOKEN: ${{ secrets.KARTOONS_TOKEN }}
         run: |
           set -e
           if [ -z "$RAILWAY_TOKEN" ]; then
@@ -180,6 +183,9 @@ jobs:
           fi
           if [ -n "$GRAMCINEMA_TOKEN" ]; then
             railway variable set "GRAMCINEMA_TOKEN=$GRAMCINEMA_TOKEN" --service unified-streams --skip-deploys || true
+          fi
+          if [ -n "$KARTOONS_TOKEN" ]; then
+            railway variable set "KARTOONS_TOKEN=$KARTOONS_TOKEN" --service unified-streams --skip-deploys || true
           fi
 
       - name: Deploy to Railway

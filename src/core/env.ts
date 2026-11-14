@@ -23,6 +23,7 @@ export const EnvSchema = z.object({
   MAX_STREAMS_PER_PROVIDER: z.coerce.number().int().min(1).default(100),
   MAX_STREAMS: z.coerce.number().int().min(1).default(1000),
   SEARCH_CONCURRENCY: z.coerce.number().int().min(1).default(30),
+  SEARCH_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10000),
   SCRAPER_CONCURRENCY: z.coerce.number().int().min(1).default(30),
   SA7_CONCURRENCY: z.coerce.number().int().min(1).default(30),
   CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().min(1).default(3),
@@ -45,6 +46,7 @@ export const EnvSchema = z.object({
   SCRAPER_SETTINGS_JSON: z.string().optional(),
   FEBBOX_UI_COOKIE: z.string().optional(),
   GRAMCINEMA_TOKEN: z.string().optional(),
+  KARTOONS_TOKEN: z.string().optional(),
   SA7_ENABLED_PROVIDERS: z.string().optional(),
   SA7_DISABLED_PROVIDERS: z.string().optional(),
   NUVIO_ENABLED_SCRAPERS: z.string().optional(),
@@ -381,7 +383,7 @@ export function deriveFleetEnv(
       lowercase: false,
     });
     outEnv.SEARCH_CONCURRENCY = String(env.SEARCH_CONCURRENCY);
-    outEnv.SEARCH_TIMEOUT_MS = String(Math.min(10000, workerDeadlineMs));
+    outEnv.SEARCH_TIMEOUT_MS = String(Math.min(env.SEARCH_TIMEOUT_MS, workerDeadlineMs));
     outEnv.META_TIMEOUT_MS = String(Math.min(15000, workerDeadlineMs));
     outEnv.STREAM_TIMEOUT_MS = String(Math.min(20000, workerDeadlineMs));
     outEnv.SETTLE_MS = '0';
@@ -403,6 +405,32 @@ export function deriveFleetEnv(
       const cookie = env.FEBBOX_UI_COOKIE.trim();
       if (cookie) {
         vegaSettings.kv.febboxCookie = cookie.startsWith('ui=') ? cookie : `ui=${cookie}`;
+      }
+    }
+    if (env.KARTOONS_TOKEN) {
+      let rawToken = env.KARTOONS_TOKEN.trim();
+      if (rawToken.startsWith('token=')) {
+        rawToken = rawToken.slice('token='.length).trim();
+      }
+      if (rawToken.toLowerCase().startsWith('bearer ')) {
+        rawToken = rawToken.slice(7).trim();
+      }
+      if (rawToken) {
+        const existing = vegaSettings.kv.kartoons_device_session;
+        let session: Record<string, unknown> = {};
+        if (typeof existing === 'string') {
+          try {
+            const parsed = JSON.parse(existing);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              session = parsed as Record<string, unknown>;
+            }
+          } catch {
+            session = {};
+          }
+        } else if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+          session = { ...(existing as Record<string, unknown>) };
+        }
+        vegaSettings.kv.kartoons_device_session = { ...session, token: rawToken };
       }
     }
     if (Object.keys(vegaSettings.kv).length > 0 || vegaSettings.skipTimings !== undefined) {

@@ -364,3 +364,10 @@
     15. Low gap: `Logger` never configures or instantiates `CloudflareSink` when `LOG_SINK=cloudflare`.
   - All findings verified against runtime code and documented with exact root causes and proposed remedies.
   - Saved full bug report to `docs/bugs.md` and added `docs/bugs.md` to `.gitignore`.
+
+- Enable Duplicate Scrapers on Beamup Instance (Nov 14 2026):
+  - Enabled all 13 duplicate scrapers disabled in Railway (`moviesdrive, 4khdhub, hdhub4u, vegamovies, castle, anizone, moviebox, moviesmod, reanime, animeworld, animesalt, anizen, anikage`) on Beamup via `instances.beamup.sa7` in `config/providers.json`.
+  - Switched `instances.beamup.sa7` from `"mode": "deny", "ids": ["*"]` to `"mode": "allow"` with the 13 duplicate IDs.
+  - Updated Vitest unit test in `tests/features/disabledProviders.test.ts` to assert that SA7 runs these 13 providers in allowlist mode on Beamup without the wildcard denial.
+  - Validated with `npm run policy:check`, `npm run test:feature`, and `npm run verify` (all passed 100%).
+  - Kept changes local without deploying or pushing, per user instruction.
