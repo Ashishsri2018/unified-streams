@@ -108,7 +108,12 @@
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs
 
-- [ ] **Phase 11: Logic Bug Fixes & Codebase Hardening**
+- [x] **Phase 12: Subtitle Filtering in Configure Page & Stream Pipeline**
+  - [x] Add subtitle language input (comma-separated), quick language chips, and "Include unknown language" checkbox to `/configure` (`src/addon/configureHtml.ts`)
+  - [x] Support "no selection = no filter", selective language filtering, and language alias matching in `src/core/subtitles.ts`
+  - [x] Connect subtitle track filtering to `filterStream` in `src/addon/filters.ts` while ensuring streams are never dropped due to subtitles
+  - [x] Add comprehensive automated tests in `tests/features/subtitles.test.ts` and `tests/features/subtitlesFilter.test.ts`
+
   - [x] Unify URL and stream classification in `src/core/urlClassifier.ts`, resolving `/api/watch/m3u8` misclassification as `externalUrl` and centralizing rules across fleets and gateway
   - [x] Consolidate all 8 gateway-fleet code duplications and architectural redundancies (`src/core/streamQuality.ts`, `src/core/streamHeaders.ts`, `src/core/subtitles.ts`, `contentId.ts`, metadata forwarding) and prune `docs/gateway-fleet-duplications.md`
   - [x] Fix SA7 unknown resolution dropping bug on configured requests (`src/fleets/sa7/worker.js`)

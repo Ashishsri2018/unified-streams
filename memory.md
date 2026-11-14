@@ -1,5 +1,24 @@
 # Unified Streams Memory Log
 
+- Subtitle Filtering in Configure Page & Gateway Stream Pipeline (Session Nov 14 2026):
+  - Added subtitle language filtering to the `/configure` web UI (`src/addon/configureHtml.ts`):
+    - Text input `#subtitleLangs` for comma-separated language tags/names (e.g., `en, es, hi` or `English, Spanish`).
+    - Quick-select chip buttons for popular languages (`English`, `Spanish`, `French`, `German`, `Hindi`, `Japanese`) for one-click append.
+    - Checkbox `#includeUnknownSubtitleLang` for controlling unknown/unrecognized language tracks (default checked).
+    - Real-time summary integration: distinguishes "All tracks retained (no filter)" vs "Only en, es (including/excluding unknown)".
+    - Prefill and reset handling: hydrates saved subtitle preferences and restores defaults cleanly.
+  - Enhanced language comparison and normalization in `src/core/subtitles.ts`:
+    - Handles language variants, ISO codes, and subtags (`en`, `eng`, `eng-us`, `eng eu`, `en-eu`, `English`, `English (US)`, `English [CC]`, `Brazilian Portuguese`, `Español`, `Français`, `Deutsch`, etc.).
+    - Robust `filterSubtitleTracks` supporting "no selection = no filter", allowed language matching across both normalized base codes and raw tags, and unknown language inclusion/exclusion.
+  - Connected subtitle filtering into `filterStream` (`src/addon/filters.ts`):
+    - Prunes non-matching tracks from `stream.subtitles`.
+    - **Never drops streams because of subtitles**: streams with embedded/inline container subtitles or streams where all external tracks are excluded remain fully intact and are delivered to Stremio.
+  - Added test suites:
+    - `tests/features/subtitlesFilter.test.ts` (5 tests covering stream retention, subtitle pruning, inline container streams, and variant matching).
+    - Expanded `tests/features/subtitles.test.ts` and `tests/features/app.test.ts`.
+  - Stored changes locally without deploying per user constraints.
+
+
 - Full Resolution and Pruning of Gateway-Fleet Duplications (Session Nov 14 2026):
   - Addressed all 8 audited code duplications and architectural redundancies from `docs/gateway-fleet-duplications.md`:
     1. **Content ID Parsing**: Refactored Nuvio and Vega `parseId.ts` and SA7 `content-id.js` to delegate to `src/core/contentId.ts`, harmonizing Season 0 specials, season packs, and anime IDs across all workers.

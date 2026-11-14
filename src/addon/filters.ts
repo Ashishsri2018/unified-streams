@@ -1,4 +1,4 @@
-import { SubtitleTrack } from './subtitles.js';
+import { SubtitleTrack, filterSubtitleTracks } from './subtitles.js';
 import { inferResolution, inferSizeBytes } from '../core/streamQuality.js';
 
 export { inferResolution, inferSizeBytes };
@@ -56,6 +56,23 @@ export function filterStream(stream: StremioStream, config: StreamFilterConfig):
       const maxBytes = config.maxSizeGB * 1024 * 1024 * 1024;
       if (sizeBytes > maxBytes) return null;
     }
+  }
+
+  // 3. Subtitle Tracks Filter (Streams are NEVER dropped because of subtitles)
+  if (stream.subtitles && stream.subtitles.length > 0 && config.subtitleMode !== 'all') {
+    const filteredTracks = filterSubtitleTracks(
+      stream.subtitles,
+      config.subtitleMode,
+      config.subtitleLangs,
+      config.includeUnknownSubtitleLang,
+    );
+    const copy = { ...stream };
+    if (filteredTracks && filteredTracks.length > 0) {
+      copy.subtitles = filteredTracks;
+    } else {
+      delete copy.subtitles;
+    }
+    return copy;
   }
 
   // Inline subtitles belong to the stream object and are passed through as-is.

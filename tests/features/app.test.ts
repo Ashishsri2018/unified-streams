@@ -151,14 +151,23 @@ describe('gateway HTTP endpoints and contract', () => {
   });
 
   it('GET /:config/configure prefills the saved configuration', async () => {
-    const encoded = encodeUserConfig({ maxRes: 720, backends: ['vega'] });
+    const encoded = encodeUserConfig({
+      maxRes: 720,
+      backends: ['vega'],
+      subtitleLangs: ['en', 'es'],
+      includeUnknownSubtitleLang: false,
+    });
     const res = await request(app).get(`/${encoded}/configure`);
     expect(res.status).toBe(200);
     expect(res.text).toContain('const PREFILL_CONFIG = ');
     expect(res.text).toContain('"maxRes":720');
     expect(res.text).toContain('"backends":["vega"]');
+    expect(res.text).toContain('"subtitleLangs":["en","es"]');
+    expect(res.text).toContain('"includeUnknownSubtitleLang":false');
     expect(res.text).toContain('Stream filters');
     expect(res.text).toContain('Provider fleets');
+    expect(res.text).toContain('id="subtitleLangs"');
+    expect(res.text).toContain('id="includeUnknownSubtitleLang"');
     expect(res.text).toContain('passed through unchanged');
     expect(res.text).not.toContain('name="subMode"');
   });
@@ -227,8 +236,9 @@ describe('gateway HTTP endpoints and contract', () => {
       includeUnknownRes: false,
       maxSizeGB: 2,
       includeUnknownSize: false,
-      subtitleMode: 'none',
+      subtitleMode: 'languages',
       subtitleLangs: ['en'],
+      includeUnknownSubtitleLang: false,
       backends: ['sa7', 'nuvio', 'vega'],
     });
 
@@ -237,7 +247,7 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.body.streams).toHaveLength(1);
     expect(res.body.streams[0].title).toBe('SA7 720p');
     expect(res.body.streams[0].url).toBe('https://cdn.test/sa7-720.mp4');
-    expect(res.body.streams[0].subtitles).toEqual(inlineSubtitles);
+    expect(res.body.streams[0].subtitles).toEqual([inlineSubtitles[0]]);
   });
 
   it('GET /stream only fans out to fleets selected in the config', async () => {

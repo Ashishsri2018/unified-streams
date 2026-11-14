@@ -101,7 +101,7 @@ export function renderConfigurePageHtml(
     }
     .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .field-help { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
-    select, input[type="number"] {
+    select, input[type="number"], input[type="text"] {
       width: 100%;
       min-height: 42px;
       padding: 9px 11px;
@@ -112,6 +112,22 @@ export function renderConfigurePageHtml(
       font: inherit;
       outline: none;
     }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-deep);
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+      min-height: unset;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--text); }
     select:focus-visible, input:focus-visible, input[type="checkbox"]:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
@@ -319,6 +335,27 @@ export function renderConfigurePageHtml(
           <span>Include streams when the file size cannot be detected</span>
         </label>
       </fieldset>
+
+      <fieldset>
+        <legend>Subtitles</legend>
+        <div class="field">
+          <label for="subtitleLangs">Preferred languages</label>
+          <input type="text" id="subtitleLangs" placeholder="e.g. en, es, hi (comma-separated)">
+        </div>
+        <div class="chip-row" aria-label="Quick language additions">
+          <button type="button" class="chip" data-lang="en">+ English (en)</button>
+          <button type="button" class="chip" data-lang="es">+ Spanish (es)</button>
+          <button type="button" class="chip" data-lang="fr">+ French (fr)</button>
+          <button type="button" class="chip" data-lang="de">+ German (de)</button>
+          <button type="button" class="chip" data-lang="hi">+ Hindi (hi)</button>
+          <button type="button" class="chip" data-lang="ja">+ Japanese (ja)</button>
+        </div>
+        <p class="field-help">Leave blank to keep all subtitle tracks. Matching works for language codes (<code>en</code>, <code>eng</code>, <code>en-us</code>, <code>eng eu</code>) and names (<code>English</code>).</p>
+        <label class="check" id="unknownSubCheck">
+          <input type="checkbox" id="includeUnknownSubtitleLang" checked>
+          <span>Include subtitle tracks when the language cannot be detected</span>
+        </label>
+      </fieldset>
     </section>
 
     <section class="card" aria-labelledby="fleets-heading">
@@ -365,7 +402,7 @@ export function renderConfigurePageHtml(
         <button type="button" id="btnReset">Reset defaults</button>
       </div>
       <p class="status-text" id="copyStatus" aria-live="polite"></p>
-      <p class="note">Subtitle tracks returned inline with a stream are passed through unchanged. This addon does not provide a separate subtitles resource.</p>
+      <p class="note">Attached subtitle tracks (<code>subtitles[]</code>) are filtered to your selected languages. Streams are never removed because of subtitles, and embedded audio/subtitles within video containers are passed through unchanged. This addon does not provide a separate subtitles resource.</p>
     </section>
 
     <footer class="footer">Unified Streams · one addon for three provider fleets</footer>
@@ -407,13 +444,32 @@ export function renderConfigurePageHtml(
       });
     }
 
+    function parsedSubtitleLangs() {
+      const raw = el('subtitleLangs').value;
+      if (!raw || !raw.trim()) return [];
+      const parts = raw.split(',');
+      const result = [];
+      const seen = {};
+      for (let i = 0; i < parts.length; i++) {
+        const clean = parts[i].trim().toLowerCase();
+        if (clean && !seen[clean]) {
+          seen[clean] = true;
+          result.push(clean);
+        }
+      }
+      return result.slice(0, 20);
+    }
+
     function syncUnknownCheckboxes() {
       const hasResolutionBound = el('minRes').value !== '' || el('maxRes').value !== '';
       const hasSizeLimit = el('maxSizeGB').value !== '';
+      const hasSubFilter = parsedSubtitleLangs().length > 0;
       el('includeUnknownRes').disabled = !hasResolutionBound;
       el('includeUnknownSize').disabled = !hasSizeLimit;
+      el('includeUnknownSubtitleLang').disabled = !hasSubFilter;
       el('unknownResCheck').classList.toggle('disabled', !hasResolutionBound);
       el('unknownSizeCheck').classList.toggle('disabled', !hasSizeLimit);
+      el('unknownSubCheck').classList.toggle('disabled', !hasSubFilter);
     }
 
     function resolutionLabel(height) {
@@ -455,7 +511,7 @@ export function renderConfigurePageHtml(
       el('summary').appendChild(item);
     }
 
-    function renderSummary(minRes, maxRes, maxSizeGB, backends) {
+    function renderSummary(minRes, maxRes, maxSizeGB, backends, subLangs, includeUnknownSub) {
       const summary = el('summary');
       summary.replaceChildren();
 
@@ -471,6 +527,14 @@ export function renderConfigurePageHtml(
         ? el('includeUnknownSize').checked ? ' (including unknown)' : ' (excluding unknown)'
         : '';
       addSummary('File size', size + unknownSize);
+
+      if (subLangs.length === 0) {
+        addSummary('Subtitles', 'All tracks retained (no filter)');
+      } else {
+        const unk = includeUnknownSub ? 'including unknown' : 'excluding unknown';
+        addSummary('Subtitles', 'Only ' + subLangs.join(', ') + ' (' + unk + ')');
+      }
+
       addSummary('Fleets', fleetSummary(backends));
     }
 
@@ -505,9 +569,12 @@ export function renderConfigurePageHtml(
       const maxRes = numberOrNull('maxRes');
       const maxSizeGB = numberOrNull('maxSizeGB');
       const backends = selectedBackends();
+      const subLangs = parsedSubtitleLangs();
+      const includeUnknownSub = el('includeUnknownSubtitleLang').checked;
+      const subtitleMode = subLangs.length > 0 ? 'languages' : 'all';
       const errors = validate(minRes, maxRes, maxSizeGB);
 
-      renderSummary(minRes, maxRes, maxSizeGB, backends.length > 0 ? backends : ALL_FLEETS);
+      renderSummary(minRes, maxRes, maxSizeGB, backends.length > 0 ? backends : ALL_FLEETS, subLangs, includeUnknownSub);
       setInvalid(errors);
       if (errors.length > 0) return { valid: false, manifestUrl: '' };
 
@@ -518,6 +585,9 @@ export function renderConfigurePageHtml(
         includeUnknownRes: el('includeUnknownRes').checked,
         maxSizeGB: maxSizeGB,
         includeUnknownSize: el('includeUnknownSize').checked,
+        subtitleMode: subtitleMode,
+        subtitleLangs: subLangs,
+        includeUnknownSubtitleLang: includeUnknownSub,
         backends: backends
       };
 
@@ -548,6 +618,17 @@ export function renderConfigurePageHtml(
       }
       if (PREFILL.includeUnknownRes === false) el('includeUnknownRes').checked = false;
       if (PREFILL.includeUnknownSize === false) el('includeUnknownSize').checked = false;
+
+      if (Array.isArray(PREFILL.subtitleLangs) && PREFILL.subtitleLangs.length > 0) {
+        el('subtitleLangs').value = PREFILL.subtitleLangs.join(', ');
+      } else {
+        el('subtitleLangs').value = '';
+      }
+      if (PREFILL.includeUnknownSubtitleLang === false) {
+        el('includeUnknownSubtitleLang').checked = false;
+      } else {
+        el('includeUnknownSubtitleLang').checked = true;
+      }
 
       const backends = Array.isArray(PREFILL.backends) && PREFILL.backends.length > 0
         ? PREFILL.backends
@@ -580,11 +661,11 @@ export function renderConfigurePageHtml(
       document.body.removeChild(field);
     }
 
-    ['minRes', 'maxRes', 'maxSizeGB'].forEach(function (id) {
+    ['minRes', 'maxRes', 'maxSizeGB', 'subtitleLangs'].forEach(function (id) {
       el(id).addEventListener('input', updateUrl);
       el(id).addEventListener('change', updateUrl);
     });
-    ['includeUnknownRes', 'includeUnknownSize'].forEach(function (id) {
+    ['includeUnknownRes', 'includeUnknownSize', 'includeUnknownSubtitleLang'].forEach(function (id) {
       el(id).addEventListener('change', updateUrl);
     });
     FLEETS.forEach(function (fleet) {
@@ -593,6 +674,20 @@ export function renderConfigurePageHtml(
         updateUrl();
       });
     });
+
+    const chips = document.querySelectorAll('.chip');
+    for (let i = 0; i < chips.length; i++) {
+      chips[i].addEventListener('click', function () {
+        const lang = this.getAttribute('data-lang');
+        if (!lang) return;
+        const current = parsedSubtitleLangs();
+        if (current.indexOf(lang) === -1) {
+          current.push(lang);
+          el('subtitleLangs').value = current.join(', ');
+          updateUrl();
+        }
+      });
+    }
 
     el('btnInstall').addEventListener('click', function () {
       const result = updateUrl();
@@ -623,6 +718,8 @@ export function renderConfigurePageHtml(
       el('maxSizeGB').value = '';
       el('includeUnknownRes').checked = true;
       el('includeUnknownSize').checked = true;
+      el('subtitleLangs').value = '';
+      el('includeUnknownSubtitleLang').checked = true;
       FLEETS.forEach(function (fleet) {
         setFleetChecked(fleet, true);
       });

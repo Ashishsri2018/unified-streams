@@ -14,9 +14,10 @@ export interface SubtitleTrack {
 }
 
 export const LANGUAGE_ALIASES: Readonly<Record<string, string>> = Object.freeze({
-  // English aliases
+  // English aliases & variants
   english: 'en', eng: 'en', en: 'en',
-  'en-us': 'en', 'en-gb': 'en',
+  'en-us': 'en', 'en-gb': 'en', 'en-uk': 'en', 'en-eu': 'en',
+  'eng-us': 'en', 'eng-gb': 'en', 'eng-uk': 'en', 'eng-eu': 'en',
   'e-sub': 'en', 'e.sub': 'en', 'e sub': 'en', esub: 'en',
   // Hindi & Indic
   hindi: 'hi', hin: 'hi', hi: 'hi',
@@ -26,27 +27,66 @@ export const LANGUAGE_ALIASES: Readonly<Record<string, string>> = Object.freeze(
   kannada: 'kn', kan: 'kn', kn: 'kn',
   bengali: 'bn', ben: 'bn', bn: 'bn',
   marathi: 'mr', mar: 'mr', mr: 'mr',
-  // Other major languages
+  // Spanish
   spanish: 'es', spa: 'es', es: 'es',
+  espanol: 'es', 'español': 'es', 'es-es': 'es', 'es-la': 'es',
+  // French
   french: 'fr', fre: 'fr', fra: 'fr', fr: 'fr',
+  francais: 'fr', 'français': 'fr', 'fr-fr': 'fr', 'fr-ca': 'fr',
+  // German
   german: 'de', ger: 'de', deu: 'de', de: 'de',
+  deutsch: 'de', 'de-de': 'de',
+  // Italian
+  italian: 'it', ita: 'it', it: 'it',
+  italiano: 'it', 'it-it': 'it',
+  // Japanese
   japanese: 'ja', jpn: 'ja', ja: 'ja',
+  // Korean
   korean: 'ko', kor: 'ko', ko: 'ko',
+  // Chinese
   chinese: 'zh', chi: 'zh', zho: 'zh', zh: 'zh',
+  'zh-cn': 'zh', 'zh-tw': 'zh',
+  // Arabic
   arabic: 'ar', ara: 'ar', ar: 'ar',
+  // Russian
   russian: 'ru', rus: 'ru', ru: 'ru',
+  // Portuguese
   portuguese: 'pt', por: 'pt', pt: 'pt',
-  'pt-br': 'pt', 'brazilian portuguese': 'pt',
+  'pt-br': 'pt', 'pt-pt': 'pt',
+  'brazilian-portuguese': 'pt', 'brazilian portuguese': 'pt', brazilian: 'pt',
+  'português': 'pt', portugues: 'pt',
+  // Turkish, Polish, Dutch, Swedish, Greek, Basque
+  turkish: 'tr', tur: 'tr', tr: 'tr',
+  polish: 'pl', pol: 'pl', pl: 'pl',
+  dutch: 'nl', nld: 'nl', dut: 'nl', nl: 'nl',
+  swedish: 'sv', swe: 'sv', sv: 'sv',
+  greek: 'el', ell: 'el', gre: 'el', el: 'el',
+  basque: 'eu', baq: 'eu', eus: 'eu', eu: 'eu',
+  // Multilingual & Unknown
   multi: 'multi', multilingual: 'multi', mul: 'multi',
   und: 'unknown', unknown: 'unknown',
 });
 
 export function normalizeSubtitleLanguage(rawLang: string | undefined): string {
   if (!rawLang || typeof rawLang !== 'string') return 'unknown';
-  const clean = rawLang.trim().toLowerCase().replace(/[._]/g, '-');
+
+  let clean = rawLang.trim().toLowerCase();
+  if (!clean) return 'unknown';
+
+  // Strip parenthetical/bracketed content (e.g. "English (US)" -> "English", "eng [cc]" -> "eng")
+  const stripped = clean.replace(/\([^)]*\)|\[[^\]]*\]/g, '').trim();
+  if (stripped) {
+    clean = stripped;
+  }
+
+  // Normalize delimiters (e.g. "eng eu" -> "eng-eu", "e_sub" -> "e-sub", "en.us" -> "en-us")
+  clean = clean.replace(/[._\s]+/g, '-');
+
   if (LANGUAGE_ALIASES[clean]) {
     return LANGUAGE_ALIASES[clean];
   }
+
+  // Handle prefix/subtag (e.g. "en-us" -> "en", "eng-eu" -> "eng", "es-la" -> "es")
   const hyphenIdx = clean.indexOf('-');
   if (hyphenIdx > 0) {
     const base = clean.slice(0, hyphenIdx);
@@ -54,6 +94,7 @@ export function normalizeSubtitleLanguage(rawLang: string | undefined): string {
       return LANGUAGE_ALIASES[base];
     }
   }
+
   return clean.length <= 3 ? clean : 'unknown';
 }
 
@@ -68,15 +109,36 @@ export function filterSubtitleTracks(
   if (!tracks || tracks.length === 0) return undefined;
   if (mode === 'none') return undefined;
   if (mode === 'all') return tracks;
+  if (mode === 'languages' && (!selectedLangs || selectedLangs.length === 0)) return tracks;
 
-  const allowed = new Set(selectedLangs.map((l) => l.trim().toLowerCase()));
+  // Build allowed set containing both normalized language codes and raw inputs
+  const allowed = new Set<string>();
+  for (const lang of selectedLangs) {
+    const raw = lang.trim().toLowerCase();
+    if (raw) {
+      allowed.add(raw);
+      const normalized = normalizeSubtitleLanguage(raw);
+      if (normalized && normalized !== 'unknown') {
+        allowed.add(normalized);
+      }
+    }
+  }
 
   const filtered = tracks.filter((track) => {
-    const norm = normalizeSubtitleLanguage(track.lang || track.label);
+    let norm = normalizeSubtitleLanguage(track.lang);
+    if (norm === 'unknown' && (track.label || track.title)) {
+      norm = normalizeSubtitleLanguage(track.label || track.title);
+    }
+
     if (norm === 'unknown') {
       return includeUnknown;
     }
-    return allowed.has(norm);
+
+    if (allowed.has(norm)) return true;
+    if (track.lang && allowed.has(track.lang.trim().toLowerCase())) return true;
+    if (track.label && allowed.has(track.label.trim().toLowerCase())) return true;
+
+    return false;
   });
 
   return filtered.length > 0 ? filtered : undefined;

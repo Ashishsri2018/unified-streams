@@ -62,7 +62,7 @@ describe('stream filters', () => {
     expect(filterStream(unknown, config)).toBeNull();
   });
 
-  it('never filters or rewrites inline stream subtitles', () => {
+  it('filters subtitle tracks while never dropping the stream itself', () => {
     const subtitles = [
       { id: 'en', url: 'https://sub.test/en.vtt', lang: 'en' },
       { id: 'hi', url: 'https://sub.test/hi.vtt', lang: 'hi' },
@@ -74,13 +74,27 @@ describe('stream filters', () => {
       subtitles,
     };
 
-    const modes: Array<StreamFilterConfig['subtitleMode']> = ['all', 'none', 'languages'];
+    // Mode: all preserves all subtitle tracks
+    const allResult = filterStream(stream, { ...baseConfig, subtitleMode: 'all' });
+    expect(allResult).not.toBeNull();
+    expect(allResult?.subtitles).toEqual(subtitles);
+    expect(allResult?.url).toBe('https://test/movie.mp4');
 
-    for (const subtitleMode of modes) {
-      const result = filterStream(stream, { ...baseConfig, subtitleMode, subtitleLangs: ['en'] });
-      expect(result).not.toBeNull();
-      expect(result?.subtitles).toEqual(subtitles);
-      expect(result?.url).toBe('https://test/movie.mp4');
-    }
+    // Mode: languages (en only, unknown included)
+    const langResult = filterStream(stream, {
+      ...baseConfig,
+      subtitleMode: 'languages',
+      subtitleLangs: ['en'],
+      includeUnknownSubtitleLang: true,
+    });
+    expect(langResult).not.toBeNull();
+    expect(langResult?.subtitles).toEqual([subtitles[0], subtitles[2]]);
+    expect(langResult?.url).toBe('https://test/movie.mp4');
+
+    // Mode: none strips subtitles but keeps stream intact
+    const noneResult = filterStream(stream, { ...baseConfig, subtitleMode: 'none' });
+    expect(noneResult).not.toBeNull();
+    expect(noneResult?.subtitles).toBeUndefined();
+    expect(noneResult?.url).toBe('https://test/movie.mp4');
   });
 });

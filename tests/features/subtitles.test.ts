@@ -33,10 +33,21 @@ describe('subtitle normalization and filtering', () => {
   it('normalizes various language aliases and codes', () => {
     expect(normalizeSubtitleLanguage('English')).toBe('en');
     expect(normalizeSubtitleLanguage('eng')).toBe('en');
+    expect(normalizeSubtitleLanguage('en')).toBe('en');
     expect(normalizeSubtitleLanguage('en-US')).toBe('en');
+    expect(normalizeSubtitleLanguage('eng-us')).toBe('en');
+    expect(normalizeSubtitleLanguage('eng eu')).toBe('en');
+    expect(normalizeSubtitleLanguage('en eu')).toBe('en');
+    expect(normalizeSubtitleLanguage('eng-eu')).toBe('en');
+    expect(normalizeSubtitleLanguage('English (US)')).toBe('en');
+    expect(normalizeSubtitleLanguage('English [CC]')).toBe('en');
     expect(normalizeSubtitleLanguage('E-Sub')).toBe('en');
     expect(normalizeSubtitleLanguage('ESub')).toBe('en');
     expect(normalizeSubtitleLanguage('Hindi')).toBe('hi');
+    expect(normalizeSubtitleLanguage('Spanish (Latin America)')).toBe('es');
+    expect(normalizeSubtitleLanguage('Español')).toBe('es');
+    expect(normalizeSubtitleLanguage('Français')).toBe('fr');
+    expect(normalizeSubtitleLanguage('Deutsch')).toBe('de');
     expect(normalizeSubtitleLanguage('Brazilian Portuguese')).toBe('pt');
     expect(normalizeSubtitleLanguage('pt-BR')).toBe('pt');
     expect(normalizeSubtitleLanguage(undefined)).toBe('unknown');
@@ -54,6 +65,9 @@ describe('subtitle normalization and filtering', () => {
     // mode: all
     expect(filterSubtitleTracks(tracks, 'all', [], false)).toEqual(tracks);
 
+    // mode: languages with empty selection (no selection = no filter)
+    expect(filterSubtitleTracks(tracks, 'languages', [], false)).toEqual(tracks);
+
     // mode: none
     expect(filterSubtitleTracks(tracks, 'none', [], false)).toBeUndefined();
 
@@ -66,5 +80,20 @@ describe('subtitle normalization and filtering', () => {
     const withUnknown = filterSubtitleTracks(tracks, 'languages', ['en'], true);
     expect(withUnknown).toHaveLength(2);
     expect(withUnknown?.map((t) => t.lang)).toEqual(['English', 'und']);
+
+    // mode: languages matching variants (eng, eng-us, English [CC])
+    const variantTracks: SubtitleTrack[] = [
+      { url: 'https://sub.test/en1.vtt', lang: 'eng-us' },
+      { url: 'https://sub.test/en2.vtt', lang: 'eng eu' },
+      { url: 'https://sub.test/en3.vtt', lang: 'English [CC]' },
+      { url: 'https://sub.test/es.vtt', lang: 'Spanish' },
+    ];
+    const matchedVariants = filterSubtitleTracks(variantTracks, 'languages', ['en'], false);
+    expect(matchedVariants).toHaveLength(3);
+    expect(matchedVariants?.map((t) => t.url)).toEqual([
+      'https://sub.test/en1.vtt',
+      'https://sub.test/en2.vtt',
+      'https://sub.test/en3.vtt',
+    ]);
   });
 });

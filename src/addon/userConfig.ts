@@ -93,13 +93,20 @@ function parseV1Config(v1: Record<string, unknown>): UserConfig {
 }
 
 export function toFilterConfig(config: UserConfig): StreamFilterConfig {
+  const subtitleMode =
+    config.subtitleMode === 'none'
+      ? 'none'
+      : config.subtitleLangs.length > 0
+        ? 'languages'
+        : 'all';
+
   return {
     minRes: config.minRes,
     maxRes: config.maxRes,
     includeUnknownRes: config.includeUnknownRes,
     maxSizeGB: config.maxSizeGB,
     includeUnknownSize: config.includeUnknownSize,
-    subtitleMode: config.subtitleMode,
+    subtitleMode,
     subtitleLangs: config.subtitleLangs,
     includeUnknownSubtitleLang: config.includeUnknownSubtitleLang,
   };
