@@ -73,6 +73,9 @@
   - [x] Create `.github/workflows/ci.yml`, `release.yml`, `rollback.yml`
   - [x] Create `scripts/apply-env.mjs` for one-shot bulk env import
   - [x] Configure dual Beamup + Railway CI/CD pipeline in `.github/workflows/ci.yml`
+  - [x] Integrate Railway project `melodious-tranquility` with disconnected GitHub webhooks (CI as single deploy source)
+  - [x] Configure platform-differentiated timeouts: 27s backend / 29s global on Railway vs 12s backend / 13s global on Beamup
+  - [x] Sync credentials (`RAILWAY_TOKEN`, `TMDB_API_KEY`, `GRAMCINEMA_TOKEN`, `FEBBOX_UI_COOKIE`) across GitHub Secrets, Dokku, and Railway
   - [x] Verify end-to-end tests, lint, typecheck, build
   - [x] Verify live runtime smoke test (Gateway on 7000, SA7 on 7001, Nuvio on 7002, Vega on 7003 — 89 active providers)
 
