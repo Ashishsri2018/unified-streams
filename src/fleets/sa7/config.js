@@ -25,9 +25,9 @@ module.exports = {
   tmdbCacheMaxEntries: envInt('TMDB_CACHE_MAX_ENTRIES', 5000, 1),
   maxPerProviderStreams: envInt('MAX_PER_PROVIDER_STREAMS', 100, 1),
   maxTotalStreams: envInt('MAX_TOTAL_STREAMS', 1000, 1),
-  onlyProviders: String(process.env.PROVIDERS || '')
+  disabledProviders: String(process.env.DISABLED_PROVIDERS || process.env.SA7_DISABLED_PROVIDERS || '')
     .split(',')
-    .map((s) => s.trim())
+    .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
   cinemetaUrl: (process.env.CINEMETA_URL || 'https://v3-cinemeta.strem.io').replace(/\/$/, ''),
   tmdbApiKey: process.env.TMDB_API_KEY || '',

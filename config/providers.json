@@ -1,21 +1,21 @@
 {
   "sa7": {
-    "mode": "allow",
+    "mode": "deny",
     "ids": [
-      "dahmermovies",
-      "dahmermovies-tv",
-      "desiflix",
-      "einthusan",
-      "kurage",
-      "movix-vf",
-      "multimovies",
-      "netmirror",
-      "playimdb",
-      "puretoons",
-      "redflix",
-      "toonstream",
-      "topcartoons",
-      "vidrock"
+      "moviesdrive",
+      "4khdhub",
+      "hdhub4u",
+      "vegamovies",
+      "castle",
+      "anizone",
+      "moviebox",
+      "moviesmod",
+      "torrentio",
+      "reanime",
+      "animeworld",
+      "animesalt",
+      "anizen",
+      "anikage"
     ]
   },
   "nuvio": {

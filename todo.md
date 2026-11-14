@@ -98,6 +98,8 @@
   - [x] Tune timeout budgets: 13s global deadline, 12s backend worker abort, 11s worker budget; add 🖥️ emoji to externalUrl stream titles
   - [x] Enforce HTML-only externalUrl classification: extensionless streams (e.g. dash-hls-bridge) remain in url, compressed files (zip, rar) remain in url with 🔲 emoji in name
   - [x] Live addon verification: tested 1 movie (Interstellar), 1 series (Breaking Bad S01E01), and 1 anime (Attack on Titan S01E01) on Beamup with 100% accurate 🖥️ tagging on externalUrl streams
+  - [x] Convert SA7 provider policy from allow-list to deny-list (`SA7_DISABLED_PROVIDERS`), aligning with Nuvio and Vega conventions
+  - [x] Enable instance-level environment variable overrides for disabled providers (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`) without requiring code changes
   - [ ] Monitor provider success/timeout rates via `/stats`
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs

@@ -298,3 +298,12 @@
     - Updated `.github/workflows/ci.yml` Dokku env sync to maintain disabled lists on Beamup deployments.
     - Added unit test `tests/features/disabledProviders.test.ts` testing quote stripping and list merging for both fleets.
     - Verified all 49 Vitest feature tests and full verification pipeline (`npm run verify`) pass.
+
+- Unified Fleet Disabled Providers System & SA7 Deny-List Migration:
+  - Migrated SA7 fleet from an allow-list (`SA7_PROVIDERS` / `PROVIDERS`) to a deny-list (`SA7_DISABLED_PROVIDERS` / `DISABLED_PROVIDERS`), aligning with Nuvio and Vega conventions.
+  - Updated `config/providers.json` so SA7 operates in `mode: "deny"` with the 14 duplicate scrapers (`moviesdrive, 4khdhub, hdhub4u, vegamovies, castle, anizone, moviebox, moviesmod, torrentio, reanime, animeworld, animesalt, anizen, anikage`) disabled, leaving the exact same 14 active scrapers (`dahmermovies, dahmermovies-tv, desiflix, einthusan, kurage, movix-vf, multimovies, netmirror, playimdb, puretoons, redflix, toonstream, topcartoons, vidrock`).
+  - Updated `scripts/check-provider-policy.mjs` to validate `policy.sa7.mode === 'deny'` and ensure `torrentio` is explicitly in `policy.sa7.ids`.
+  - Updated SA7 runtime (`src/fleets/sa7/config.js`, `src/fleets/sa7/providers.js`) to read `process.env.DISABLED_PROVIDERS || process.env.SA7_DISABLED_PROVIDERS || ''` and filter scrapers with `!disabled.has(p.id.toLowerCase())`.
+  - Enhanced `src/core/env.ts` with `SA7_DISABLED_PROVIDERS` schema definition, and refactored `deriveFleetEnv()` into modular helper functions (`cleanEnvList`, `deriveSa7Env`, `deriveNuvioEnv`, `deriveVegaEnv`) complying with the <150 LOC rule.
+  - Added quote-stripping and instance override merging for `SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, and `VEGA_DISABLED_PROVIDERS` allowing per-instance provider customization purely via environment variables.
+  - Added unit test coverage in `tests/features/disabledProviders.test.ts` and `tests/features/core.test.ts`; all 51 Vitest feature tests and `npm run verify` pass 100%.

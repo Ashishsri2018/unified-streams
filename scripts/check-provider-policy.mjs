@@ -84,6 +84,7 @@ function verifyPolicy() {
       if (policy.vega.ids.includes(target) && policy.vega.mode === 'deny') isDisabled = true;
       if (policy.nuvio.ids.includes(target) && policy.nuvio.mode === 'deny') isDisabled = true;
       if (!policy.sa7.ids.includes(target) && policy.sa7.mode === 'allow') isDisabled = true;
+      if (policy.sa7.ids.includes(target) && policy.sa7.mode === 'deny') isDisabled = true;
       if (!isDisabled) {
         throw new Error(`Default-disabled provider '${target}' must remain disabled`);
       }

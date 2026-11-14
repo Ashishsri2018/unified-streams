@@ -52,12 +52,12 @@ function clearProviderModuleCache(dir) {
 
 function buildRegistry() {
   const manifest = JSON.parse(fs.readFileSync(config.providerManifest, 'utf8'));
-  const allow = config.onlyProviders;
+  const disabled = new Set([
+    ...DISABLED_PROVIDER_IDS,
+    ...(config.disabledProviders || []),
+  ]);
   const entries = (manifest.providers || []).filter(
-    (p) =>
-      p.enabled !== false &&
-      !DISABLED_PROVIDER_IDS.has(p.id) &&
-      (allow.length === 0 || allow.includes(p.id))
+    (p) => p.enabled !== false && !disabled.has(p.id.toLowerCase())
   );
 
   const next = [];
@@ -71,9 +71,9 @@ function buildRegistry() {
     }
   }
 
-  const disabled = [...DISABLED_PROVIDER_IDS].join(', ') || 'none';
+  const disabledList = [...disabled].join(', ') || 'none';
   console.log(
-    `[providers] loaded ${next.length}/${entries.length} (disabled: ${disabled})`
+    `[providers] loaded ${next.length}/${entries.length} (disabled: ${disabledList})`
   );
   return next;
 }

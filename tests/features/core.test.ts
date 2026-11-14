@@ -15,6 +15,15 @@ describe('provider policy and concurrency', () => {
     expect(policy.isProviderEnabled('sa7', 'vidrock')).toBe(true);
     expect(policy.isProviderEnabled('sa7', 'unknown')).toBe(false);
 
+    // SA7 (deny mode)
+    const denyPolicy = new ProviderPolicy({
+      sa7: { mode: 'deny', ids: ['moviesdrive'] },
+      nuvio: { mode: 'deny', ids: ['bad_provider'] },
+      vega: { mode: 'deny', ids: ['torrentio'] },
+    });
+    expect(denyPolicy.isProviderEnabled('sa7', 'moviesdrive')).toBe(false);
+    expect(denyPolicy.isProviderEnabled('sa7', 'vidrock')).toBe(true);
+
     // Nuvio (deny mode)
     expect(policy.isProviderEnabled('nuvio', 'bad_provider')).toBe(false);
     expect(policy.isProviderEnabled('nuvio', 'good_provider')).toBe(true);

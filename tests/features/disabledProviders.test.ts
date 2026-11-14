@@ -41,4 +41,39 @@ describe('disabled providers derivation', () => {
     expect(disabled).toContain('torrentio');
     expect(disabled).toContain('disneyMirror');
   });
+
+  it('merges SA7_DISABLED_PROVIDERS and strips surrounding quotes', () => {
+    const rawList = "'redflix,desiflix,vidrock'";
+    const appEnv = loadAppEnv({
+      SA7_DISABLED_PROVIDERS: rawList,
+    });
+    const sa7Env = deriveFleetEnv(appEnv, 'sa7', 7001);
+
+    expect(sa7Env.DISABLED_PROVIDERS).toBeDefined();
+    const disabled = sa7Env.DISABLED_PROVIDERS.split(',');
+    expect(disabled).toContain('redflix');
+    expect(disabled).toContain('desiflix');
+    expect(disabled).toContain('vidrock');
+    expect(disabled).not.toContain("'redflix");
+    expect(disabled).not.toContain("vidrock'");
+    // Baseline deny list must also be preserved
+    expect(disabled).toContain('moviesdrive');
+    expect(disabled).toContain('torrentio');
+  });
+
+  it('allows customizing disabled providers per instance without code changes', () => {
+    const customAppEnv = loadAppEnv({
+      SA7_DISABLED_PROVIDERS: 'redflix',
+      NUVIO_DISABLED_SCRAPERS: 'fjoral',
+      VEGA_DISABLED_PROVIDERS: 'showbox',
+    });
+
+    const sa7Env = deriveFleetEnv(customAppEnv, 'sa7', 7001);
+    const nuvioEnv = deriveFleetEnv(customAppEnv, 'nuvio', 7002);
+    const vegaEnv = deriveFleetEnv(customAppEnv, 'vega', 7003);
+
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).toContain('redflix');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('fjoral');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('showbox');
+  });
 });

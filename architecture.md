@@ -114,7 +114,12 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
     3. Concurrently deploys to:
        - `deploy-beamup`: Syncs Dokku environment (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, `PUBLIC_BASE_URL`) and pushes to Beamup Dokku.
        - `deploy-railway`: Installs Railway CLI, syncs environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and triggers `railway up --service unified-streams --detach`.
-- **Active Fleets & Providers**: Canonical duplicate-excluded provider fleet enforced via `config/providers.json` and `config/provider-audit.csv` (SA7: 12-13, Nuvio: 31, Vega: 36-40) with redundant duplicate scrapers, torrent scrapers, and Internet Archive excluded.
+- **Active Fleets & Unified Disabled Providers System**:
+  - All three fleets (SA7, Nuvio, Vega) use a unified deny-list (`mode: "deny"`) architecture in `config/providers.json`.
+  - SA7 uses `SA7_DISABLED_PROVIDERS` (or internal `DISABLED_PROVIDERS`), dropping the legacy allow-list. Defaults disable the 14 duplicate scrapers (`moviesdrive,4khdhub,hdhub4u,vegamovies,castle,anizone,moviebox,moviesmod,torrentio,reanime,animeworld,animesalt,anizen,anikage`), leaving 14 active scrapers (`dahmermovies, dahmermovies-tv, desiflix, einthusan, kurage, movix-vf, multimovies, netmirror, playimdb, puretoons, redflix, toonstream, topcartoons, vidrock`).
+  - Nuvio uses `NUVIO_DISABLED_SCRAPERS` (or internal `DISABLED_SCRAPERS`), disabling 18 duplicates/BDIX/IA scrapers by default, leaving 31 active scrapers.
+  - Vega uses `VEGA_DISABLED_PROVIDERS` (or internal `DISABLED_PROVIDERS`), disabling `torrentio,internetArchive,youtube,katmovies,multi` by default, leaving 36 active scrapers.
+  - **Instance-Level Environment Overrides**: Any deployment instance (e.g. Beamup, Railway, local Docker) can selectively enable or disable scrapers across all three fleets purely via environment variables (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`) without requiring code changes. The core environment derivation (`src/core/env.ts`) automatically strips surrounding quotes, cleans comma-separated lists, and merges instance overrides with the base canonical policy.
 - **Platform Provider Compatibility & Beamup-Disabled Scrapers**:
   Targeted 6-title benchmark across both platforms identified 17 scrapers that work only on Railway (due to Beamup's ~14s reverse proxy cut-off and datacenter IP blocks) while succeeding on Railway:
   - **Vega (5)**: `4khdhub`, `autoEmbed`, `showbox`, `hdhub4u`, `vega`.
