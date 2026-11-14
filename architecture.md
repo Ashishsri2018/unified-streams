@@ -116,15 +116,20 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
        - `deploy-railway`: Installs Railway CLI, syncs environment variables (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and triggers `railway up --service unified-streams --detach`.
 - **Active Fleets & Unified Disabled Providers System**:
   - All three fleets (SA7, Nuvio, Vega) use a unified deny-list (`mode: "deny"`) architecture in `config/providers.json`.
-  - SA7 uses `SA7_DISABLED_PROVIDERS` (or internal `DISABLED_PROVIDERS`), dropping the legacy allow-list. Defaults disable the 14 duplicate scrapers (`moviesdrive,4khdhub,hdhub4u,vegamovies,castle,anizone,moviebox,moviesmod,torrentio,reanime,animeworld,animesalt,anizen,anikage`), leaving 14 active scrapers (`dahmermovies, dahmermovies-tv, desiflix, einthusan, kurage, movix-vf, multimovies, netmirror, playimdb, puretoons, redflix, toonstream, topcartoons, vidrock`).
-  - Nuvio uses `NUVIO_DISABLED_SCRAPERS` (or internal `DISABLED_SCRAPERS`), disabling 18 duplicates/BDIX/IA scrapers by default, leaving 31 active scrapers.
-  - Vega uses `VEGA_DISABLED_PROVIDERS` (or internal `DISABLED_PROVIDERS`), disabling `torrentio,internetArchive,youtube,katmovies,multi` by default, leaving 36 active scrapers.
-  - **Instance-Level Environment Overrides**: Any deployment instance (e.g. Beamup, Railway, local Docker) can selectively enable or disable scrapers across all three fleets purely via environment variables (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`) without requiring code changes. The core environment derivation (`src/core/env.ts`) automatically strips surrounding quotes, cleans comma-separated lists, and merges instance overrides with the base canonical policy.
-- **Platform Provider Compatibility & Beamup-Disabled Scrapers**:
-  Targeted 6-title benchmark across both platforms identified 17 scrapers that work only on Railway (due to Beamup's ~14s reverse proxy cut-off and datacenter IP blocks) while succeeding on Railway:
-  - **Vega (5)**: `4khdhub`, `autoEmbed`, `showbox`, `hdhub4u`, `vega`.
-  - **Nuvio (12)**: `fjoral`, `xylos`, `maelith`, `xandril`, `vitrix`, `ozeris`, `ilvyrel`, `solunix`, `qorva`, `lenyr`, `phraxis`, `praxiel`.
-  - Configured exclusively on Beamup via Dokku environment variables `NUVIO_DISABLED_SCRAPERS` and `VEGA_DISABLED_PROVIDERS`, keeping Railway enabled for all available providers.
+  - **Railway Instance Routing (Primary)**:
+    - SA7 (14 active): 14 duplicate scrapers disabled (`moviesdrive, 4khdhub, hdhub4u, vegamovies, castle, anizone, moviebox, moviesmod, torrentio, reanime, animeworld, animesalt, anizen, anikage`), leaving 14 active scrapers (`dahmermovies, dahmermovies-tv, desiflix, einthusan, kurage, movix-vf, multimovies, netmirror, playimdb, puretoons, redflix, toonstream, topcartoons, vidrock`).
+    - Nuvio (30 active): Baseline 20 duplicates/BDIX/dead scrapers + `sylphera` disabled (21 disabled), leaving 30 active scrapers.
+    - Vega (25 active): Baseline 13 torrent/IA/youtube/duplicate scrapers + `animeworld, movies4u, luxMovies` (and `rogmovies`) disabled (16 disabled), leaving 25 active scrapers.
+    - Total active providers on Railway = **69 providers**.
+  - **Beamup Instance Routing (4 Exclusive Providers)**:
+    - To eliminate Beamup proxy timeouts (~14s cut-off) and IP blocks while preserving high-yield Beamup-exclusive scrapers, Beamup runs **strictly 4 active providers**:
+      - `nuvio`: `sylphera` (1 active).
+      - `vega`: `animeworld`, `movies4u`, `luxMovies` (RogMovies) (3 active).
+      - `sa7`: All 28 providers disabled (0 active).
+    - Enforced via Dokku environment variables (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`).
+  - **Instance-Level Environment Overrides & Alias Mapping**:
+    - Any deployment instance can selectively customize scrapers purely via environment variables without requiring code changes.
+    - In `src/core/env.ts`, `deriveVegaEnv` automatically aliases `rogmovies` / `rogmovie` to `luxMovies` (and vice-versa), ensuring consistent scraper targeting across fleets. Quotes are stripped and lists are merged with base canonical policy.
 - **Provider Credentials Pipeline**:
   - `FEBBOX_UI_COOKIE`: Ingested by gateway from environment / GitHub Actions secrets, formatted as `ui=<token>`, and passed to Vega worker via `PROVIDER_SETTINGS_JSON.kv.febboxCookie` for authenticated Showbox streams.
   - `GRAMCINEMA_TOKEN`: Ingested by gateway from environment / GitHub Actions secrets, stripped of `gc_session=` or `Bearer ` prefixes, and forwarded to Nuvio worker via `SCRAPER_SETTINGS_JSON.fjoral.cinemaTvToken` for authenticated GramCinema (`bollywood.eu.org`) streams. `fjoral` resolution settings default `enable720p`, `enable1080p`, and `enable2160p` to true.

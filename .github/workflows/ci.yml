@@ -99,8 +99,10 @@ jobs:
           [ -n "$FEBBOX_UI_COOKIE" ] && CONFIG_PAIRS+=("FEBBOX_UI_COOKIE='$FEBBOX_UI_COOKIE'")
           [ -n "$GRAMCINEMA_TOKEN" ] && CONFIG_PAIRS+=("GRAMCINEMA_TOKEN='$GRAMCINEMA_TOKEN'")
           [ -n "$PUBLIC_BASE_URL" ] && CONFIG_PAIRS+=("PUBLIC_BASE_URL='$PUBLIC_BASE_URL'")
-          CONFIG_PAIRS+=("NUVIO_DISABLED_SCRAPERS=fjoral,xylos,maelith,xandril,vitrix,ozeris,ilvyrel,solunix,qorva,lenyr,phraxis,praxiel")
-          CONFIG_PAIRS+=("VEGA_DISABLED_PROVIDERS=4khdhub,autoEmbed,showbox,hdhub4u,vega")
+          # Beamup: Strictly keep only 4 providers active (Vega: animeworld, movies4u, luxMovies/RogMovies; Nuvio: sylphera; SA7: all disabled)
+          CONFIG_PAIRS+=("SA7_DISABLED_PROVIDERS=moviesdrive,4khdhub,hdhub4u,vegamovies,castle,redflix,kurage,anizone,desiflix,dahmermovies,dahmermovies-tv,moviebox,moviesmod,movix-vf,playimdb,topcartoons,torrentio,vidrock,reanime,animeworld,animesalt,anizen,netmirror,anikage,multimovies,toonstream,puretoons,einthusan")
+          CONFIG_PAIRS+=("NUVIO_DISABLED_SCRAPERS=brellor,bdix-cf,bdix-df,durnel,esvyl,evyrith,fastrion,fendrix,bdix-fh,fjoral,fyron,gravix,haylox,hexion,ilvyrel,jhaeros,jyniq,karnis,kethrax,kryxalia,lenyr,lyrin,maelith,mavonyx,novus,nyxora,onyxia,ozeris,phraxis,praxiel,pynvix,qorva,quinox,qyrvaen,rylvane,rynara,solunix,soryn,svartok,tyvrel,vornix,vyranel,waelum,wrenok,xandril,xylos,zevran,zyrvael")
+          CONFIG_PAIRS+=("VEGA_DISABLED_PROVIDERS=vega,autoEmbed,drive,multi,4khdhub,1cinevood,world4u,katmovies,mod,uhd,protonMovies,cinemaLuxe,filmyfly,movieBox,movieBoxWeb,gokuHD,dramacool,mkvDrama,eonMovies,kmMovies,zeefliz,katMovieFix,ringz,netflixMirror,primeMirror,disneyMirror,hdhub4u,ogomovies,a111477,vadapav,moviesApi,moviezwap,showbox,ridoMovies,flixhq,primewire,hiAnime,animetsu,tokyoInsider,kissKh,dooflix,topmovies,guardahd,skyMovieHD,Joya9tv,uniquestream,torrentio,cinefreak,anikoto,kickAssAnime,animesub,everything,castle,animesalt,movielinkdb,mxplayer,youtube,kartoons,1flex,internetArchive,rareanimes")
           if [ ${#CONFIG_PAIRS[@]} -gt 0 ]; then
             set +e
             output=$(ssh -o StrictHostKeyChecking=no dokku@a.baby-beamup.club "config:set $APP ${CONFIG_PAIRS[*]}" 2>&1)

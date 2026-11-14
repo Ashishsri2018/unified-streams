@@ -76,4 +76,25 @@ describe('disabled providers derivation', () => {
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('fjoral');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('showbox');
   });
+
+  it('maps rogmovies / rogmovie alias to luxMovies in Vega disabled list', () => {
+    const appEnv = loadAppEnv({
+      VEGA_DISABLED_PROVIDERS: 'rogmovies',
+    });
+    const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
+    const disabled = vegaEnv.DISABLED_PROVIDERS.split(',');
+    expect(disabled).toContain('rogmovies');
+    expect(disabled).toContain('luxMovies');
+  });
+
+  it('verifies baseline policy has sylphera, animeworld, movies4u, and luxMovies disabled by default', () => {
+    const defaultEnv = loadAppEnv({});
+    const nuvioEnv = deriveFleetEnv(defaultEnv, 'nuvio', 7002);
+    const vegaEnv = deriveFleetEnv(defaultEnv, 'vega', 7003);
+
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('sylphera');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('animeworld');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('movies4u');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('luxMovies');
+  });
 });

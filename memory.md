@@ -307,3 +307,17 @@
   - Enhanced `src/core/env.ts` with `SA7_DISABLED_PROVIDERS` schema definition, and refactored `deriveFleetEnv()` into modular helper functions (`cleanEnvList`, `deriveSa7Env`, `deriveNuvioEnv`, `deriveVegaEnv`) complying with the <150 LOC rule.
   - Added quote-stripping and instance override merging for `SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, and `VEGA_DISABLED_PROVIDERS` allowing per-instance provider customization purely via environment variables.
   - Added unit test coverage in `tests/features/disabledProviders.test.ts` and `tests/features/core.test.ts`; all 51 Vitest feature tests and `npm run verify` pass 100%.
+
+- Platform-Differentiated Provider Allocation (4-Active on Beamup vs Primary on Railway):
+  - Beamup: Configured strictly 4 active providers across the entire addon to avoid ~14s proxy cut-offs and datacenter IP blocks while preserving high-yield Beamup-exclusive scrapers:
+    - `nuvio`: `sylphera` (1 active).
+    - `vega`: `animeworld`, `movies4u`, `luxMovies` (RogMovies) (3 active).
+    - `sa7`: All 28 providers disabled (0 active).
+    - Total active on Beamup = 4 providers.
+  - Railway: Configured as the primary workhorse instance:
+    - Disabled the 4 Beamup-dedicated scrapers (`sylphera` in Nuvio; `animeworld`, `movies4u`, `luxMovies`/`rogmovies` in Vega).
+    - Preserved disabled status for duplicates, Internet Archive, YouTube, and torrent scrapers.
+    - All other scrapers stay active: SA7 has 14 active, Nuvio has 30 active, Vega has 25 active (69 active providers total).
+  - Aliasing in `src/core/env.ts`: `deriveVegaEnv()` automatically maps `rogmovies` and `rogmovie` to `luxMovies` (and vice-versa).
+  - Updated `config/providers.json`, `config/defaults.env`, `.env.example`, `.github/workflows/ci.yml`.
+  - Added unit tests in `tests/features/disabledProviders.test.ts`; all 53 Vitest feature tests and `npm run verify` pass 100%.

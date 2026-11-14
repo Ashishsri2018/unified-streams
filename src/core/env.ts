@@ -191,8 +191,18 @@ function deriveVegaEnv(
   workerDeadlineMs: number,
 ): void {
   const extraDisabled = cleanEnvList(env.VEGA_DISABLED_PROVIDERS);
+  const mappedExtra: string[] = [];
+  for (const item of extraDisabled) {
+    mappedExtra.push(item);
+    const lower = item.toLowerCase();
+    if (lower === 'rogmovies' || lower === 'rogmovie') {
+      mappedExtra.push('luxMovies');
+    } else if (lower === 'luxmovies') {
+      mappedExtra.push('rogmovies');
+    }
+  }
   const baseline = vegaDeny ? vegaDeny.split(',').map((s) => s.trim()) : [];
-  const list = Array.from(new Set([...baseline, ...extraDisabled])).filter(Boolean).join(',');
+  const list = Array.from(new Set([...baseline, ...mappedExtra])).filter(Boolean).join(',');
   if (list) {
     outEnv.DISABLED_PROVIDERS = list;
     outEnv.VEGA_DISABLED_PROVIDERS = list;

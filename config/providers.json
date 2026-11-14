@@ -40,7 +40,8 @@
       "soryn",
       "vornix",
       "zevran",
-      "zyrvael"
+      "zyrvael",
+      "sylphera"
     ]
   },
   "vega": {
@@ -58,7 +59,10 @@
       "world4u",
       "netflixMirror",
       "primeMirror",
-      "disneyMirror"
+      "disneyMirror",
+      "animeworld",
+      "movies4u",
+      "luxMovies"
     ]
   }
 }

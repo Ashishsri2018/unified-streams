@@ -100,6 +100,7 @@
   - [x] Live addon verification: tested 1 movie (Interstellar), 1 series (Breaking Bad S01E01), and 1 anime (Attack on Titan S01E01) on Beamup with 100% accurate 🖥️ tagging on externalUrl streams
   - [x] Convert SA7 provider policy from allow-list to deny-list (`SA7_DISABLED_PROVIDERS`), aligning with Nuvio and Vega conventions
   - [x] Enable instance-level environment variable overrides for disabled providers (`SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, `VEGA_DISABLED_PROVIDERS`) without requiring code changes
+  - [x] Configure 4-provider exclusive routing on Beamup (Vega: animeworld, movies4u, luxMovies/RogMovies; Nuvio: sylphera; SA7: disabled) and primary routing on Railway (excluding Beamup 4, duplicates, IA, YouTube, torrents)
   - [ ] Monitor provider success/timeout rates via `/stats`
   - [ ] Conduct weekly review of failing providers (>30% timeouts or >50% errors)
   - [ ] Swap underperforming providers with reserve pool providers via reversible `config/providers.json` PRs
