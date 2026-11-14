@@ -267,5 +267,8 @@
   - Configured Dual-Target CI/CD in `.github/workflows/ci.yml`:
     - Updated pipeline to run `deploy-beamup` and `deploy-railway` in parallel upon successful completion of `verify` and `docker` smoke test.
     - `deploy-railway` installs Railway CLI, syncs environment secrets (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and initiates deployment via `railway up --service unified-streams --detach`.
-    - Enabled `checkSuites: true` on the Railway GitHub deployment trigger so Railway adheres to GitHub Actions verification gates.
-    - Updated `architecture.md` to document the dual Beamup + Railway production deployment architecture.
+    - Disconnected direct GitHub webhook trigger on Railway so that GitHub Actions CI/CD serves as the single source of truth for deployments.
+    - Added GitHub Actions repository secret `RAILWAY_TOKEN` and refreshed `TMDB_API_KEY`, `GRAMCINEMA_TOKEN`, and `FEBBOX_UI_COOKIE`.
+    - Synced credentials directly to Railway service `unified-streams` and Dokku on Beamup.
+    - Pushed commit `5247b9f` to `main` and verified end-to-end GitHub Actions workflow execution (run `43538995079`): `Verify` (17s), `Docker Build & Smoke Test` (30s), `Deploy to Railway` (15s), and `Deploy to Beamup` (3m2s) all passed successfully.
+    - Verified live HTTP 200 responses on both Railway (`https://unified-streams-production.up.railway.app/manifest.json`) and Beamup (`https://a38b6dd4fcd1-unified-streams-docker.baby-beamup.club/manifest.json`).
