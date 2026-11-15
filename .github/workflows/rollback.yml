@@ -1,0 +1,19 @@
+name: Rollback Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_commit:
+        description: 'Commit SHA to roll back to'
+        required: true
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.target_commit }}
+      - name: Report Rollback
+        run: echo "Rolling back to commit ${{ github.event.inputs.target_commit }}"

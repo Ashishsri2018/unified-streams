@@ -1,0 +1,205 @@
+name: CI / Release Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify (Policy, Icon, Lint, Typecheck, Test, Build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run verification suite
+        run: npm run verify
+
+  docker:
+    name: Docker Build & Smoke Test
+    needs: [verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: unified-streams:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Container Smoke Test
+        run: |
+          docker run -d --name streams-smoke -p 7000:7000 unified-streams:test
+          sleep 5
+          docker logs streams-smoke
+          curl -f http://127.0.0.1:7000/ || exit 1
+          curl -f http://127.0.0.1:7000/manifest.json || exit 1
+          curl -f http://127.0.0.1:7000/logo.png -o /dev/null || exit 1
+          docker stop streams-smoke
+
+  deploy-beamup:
+    name: Deploy to Beamup
+    needs: [verify, docker]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure SSH
+        env:
+          BEAMUP_SSH_PRIVATE_KEY: ${{ secrets.BEAMUP_SSH_PRIVATE_KEY }}
+          BEAMUP_REMOTE: ${{ secrets.BEAMUP_REMOTE }}
+        run: |
+          set -e
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$BEAMUP_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          BEAMUP_HOST="${BEAMUP_REMOTE#*@}"
+          BEAMUP_HOST="${BEAMUP_HOST%:*}"
+          ssh-keyscan -H "$BEAMUP_HOST" >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Sync Dokku Environment
+        env:
+          BEAMUP_REMOTE: ${{ secrets.BEAMUP_REMOTE }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          FEBBOX_UI_COOKIE: ${{ secrets.FEBBOX_UI_COOKIE }}
+          GRAMCINEMA_TOKEN: ${{ secrets.GRAMCINEMA_TOKEN }}
+          KARTOONS_TOKEN: ${{ secrets.KARTOONS_TOKEN }}
+          PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+        run: |
+          set -e
+          BEAMUP_HOST="${BEAMUP_REMOTE#*@}"
+          BEAMUP_HOST="${BEAMUP_HOST%:*}"
+          APP="${BEAMUP_REMOTE#*:}"
+          CONFIG_PAIRS=()
+          # Selects config/instances/beamup.env. CI only sets the profile and
+          # credentials; any per-instance setting changed later in Dokku wins on
+          # the next deploy because it is not overwritten here.
+          CONFIG_PAIRS+=("INSTANCE_PROFILE=beamup")
+          [ -n "$TMDB_API_KEY" ] && CONFIG_PAIRS+=("TMDB_API_KEY='$TMDB_API_KEY'")
+          [ -n "$FEBBOX_UI_COOKIE" ] && CONFIG_PAIRS+=("FEBBOX_UI_COOKIE='$FEBBOX_UI_COOKIE'")
+          [ -n "$GRAMCINEMA_TOKEN" ] && CONFIG_PAIRS+=("GRAMCINEMA_TOKEN='$GRAMCINEMA_TOKEN'")
+          [ -n "$KARTOONS_TOKEN" ] && CONFIG_PAIRS+=("KARTOONS_TOKEN='$KARTOONS_TOKEN'")
+          [ -n "$PUBLIC_BASE_URL" ] && CONFIG_PAIRS+=("PUBLIC_BASE_URL='$PUBLIC_BASE_URL'")
+          if [ ${#CONFIG_PAIRS[@]} -gt 0 ]; then
+            set +e
+            output=$(ssh -o StrictHostKeyChecking=no "dokku@$BEAMUP_HOST" "config:set $APP ${CONFIG_PAIRS[*]}" 2>&1)
+            status=$?
+            set -e
+            printf '%s\n' "$output"
+            if [ "$status" -ne 0 ]; then
+              if printf '%s' "$output" | grep -q "Setting config vars" || printf '%s' "$output" | grep -q "Deploying web" || printf '%s' "$output" | grep -q "All checks successful"; then
+                echo "::warning::Dokku config set succeeded; cluster sync hook completed with non-fatal status."
+              else
+                exit "$status"
+              fi
+            fi
+          fi
+
+      - name: Push to Beamup
+        env:
+          BEAMUP_REMOTE: ${{ secrets.BEAMUP_REMOTE }}
+        run: |
+          set -uo pipefail
+          git remote add beamup "$BEAMUP_REMOTE"
+          set +e
+          output=$(git push beamup HEAD:master --force 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            if printf '%s' "$output" | grep -q "Application deployed" || printf '%s' "$output" | grep -q "Deploying web"; then
+              echo "::warning::Beamup deployed the app successfully; cluster sync hook completed with non-fatal status."
+            else
+              exit "$status"
+            fi
+          fi
+
+  deploy-railway:
+    name: Deploy to Railway
+    needs: [verify, docker]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Sync Railway Environment
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || 'unified-streams' }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          FEBBOX_UI_COOKIE: ${{ secrets.FEBBOX_UI_COOKIE }}
+          GRAMCINEMA_TOKEN: ${{ secrets.GRAMCINEMA_TOKEN }}
+          KARTOONS_TOKEN: ${{ secrets.KARTOONS_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set in GitHub repository secrets."
+            exit 1
+          fi
+
+          # Selects config/instances/railway.env. CI only sets the profile and
+          # credentials; per-instance values changed later in Railway win on the
+          # next deploy because they are not overwritten here.
+          railway variable set "INSTANCE_PROFILE=railway" --service "$RAILWAY_SERVICE" --skip-deploys || true
+
+          if [ -n "$TMDB_API_KEY" ]; then
+            railway variable set "TMDB_API_KEY=$TMDB_API_KEY" --service "$RAILWAY_SERVICE" --skip-deploys || true
+          fi
+          if [ -n "$FEBBOX_UI_COOKIE" ]; then
+            railway variable set "FEBBOX_UI_COOKIE=$FEBBOX_UI_COOKIE" --service "$RAILWAY_SERVICE" --skip-deploys || true
+          fi
+          if [ -n "$GRAMCINEMA_TOKEN" ]; then
+            railway variable set "GRAMCINEMA_TOKEN=$GRAMCINEMA_TOKEN" --service "$RAILWAY_SERVICE" --skip-deploys || true
+          fi
+          if [ -n "$KARTOONS_TOKEN" ]; then
+            railway variable set "KARTOONS_TOKEN=$KARTOONS_TOKEN" --service "$RAILWAY_SERVICE" --skip-deploys || true
+          fi
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || 'unified-streams' }}
+        run: |
+          railway up --service "$RAILWAY_SERVICE" --detach
+

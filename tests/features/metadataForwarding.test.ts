@@ -1,0 +1,98 @@
+import { describe, it, expect, vi } from 'vitest';
+import { WorkerClient } from '../../src/core/workerClient.js';
+import { INTERNAL_HEADERS } from '../../src/core/contract.js';
+import { parseCanonicalYear } from '../../src/core/metadata.js';
+
+describe('Metadata Forwarding between Gateway and Loopback Workers', () => {
+  it('attaches metadata headers in WorkerClient.fetchStream', async () => {
+    let capturedHeaders: Headers | undefined;
+
+    const mockFetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      capturedHeaders = new Headers(init?.headers);
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ streams: [] }),
+      });
+    });
+
+    vi.stubGlobal('fetch', mockFetch);
+
+    const client = new WorkerClient({
+      fleet: 'nuvio',
+      baseUrl: 'http://127.0.0.1:7002',
+      internalToken: 'secret',
+    });
+
+    await client.fetchStream(
+      'movie',
+      'tt1375666',
+      '',
+      5000,
+      'req-test',
+      {
+        title: 'Inception',
+        year: 2010,
+        tmdbId: 27205,
+        imdbId: 'tt1375666',
+      },
+    );
+
+    expect(capturedHeaders).toBeDefined();
+    expect(capturedHeaders?.get(INTERNAL_HEADERS.REQUEST_ID)).toBe('req-test');
+    expect(capturedHeaders?.get(INTERNAL_HEADERS.META_TITLE)).toBe(encodeURIComponent('Inception'));
+    expect(capturedHeaders?.get(INTERNAL_HEADERS.META_YEAR)).toBe('2010');
+    expect(capturedHeaders?.get(INTERNAL_HEADERS.META_TMDB_ID)).toBe('27205');
+    expect(capturedHeaders?.get(INTERNAL_HEADERS.META_IMDB_ID)).toBe('tt1375666');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('sanitizes string year containing non-ASCII en-dash (e.g. 2019–) to valid ASCII year', async () => {
+    let capturedHeaders: Headers | undefined;
+
+    const mockFetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      capturedHeaders = new Headers(init?.headers);
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ streams: [] }),
+      });
+    });
+
+    vi.stubGlobal('fetch', mockFetch);
+
+    const client = new WorkerClient({
+      fleet: 'nuvio',
+      baseUrl: 'http://127.0.0.1:7002',
+    });
+
+    await client.fetchStream(
+      'series',
+      'tt9561862:1:1',
+      '',
+      5000,
+      'req-test-dash',
+      {
+        title: 'Love, Death & Robots',
+        year: '2019–' as unknown as number,
+        tmdbId: 86831,
+        imdbId: 'tt9561862',
+      },
+    );
+
+    expect(capturedHeaders?.get(INTERNAL_HEADERS.META_YEAR)).toBe('2019');
+    expect(capturedHeaders?.get(INTERNAL_HEADERS.META_TMDB_ID)).toBe('86831');
+    expect(capturedHeaders?.get(INTERNAL_HEADERS.META_TITLE)).toBe(encodeURIComponent('Love, Death & Robots'));
+
+    vi.unstubAllGlobals();
+  });
+
+  it('correctly parses various year formats with parseCanonicalYear', () => {
+    expect(parseCanonicalYear(2019)).toBe(2019);
+    expect(parseCanonicalYear('2019–')).toBe(2019);
+    expect(parseCanonicalYear('2008–2013')).toBe(2008);
+    expect(parseCanonicalYear('2019-2022')).toBe(2019);
+    expect(parseCanonicalYear('invalid')).toBeUndefined();
+    expect(parseCanonicalYear(null)).toBeUndefined();
+    expect(parseCanonicalYear(undefined)).toBeUndefined();
+  });
+});

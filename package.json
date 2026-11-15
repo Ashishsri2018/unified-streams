@@ -1,0 +1,47 @@
+{
+  "name": "unified-streams",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unified Stremio stream addon combining SA7, Nuvio, and Vega provider fleets",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint src tests scripts vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:feature": "vitest run tests/features",
+    "policy:check": "node scripts/check-provider-policy.mjs",
+    "check:icon": "node scripts/check-icon.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/copy-fleet-assets.mjs",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "verify": "npm run policy:check && npm run check:icon && npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "compression": "^1.8.2",
+    "crypto-js": "^4.2.0",
+    "express": "^4.21.2",
+    "undici": "^7.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/compression": "^1.8.1",
+    "@types/crypto-js": "^4.2.2",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.13.0",
+    "@types/supertest": "^6.0.3",
+    "eslint": "^9.20.0",
+    "globals": "^15.15.0",
+    "supertest": "^7.1.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0",
+    "vitest": "^3.0.5"
+  }
+}

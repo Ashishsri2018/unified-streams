@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Unified Streams">
+  <defs>
+    <linearGradient id="gradient-stream" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="50%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background with safe padding for rounded/circular client masks -->
+  <rect width="512" height="512" rx="112" fill="#0b1020"/>
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="url(#glow)"/>
+  
+  <!-- Flow / Stream paths -->
+  <path d="M104 188c48-56 116-84 192-76 52 6 100 28 136 62l-56 60c-24-22-54-36-88-40-50-6-96 12-126 46z" fill="url(#gradient-stream)"/>
+  <path d="M112 328c36 40 88 62 144 60 50-2 96-22 128-56l52 54c-46 50-112 78-182 78-78 0-148-34-194-90z" fill="url(#gradient-stream)" opacity="0.88"/>
+  
+  <!-- Central stream pulse core -->
+  <rect x="232" y="196" width="48" height="140" rx="24" fill="#f8fafc"/>
+  <circle cx="256" cy="392" r="24" fill="#f8fafc"/>
+</svg>

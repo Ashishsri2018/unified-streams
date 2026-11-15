@@ -1,0 +1,605 @@
+# Unified Streams Memory Log
+
+- Fix Vega Exclusive-OR Rejection on Forwarded TMDB IDs (Session Nov 15 2026):
+  - Investigated user report of "nothing from vega" despite SA7 and Nuvio returning 38 streams for *Love, Death & Robots* (`tt9561862:1:1`).
+  - Diagnosed root cause in `src/fleets/vega/pipeline/streamHandler.ts`:
+    1. Line 156 of `parseRequest` checked: `if ((imdbId === null) === (tmdbId === null)) return null;`.
+    2. When gateway forwarded `x-meta-tmdb-id`, Vega attached `tmdbId` to the IMDb stream request so both `imdbId` and `tmdbId` were present.
+    3. Because both were non-null, `(false) === (false)` evaluated to `true`, causing `parseRequest` to reject the request and return `null`.
+    4. `pipeline.handle()` immediately aborted with `return []` at line 381 before incrementing `metrics.requests` (which is why `vega.metrics.requests` remained 0).
+  - Fixed in `src/fleets/vega/pipeline/streamHandler.ts`:
+    - Updated condition to `if (imdbId === null && tmdbId === null) return null;` ensuring requests with both `imdbId` and `tmdbId` are preserved and passed to providers.
+    - Updated `ImdbStreamRequest` in `src/fleets/vega/types.ts` to include optional `tmdbId?: number`.
+    - Added unit test in `tests/features/vegaTelemetry.test.ts` verifying `pipeline.handle` accepts and completes requests with both identifiers.
+  - Verified via `npm run verify`: 25/25 suites passed (146/146 tests passed).
+
+- Fix Series Undici ByteString Crash & Wire Vega TMDB Series Metadata (Session Nov 15 2026):
+  - Investigated user report of *Love, Death & Robots* (`tt9561862:1:1`) returning empty streams on Railway/production while TMDB ID (`tmdb:86831:1:1`) returned 134KB of working streams.
+  - Root Cause Diagnosed:
+    1. Cinemeta represents TV series year ranges with Unicode en-dashes (`\u2013`, code point 8211), e.g., `"2019–"`.
+    2. In `src/core/metadata.ts`, `CanonicalMetadata.year` was stored as raw string instead of numeric integer.
+    3. `WorkerClient.buildHeaders` set `headers['x-meta-year'] = String(metadata.year)`.
+    4. Node.js native `fetch()` (Undici) rejected the header value: `TypeError: Cannot convert argument to a ByteString because the character at index 4 has a value of 8211 which is greater than 255`.
+    5. This resulted in an immediate 0ms failure across all 3 workers (`outcome: 'error'`), returning `{"streams":[]}` before any worker was contacted.
+  - Solutions Implemented:
+    1. `src/core/metadata.ts`: Added `parseCanonicalYear(raw: unknown): number | undefined` extracting 4-digit numeric year.
+    2. `src/core/workerClient.ts`: Hardened `buildHeaders` to strictly sanitize `x-meta-year` to ASCII integer digits only and sanitize `x-meta-tmdb-id` and `x-meta-imdb-id`.
+    3. `src/addon/classifier.ts`, `src/addon/subtitles.ts`, `src/fleets/nuvio/addon/urlClassifier.ts`, `src/fleets/vega/pipeline/urlClassifier.ts`: Fixed interface re-exports with `export type { ... }` to eliminate TypeScript ESM build errors.
+    4. `src/fleets/vega/worker.ts` & `src/fleets/vega/pipeline/streamHandler.ts`: Wired `x-meta-tmdb-id` to Vega `streamRequest`, enabling TMDB season episode metadata fetching (episode title lookup) for series matching against scrapers like ShowBox.
+    5. `src/addon/health.ts`: Connected `cache.metadata` in health report to `ctx.metadataResolver.getStats()`.
+    6. `tests/features/metadataForwarding.test.ts`: Added unit tests verifying en-dash string sanitization into clean integer years.
+  - Verified full verification suite locally via `npm run verify`:
+    - `policy:check`: OK
+    - `check:icon`: OK
+    - `lint`: OK
+    - `typecheck`: OK
+    - `test`: 25/25 test suites passed (145/145 tests passed)
+    - `build`: OK
+
+- Fix Vega Telemetry Abort Handling & Verify Pipeline (Session Nov 15 2026):
+  - Investigated CI run failure in `tests/features/vegaTelemetry.test.ts` (`expected stat?.skipped to be 1, received 0`):
+    - Identified that `withTimeout` in `src/fleets/vega/util/concurrency.ts` did not listen to the passed `signal`. When `pipeline.handle` hit its deadline and aborted `controller`, `invoke`'s `withTimeout` continued waiting for its own timer (`timeoutMs = remaining + 50ms`), postponing provider finalization and telemetry recording past the test's fixed 200ms wait.
+    - Updated `withTimeout` in `src/fleets/vega/util/concurrency.ts` to accept optional `signal?: AbortSignal`, immediately cleaning up and rejecting on abort.
+    - Wired `signal` into `withTimeout` call in `src/fleets/vega/pipeline/streamHandler.ts`.
+    - Made `tests/features/vegaTelemetry.test.ts` resilient against runner scheduling jitter by polling for `stat?.skipped === 1` up to 2000ms in 50ms increments.
+  - Executed full verification suite locally via `npm run verify`:
+    - `policy:check`: OK
+    - `check:icon`: OK
+    - `lint`: OK
+    - `typecheck`: OK
+    - `test`: 25/25 test suites passed (143/143 tests passed)
+    - `build`: OK
+
+- Fix CI Pipeline Verification Failures (Session Nov 15 2026):
+  - Investigated failed GitHub Actions CI run `43627312515` on push to `main` (`4d4179f`).
+  - Identified two root causes in CI's `Verify (Policy, Icon, Lint, Typecheck, Test, Build)` step:
+    1. ESLint rule `@typescript-eslint/no-explicit-any` failed in `tests/features/fleetHealthAndStatus.test.ts` on 7 explicit `any` usages.
+    2. TypeScript typecheck failed in `src/addon/health.ts:147` where `updater` fallback `{}` inferred as incompatible `{ sa7?: undefined; nuvio?: undefined; vega?: undefined; }` instead of `Record<string, WorkerSnapshot> | undefined`.
+  - Fixes applied:
+    - In `tests/features/fleetHealthAndStatus.test.ts`: removed all 7 `any` casts. Applied proper types: `AppConfig`, `CodebergClient`, `NuvioSnapshot`, and directly asserted `nuvioComp.status` and `sa7Comp.status` without casting.
+    - In `src/addon/health.ts`: typed `updater` as `Record<string, WorkerSnapshot> | undefined` falling back to `undefined` when `ctx.scheduler` is omitted.
+  - Verified locally:
+    - `npm run lint` — passed with 0 errors.
+    - `npm run typecheck` — passed with 0 errors.
+    - `npm run test:feature` — all 25 test suites passed (143/143 tests).
+    - `npm run build` — passed with 0 errors.
+    - `npm run check:icon` & `npm run policy:check` — passed with 0 errors.
+
+- Fleet Working Status Reflection & Nuvio Non-blocking Snapshot Resolution (Session Nov 14 2026):
+  - Solved synchronous remote snapshot blocking in Nuvio:
+    - Updated `SnapshotManager.ensure()` in `src/fleets/nuvio/nuvio/snapshot.ts` to follow stale-while-revalidate. When an active snapshot is loaded into memory, `ensure()` serves user stream requests immediately without waiting on network downloads, triggering background refresh asynchronously if stale.
+    - Updated `src/fleets/nuvio/nuvio/manifest.ts` with `normalizeScraperFilename`: extracts relative paths (`providers/<id>.js`) from both relative paths and upstream's new full URL format (`https://*.codeberg.page/.../providers/<id>.js`).
+    - Verified that neither SA7 nor Vega perform any network snapshot downloads during stream handling (Vega preloads providers on startup, SA7 reads registry from memory and disk; both update exclusively via `/internal/reload`).
+  - Enhanced fleet health and status reflection in Gateway and Status Dashboard:
+    - Updated `src/fleets/nuvio/worker.ts`: `handleHealth` now accurately returns `snapshots.getHealth()` (`status`, `lastError`, `refreshing`) rather than hardcoded `status: 'ok'` and `lastError: null`.
+    - Updated `src/fleets/vega/worker.ts` and `src/fleets/sa7/worker.js`: report `status: 'ok' | 'degraded' | 'error'` based on provider counts and snapshot errors.
+    - Updated `src/addon/health.ts`:
+      - `buildHealthReport` now records real roundtrip loopback latency (`latencyMs`) for each worker.
+      - `aggregateFleetProviders` now ingests scheduler updater statuses and latencies, computing an accurate component `status` (`'ok' | 'degraded' | 'error'`).
+      - Degrades overall gateway status if any fleet worker or fleet updater is degraded or failing.
+    - Updated `src/addon/statusHtml.ts`:
+      - Fleet cards now prominently display `Status: WORKING` (green), `DEGRADED` (yellow), or `OFFLINE` (red).
+      - Added circuit open count, measured latency in ms, process state, snapshot SHA, and updater status.
+      - Displays dedicated error banners for updater failures or snapshot errors.
+      - Summary card now clearly reflects `${workingCount} of ${totalCount} working`.
+  - Added test suite `tests/features/fleetHealthAndStatus.test.ts` (8 tests) covering relative and remote URL manifest parsing, non-blocking snapshot resolution on stale snapshots, and fleet health degradation reporting.
+  - Ran `npm run test:feature` — all 25 test suites passed (143/143 tests passing).
+  - Kept ESLint/verify untouched per user instruction ("dont run lint/varify").
+
+- Love, Death & Robots Empty Stream & Nuvio Updater Investigation (Session Nov 14 2026):
+  - Investigated user report of `https://<RAILWAY_DOMAIN>/.../stream/series/tt9561862:1:1.json` returning `{"streams":[]}` on Railway production.
+  - Confirmed user hypothesis that Codeberg failure prevented Nuvio providers from returning streams:
+    1. In Nuvio (`src/fleets/nuvio/nuvio/snapshot.ts`), incoming stream requests call `snapshots.ensure()`.
+    2. Because the bundled snapshot is dated Nov 10 (>20h update interval), `ensure()` considers it stale and triggers `refresh(false)`.
+    3. Upstream Codeberg repo (`eclipsia/nuvio-plugin`) recently updated `manifest.json` with full URLs (`https://eclipsia.codeberg.page/nuvio-plugin/providers/...`) rather than relative paths (`providers/...`).
+    4. Nuvio's manifest validator throws `ManifestError: manifest.json scraper brellor has an invalid filename`.
+    5. This remote fetch and validation attempt took ~12-15 seconds before failing and falling back to the bundled snapshot.
+    6. Because the gateway / worker timeout was 12-15 seconds, the request hit `timeout` / `aborted` before any scrapers could run.
+  - Verified with direct scraper execution using the bundled snapshot: Nuvio resolves 9 working streams for `tt9561862:1:1` across providers `esvyl`, `evyrith`, `fyron`, and `soryn`.
+  - Confirmed SA7 providers with streams (`castle`, `moviebox`, `anizen`, `4khdhub`) are explicitly denied on Railway in `config/providers.json`.
+  - Documented that serving in-memory snapshot immediately (stale-while-revalidate) and normalizing full URL filenames in Nuvio manifest resolution will prevent request-blocking on remote refresh failures.
+
+- Fix Codeberg Branch Head Resolution for Nuvio Updater (Session Nov 14 2026):
+  - Diagnosed recurring 5-minute failure logs in Railway deployment (`updater.failed: Remote head fetch failed` for Nuvio fleet).
+  - Identified root cause in `src/core/updater/fetchers.ts`: `fetchCodebergHead` called `https://codeberg.org/api/v1/repos/${repo}/commits/${branch}` which Codeberg/Forgejo API rejected with HTTP 404 (Forgejo API uses `/branches/:branch` rather than `/commits/:branch`).
+  - Explained scheduler timing behavior: successful updates schedule 20-24 hours out (`scheduleNext` using `UPDATE_INTERVAL_MIN_HOURS` to `UPDATE_INTERVAL_MAX_HOURS`), while failed updates trigger the 5-minute retry delay (`scheduleRetry` with `RETRY_DELAY_MS = 5 * 60 * 1000`). Continuous 404 failure trapped Nuvio in the 5-minute retry loop.
+  - Implemented fix in `src/core/updater/fetchers.ts`:
+    - Updated endpoint to `https://codeberg.org/api/v1/repos/${repo}/branches/${encodeURIComponent(branch)}` and parsed `json.commit?.id || json.sha`.
+    - Added fallback query to `https://codeberg.org/api/v1/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&limit=1` parsing `json[0]?.sha`.
+    - Maintained strict TypeScript typings without `any`.
+  - Added comprehensive test suite `tests/features/fetchers.test.ts` (7 tests covering Codeberg branch resolution, commits fallback, error statuses, malformed JSON, timeouts, and GitHub resolution).
+  - Executed tests via `npm run test:feature` (all 24 test files passed, 135/135 tests passing).
+  - Updated `todo.md`, `architecture.md`, and committed changes locally without deploying per user instruction.
+
+- Fleet Runtime Classification Heuristics Implementation (Session Nov 14 2026):
+  - Solved misclassification of swallowed network failures, DNS failures, 4xx/5xx responses, and socket timeouts as `'empty'` across all three fleets (SA7, Nuvio, Vega) with ZERO modifications to upstream vendor scrapers.
+  - Created canonical core classifier `src/core/networkClassifier.ts`:
+    - Tracks request lifecycle via `NetworkTracker` (`attempts`, status, duration, timeout/abort flags).
+    - `classifyEmptyResult` accurately identifies when all network requests failed (`error` with HTTP status or network error), when requests timed out (`timeout`), when downstream scraper steps failed, and when verified 200 OK responses legitimately had 0 matching titles (`empty`).
+  - Integrated into all 3 fleet runtimes:
+    - **Nuvio**: In `src/fleets/nuvio/nuvio/loader.ts` and `pipeline.ts`, hooked `createProviderFetch` with `AsyncLocalStorage<NetworkTracker>` to observe scraper fetch attempts and classify empty results before telemetry recording.
+    - **Vega**: In `src/fleets/vega/providers/sdk/context.ts` and `pipeline/streamHandler.ts`, hooked `createAxiosAdapter` with `AsyncLocalStorage<NetworkTracker>` to observe axios/httpTransport calls and classify empty results before telemetry recording.
+    - **SA7**: Created `src/fleets/sa7/lib/tracker.js` hooking `globalThis.fetch` and `axios.interceptors` within scoped `AsyncLocalStorage` runs inside `src/fleets/sa7/streams.js`, recording accurate errors and timeouts on circuit breaker and telemetry.
+  - Added test suite `tests/features/networkClassifier.test.ts` (8 tests passing) covering clean empty, 404 failure, DNS failure, timeout/abort, execution timeout budget, downstream pipeline failures, and SA7 CJS integration.
+  - Full verification passed (`npm run verify`): policy check OK, icon check OK, ESLint clean, TypeScript strict typecheck clean, 23/23 Vitest test suites (128/128 tests passed), and TypeScript build successful.
+  - Kept changes strictly local without deploying per AGENTS.md constraint.
+
+- Provider Status Page Empty Results Investigation (Session Nov 14 2026):
+  - Investigated user report of providers showing 100% empty results on Railway status page (`https://<RAILWAY_DOMAIN>/status`).
+  - Analyzed `/health` metrics across all 91 active providers in `sa7`, `nuvio`, and `vega`.
+  - Identified 40 providers showing `calls > 0 && empty === calls`, and categorized the root causes:
+    1. Genre / Catalog Specialization with Low Query Sample: Instance had only 8-11 lifetime requests, all mainstream Western titles. Anime (`anikoto`, `kickAssAnime`), Bollywood (`einthusan`), and Asian drama (`dramacool`, `kissKh`) providers naturally return empty for Western media. Verified live: querying *Spirited Away* (`tt0245429`) and *3 Idiots* (`tt1187043`) immediately turned `anikoto`, `kickAssAnime`, and `einthusan` into active successful providers with non-empty results and updated `lastSuccessAt`.
+    2. Dead Upstreams & Silent Catches: Upstream APIs/domains returning 404, DNS NXDOMAIN, SSL handshake errors, or connection timeouts (`playimdb`/`zevran`, `redflix`, `topmovies`, `uhd`, `world4u`, `durnel`, `fastrion`) catch errors internally and return `[]`, which telemetry logs as `empty` rather than `error`.
+    3. Missing Auth/Config: `pynvix` requires user-supplied FebBox `uiToken` to query upstream proxy.
+    4. Live TV Providers: `durbinLive` and `liveTgTv` are live TV channel providers and return empty for VOD movies/series.
+  - Recorded detailed breakdown and verification steps in `scratchpad.md`.
+
+- Subtitle Filtering in Configure Page & Gateway Stream Pipeline (Session Nov 14 2026):
+  - Added subtitle language filtering to the `/configure` web UI (`src/addon/configureHtml.ts`):
+    - Text input `#subtitleLangs` for comma-separated language tags/names (e.g., `en, es, hi` or `English, Spanish`).
+    - Quick-select chip buttons for popular languages (`English`, `Spanish`, `French`, `German`, `Hindi`, `Japanese`) for one-click append.
+    - Checkbox `#includeUnknownSubtitleLang` for controlling unknown/unrecognized language tracks (default checked).
+    - Real-time summary integration: distinguishes "All tracks retained (no filter)" vs "Only en, es (including/excluding unknown)".
+    - Prefill and reset handling: hydrates saved subtitle preferences and restores defaults cleanly.
+  - Enhanced language comparison and normalization in `src/core/subtitles.ts`:
+    - Handles language variants, ISO codes, and subtags (`en`, `eng`, `eng-us`, `eng eu`, `en-eu`, `English`, `English (US)`, `English [CC]`, `Brazilian Portuguese`, `Español`, `Français`, `Deutsch`, etc.).
+    - Robust `filterSubtitleTracks` supporting "no selection = no filter", allowed language matching across both normalized base codes and raw tags, and unknown language inclusion/exclusion.
+  - Connected subtitle filtering into `filterStream` (`src/addon/filters.ts`):
+    - Prunes non-matching tracks from `stream.subtitles`.
+    - **Never drops streams because of subtitles**: streams with embedded/inline container subtitles or streams where all external tracks are excluded remain fully intact and are delivered to Stremio.
+  - Added test suites:
+    - `tests/features/subtitlesFilter.test.ts` (5 tests covering stream retention, subtitle pruning, inline container streams, and variant matching).
+    - Expanded `tests/features/subtitles.test.ts` and `tests/features/app.test.ts`.
+  - Stored changes locally without deploying per user constraints.
+
+
+- Full Resolution and Pruning of Gateway-Fleet Duplications (Session Nov 14 2026):
+  - Addressed all 8 audited code duplications and architectural redundancies from `docs/gateway-fleet-duplications.md`:
+    1. **Content ID Parsing**: Refactored Nuvio and Vega `parseId.ts` and SA7 `content-id.js` to delegate to `src/core/contentId.ts`, harmonizing Season 0 specials, season packs, and anime IDs across all workers.
+    2. **Metadata Resolution & Amplification**: Added `ForwardedMetadata` and metadata header support (`x-meta-title`, `x-meta-year`, `x-meta-tmdb-id`) to `contract.ts` and `workerClient.ts`. The gateway resolves canonical metadata once via `MetadataResolver` and forwards headers to loopback workers over `/internal/stream`. Workers (Nuvio, Vega, SA7) prime local Cinemeta caches and bypass redundant upstream network requests.
+    3. **Quality & Resolution Inference**: Created `src/core/streamQuality.ts` exporting canonical `inferResolution` (8K down to 240p) and `inferQualityRank`. Replaced disparate regex mappings in Gateway `filters.ts`, Nuvio `mapStreams.ts`, Vega `mapStreams.ts`, and SA7 `filters.js`/`format.js`.
+    4. **Container Format Ranking**: Consolidated `getContainerRank` (`mp4`/`mkv` > other direct media > `m3u8`/`mpd`) into `src/core/streamQuality.ts`, replacing duplicate sorting implementations in Gateway `merge.ts` and Nuvio/Vega `mapStreams.ts`.
+    5. **Subtitle Normalization**: Created `src/core/subtitles.ts` with comprehensive language alias dictionaries (covering Indic, European, Asian aliases) and `normalizeSubtitlesTrackList`, unifying subtitle track parsing across Gateway, Nuvio, Vega, and SA7.
+    6. **File Size Parsing**: Created `parseSizeBytes` and `inferSizeBytes` in `src/core/streamQuality.ts` handling metric/binary units (TB, GB, MB, KB, TiB, GiB, MiB) with comma or dot decimals across all tiers.
+    7. **Hop-by-Hop Headers & Host Checks**: Created `src/core/streamHeaders.ts` with `sanitizeProxyHeaders`, `isPlaceholderHost`, and `parseHttpUrl`, replacing copy-pasted sets and filters in Nuvio and Vega.
+    8. **User Config Filtering**: Removed dead v1 configuration decoding and redundant local filter evaluation in SA7; Gateway performs canonical v2 user configuration filtering uniformly.
+  - Added new automated test suites:
+    - `tests/features/streamQuality.test.ts` (5 tests)
+    - `tests/features/streamHeaders.test.ts` (6 tests)
+    - `tests/features/metadataForwarding.test.ts` (1 test)
+    - Expanded `tests/features/subtitles.test.ts` (3 tests) and `tests/features/parseId.test.ts` (14 tests).
+  - Pruned all 8 resolved findings from `docs/gateway-fleet-duplications.md`.
+  - Full verification passed (`npm run verify`): provider policy OK, icon checks OK, ESLint clean, TypeScript strict typecheck clean, 21 Vitest test suites (115/115 tests passed), and production build successful.
+  - Kept changes local without remote deployment per user constraint.
+
+
+- Unified URL & Stream Classification Architecture (Session Nov 14 2026):
+  - Solved misclassification of API streaming endpoints like `https://c.toroplay.cymru/api/watch/m3u8?url=...` which were previously marked as `externalUrl` due to `/watch/` matching embed patterns and direct media regexes requiring a leading dot.
+  - Created single source of truth in `src/core/urlClassifier.ts` for all URL classification logic:
+    - Direct media pattern `DIRECT_MEDIA_PATTERN` matching extensions and container path segments (`.m3u8`, `/m3u8`, `.mp4`, `/mp4`, `.mpd`, `/mpd`, etc.) as well as media query parameters (`?url=...`).
+    - Web embed / player detection (`/embed/`, `/watch/` without direct media suffix, known embed domains).
+    - Archive detection (`.zip`, `.rar`, `.7z`, etc.).
+    - Blocker link detection (`/slowdown`, `/ratelimit`, `/antibot`).
+    - Canonical stream key normalization.
+  - Refactored fleets and gateway to share `src/core/urlClassifier.ts`:
+    - Gateway `src/addon/classifier.ts` re-exports canonical functions from `src/core/urlClassifier.ts`.
+    - Vega `src/fleets/vega/pipeline/urlClassifier.ts` re-exports from `src/core/urlClassifier.ts`.
+    - Nuvio `src/fleets/nuvio/addon/urlClassifier.ts` re-exports from `src/core/urlClassifier.ts`.
+    - SA7 `src/fleets/sa7/lib/url-classifier.js` delegates to `dist/core/urlClassifier.js` with unified fallback logic.
+  - Cleaned up gateway `src/addon/merge.ts` (`normalizeStreamItem`) to trust fleet `url` vs `externalUrl` classifications without re-running conflicting embed regexes, while retaining archive safety net and blocker drops.
+  - Added full test coverage in `tests/features/urlClassifier.test.ts` (6 tests) and updated `tests/features/merge.test.ts`.
+  - All 18 test suites passing (92/92 Vitest tests); `npm run verify` passed cleanly (policy, icon, lint, typecheck, tests, build).
+  - Audited remaining code duplications across gateway and fleets; documented the 8 redundant subsystems with file locations, impact analysis, and consolidation roadmap in `docs/gateway-fleet-duplications.md`.
+  - Kept changes local without deploying, per user request.
+
+- Completed Provider Allocation & Deployment Separation (Session Nov 14 2026):
+  - Added `SA7_DISABLED_PROVIDERS` support in SA7 worker runtime with instant env override (`process.env.SA7_DISABLED_PROVIDERS`).
+  - Added bidirectional alias support for Vega's `rogmovie` / `rogmovies` to `luxMovies` in `src/core/env.ts`.
+  - Configured baseline provider policy in `config/providers.json` targeting Railway with 69 active scrapers (disabling `sylphera`, `animeworld`, `movies4u`, `luxMovies`, plus duplicates, torrents, IA, and YouTube).
+  - Configured Beamup deployment in `.github/workflows/ci.yml` with Dokku environment sync targeting strictly 4 active scrapers: Vega `animeworld`, `movies4u`, `luxMovies` (`RogMovies`) and Nuvio `sylphera` (SA7 all 28 disabled).
+  - All test suites passing (53/53 Vitest tests). CI run `43550994196` succeeded across all verification, Docker, and deployment stages.
+  - Verified Railway live endpoint: 69 active providers operational (SA7: 14, Nuvio: 30, Vega: 25).
+  - Stopped further execution per user request.
+
+## Current Status
+- Completed Phase 1 (Project Scaffold & Infrastructure):
+  - Repository initialized with `.nvmrc`, `.gitignore`, `.dockerignore`.
+  - Unified root `package.json` with strict engine and single lockfile installed via `npm install`.
+  - Configured `tsconfig.json` (strict NodeNext), `eslint.config.js` (strict typing, zero `any`), and `vitest.config.ts`.
+  - Created `config/defaults.env`, `.env.example`, and canonical `config/providers.json`.
+  - Created 512x512 PNG branding icon (`assets/logo.png`), vector fallback (`assets/logo.svg`), and favicon (`assets/favicon.ico`).
+  - Added and verified validation scripts: `scripts/check-icon.mjs` and `scripts/check-provider-policy.mjs`.
+  - Added skeletons for `README.md`, `NOTICE.md`, `CHANGELOG.md`, `docs/runbook.md`, and `docs/decisions.md`.
+- Completed Phase 2 (Shared Core Modules & Feature Tests):
+  - Created `src/core/redact.ts`, `src/core/logging/events.ts`, `src/core/logging/sink.ts`, `src/core/logging/stdoutSink.ts`, `src/core/logging/queue.ts`, `src/core/logger.ts`, `src/core/env.ts`, `src/core/cache.ts`, `src/core/telemetry.ts`, `src/core/contentId.ts`, `src/core/jikan.ts`, `src/core/metadata.ts`, `src/core/policy.ts`, `src/core/contract.ts`, `src/core/workerClient.ts`, `src/core/concurrency.ts`, `src/addon/subtitles.ts`, `src/addon/classifier.ts`, `src/addon/filters.ts`, `src/addon/merge.ts`, `src/addon/userConfig.ts`.
+  - Added comprehensive feature tests in `tests/features/`: contentId, subtitles, filters, merge, cache, core (policy & concurrency), userConfig. All tests passing.
+- Completed Phase 3 (Fleets / Internal Workers):
+  - Created `src/fleets/sa7/worker.js` with isolated CommonJS marker, internal routes (`/internal/health`, `/internal/stream`, `/internal/reload`), per-provider stream cap of 100, and zero public exposure.
+  - Created `src/fleets/nuvio/worker.ts` with internal routes, Codeberg snapshot integration, and stream cache disabled.
+  - Created `src/fleets/vega/worker.ts` with internal routes, baseline provider registry, and stream cache disabled.
+  - Verified WorkerClient interaction with internal routes and contracts via `tests/features/workers.test.ts`.
+- Completed Phase 4 (Gateway & Configure Page):
+  - Created `src/addon/manifest.ts` with dynamic `idPrefixes` (IMDb, TMDB, MAL), CORS headers, and cache-control.
+  - Created `src/addon/configureHtml.ts` and `src/addon/configure.ts` with dark-mode responsive UI, stream quality, file-size limits, separate subtitle track selection, live URL copy/install buttons.
+  - Created `src/addon/logo.ts` with streaming asset serving (`/logo.png`, `/logo.svg`, `/favicon.ico`) and fast HEAD responses.
+  - Created `src/addon/stream.ts` with single gateway cache, coalescing, per-worker timeout, URL classification, stream filtering, and non-empty only caching.
+  - Created `src/addon/health.ts`, `src/addon/stats.ts`, and `src/addon/status.ts` HTML dashboard.
+  - Created `src/addon/app.ts` with explicit GET, HEAD, OPTIONS handling, root discovery endpoint, 404 subtitles protection, and 405 Method Not Allowed.
+  - Added comprehensive HTTP contract test suite (`tests/features/app.test.ts`), passing all 32 feature tests.
+- Completed Phase 5 (In-Process Updater Scheduler):
+  - Created `src/core/updater/state.ts` for atomic state persistence.
+  - Created `src/core/updater/fetchers.ts` with GitHub and Codeberg commit SHA resolution and ETag support.
+  - Created `src/core/updater/scheduler.ts` with 20-24 hour jitter, unref timers, worker reload triggers, and tests in `tests/features/updater.test.ts`.
+- Completed Phase 6 (Logging & Cloudflare Ingest):
+  - Created `src/core/logging/cloudflareSink.ts` with circuit breaker and non-blocking background queue.
+  - Created Cloudflare Ingest Worker (`cloudflare/ingest-worker/wrangler.toml`, `cloudflare/ingest-worker/src/index.ts`).
+  - Created D1 migration `cloudflare/migrations/0001_init.sql` for indexed log events and metric aggregations.
+  - Created CLI log query tool `scripts/logs-query.mjs`.
+- Completed Phase 7 (Policy & Audit Verification):
+  - Validated `config/providers.json` against `config/provider-audit.csv` with `scripts/check-provider-policy.mjs`.
+- Completed Phase 8 (Build, Docker & CI/CD):
+  - Created `src/supervisor.ts` and `src/index.ts` to coordinate gateway and internal workers in one unified process lifecycle.
+  - Implemented `scripts/copy-fleet-assets.mjs` ensuring self-contained `dist/` compilation with pure Node.js execution.
+  - Implemented automatic baseline and bundled snapshot resolution in supervisor for zero-network instant cold start.
+  - Created multi-stage `Dockerfile` and `docker-entrypoint.sh` for non-root execution.
+  - Created GitHub Actions workflows (`.github/workflows/ci.yml`, `deploy-cloudflare.yml`, `rollback.yml`).
+  - Created `scripts/apply-env.mjs` for one-shot bulk env import.
+  - Hardened HTTP gateway: disabled `x-powered-by`, added strict Content-Security-Policy and security headers to HTML pages, enforced 404 on `/subtitles` for all methods including OPTIONS.
+  - Verified live runtime: gateway port 7000, SA7 port 7001 (19 providers), Nuvio port 7002 (30 providers), Vega port 7003 (40 providers) — 89 providers operational.
+  - `npm run verify` passed cleanly: policy check, icon check, lint (0 warnings), strict typecheck, 33/33 Vitest tests, build.
+
+- Completed Phase 9 (Staging Deployment & Cutover):
+  - Created public GitHub repository `Ashishsri2018/unified-streams` and pushed the complete codebase to `main`.
+  - Configured repository secrets on GitHub via CLI: `BEAMUP_REMOTE`, `BEAMUP_SSH_PRIVATE_KEY`, `PUBLIC_BASE_URL`, `TMDB_API_KEY`.
+  - Created new Beamup application via Dokku remote.
+  - Successfully built, deployed, and validated container via `beamup-lint` and dual port-listening and uptime health checks.
+  - Sourced and applied environment variables: `PUBLIC_BASE_URL=<BEAMUP_BASE_URL>` and `TMDB_API_KEY=<REDACTED_TMDB_API_KEY>`.
+  - GitHub Actions CI/CD Release Pipeline run 43199499151 passed 100%:
+    - `Verify (Policy, Icon, Lint, Typecheck, Test, Build)`: succeeded in 14s.
+    - `Docker Build & Smoke Test`: succeeded in 31s.
+    - `Deploy to Beamup`: pushed and deployed successfully in 2m1s.
+  - Verified live deployment:
+    - `GET https://<BEAMUP_BASE_URL>/manifest.json` returns valid Stremio manifest with dynamic `idPrefixes: ["tt", "tmdb:"]` and correct logo URL.
+    - `GET https://<BEAMUP_BASE_URL>/health` returns HTTP 200 `status: "ok"` with 89 active providers (19 SA7, 30 Nuvio, 40 Vega).
+    - `HEAD https://<BEAMUP_BASE_URL>/stream/movie/tt0111161.json` returns HTTP 200 without invoking upstream fan-out.
+    - `GET https://<BEAMUP_BASE_URL>/configure` serves responsive dark configure interface with CSP.
+
+- Enhanced Status Dashboard & Aggregated Provider Observability:
+  - Upgraded `/status` to the sleek dark-mode dashboard from the previous addon with live `/health` client-side auto-refresh (15s), brand header, and summary cards.
+  - Implemented modular `src/addon/statusHtml.ts` (<150 LOC per function) rendering:
+    - 4 Top Metrics Cards: Fleets, Providers, Cache hits, Requests.
+    - Fleets component cards: SA7, Nuvio, Vega with process uptime, latency, provider totals, and snapshot SHA.
+    - Full interactive Providers table with: `Fleet | Provider | State | Calls | OK | Empty | Errors | Timeouts | Success | Avg ms | Last error`.
+    - Instant provider search filter input (`#provider-search`) allowing quick filtering across all 89+ provider circuits.
+  - Enhanced `src/addon/health.ts` and `src/core/telemetry.ts` with `aggregateFleetProviders()` returning `providers: { total, circuits, stats }` and `components` at the top level of `/health` and `/stats`.
+  - Updated Nuvio worker (`src/fleets/nuvio/worker.ts`) and Vega worker (`src/fleets/vega/worker.ts`) to return per-provider stats in `/internal/health`.
+  - Added test coverage in `tests/features/app.test.ts` for `/status` HTML and `/health` aggregated provider reporting; all 35 Vitest tests and `npm run verify` pass cleanly.
+
+- Enforced Provider Policy & Duplicate Exclusions:
+  - Synced `config/provider-audit.csv` with full audit decisions (`disable_redundant`, `keep_disabled`, `disable_requested`, `keep_primary`).
+  - Injected fleet provider policy directly into `deriveFleetEnv()` in `src/core/env.ts`:
+    - SA7: `PROVIDERS` set to the 13 non-duplicate allowed providers (`dahmermovies`, `dahmermovies-tv`, `desiflix`, `einthusan`, `kurage`, `movix-vf`, `multimovies`, `playimdb`, `puretoons`, `redflix`, `toonstream`, `topcartoons`, `vidrock`). Redundant duplicate scrapers disabled.
+    - Nuvio: `DISABLED_SCRAPERS` set to the 18 redundant duplicates, regional BDIX, and Internet Archive scrapers. 31 unique/primary scrapers active.
+    - Vega: `DISABLED_PROVIDERS` set to `torrentio,internetArchive,youtube,katmovies,multi`.
+  - Updated `config/defaults.env` with canonical `SA7_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, and `VEGA_DISABLED_PROVIDERS`.
+  - Updated Vega worker (`src/fleets/vega/worker.ts`) to exclude `disabledProviders` from active registry list and health metrics.
+  - Verified with `npm run verify` and live supervisor test: all policy and duplicate exclusions active.
+  - Deployed to Beamup via GitHub Actions run 43205464748 (`main` commit `334ec2a`).
+  - Live deployment verified on `https://<BEAMUP_BASE_URL>`:
+    - `/health` reports `status: "ok"`, 79 active non-duplicate providers (SA7: 12, Nuvio: 31, Vega: 36).
+    - `/status` serves the dark-mode dashboard with per-provider metrics table, dynamic search filter, fleet status cards, and 15s auto-refresh.
+    - Cache verification: empty stream results increment `emptySkips` and are never cached (`streams: []` with 200 OK).
+
+- Fixed Stream Resolution Pipeline & Upstream Provider Integration:
+  - Diagnosed zero stream return on real movie requests (`tt1375666` Inception):
+    1. In `src/fleets/sa7/worker.js`, `handleStream` called `collectStreams({ type, id, config })` passing a single object instead of positional parameters `(contentId, type, season, episode, config)`. Fixed by parsing content ID via `parseContentId(rawId)` and passing correct positional arguments. Local execution confirmed SA7 resolves 29 streams across providers (`castle`, `dahmermovies`, `multimovies`, `movix-vf`, `vegamovies`, `vidrock`, `moviebox`, `netmirror`).
+    2. In `src/core/env.ts`, `deriveFleetEnv()` omitted `TMDB_API_KEY`, `CINEMETA_URL`, and `TMDB_URL` from the derived fleet environment. Added `TMDB_URL` to `EnvSchema` and forwarded all three upstream variables to workers so Vega and Nuvio can resolve TMDB metadata.
+  - Committed and pushed commit `ee865fd` and `a781767` deploying live to Beamup.
+  - Live verification succeeded on `https://<BEAMUP_BASE_URL>`:
+    - `GET /stream/movie/tt1375666.json` returned 18 real playable streams.
+    - `GET /stream/movie/tt0137523.json` returned 22 real playable streams.
+    - Cache verification: subsequent requests return `cf-cache-status: HIT` with 180s TTL and sub-50ms latency.
+  - Manifest specification clarification: Confirmed and clarified why `catalogs: []` is mandatory under the Stremio v3 protocol (preventing Stremio clients from issuing broken discover/catalog queries or rendering blank discover carousels).
+
+- Fixed Vega Provider Call Tracking & Telemetry Reporting:
+  - Diagnosed why Vega providers showed 0 calls on `/status`:
+    1. In `src/fleets/vega/pipeline/streamHandler.ts`, `ProviderStat` only tracked `avgLatencyMs` and `failures`, and `getMetrics()` hardcoded `calls: null, ok: null, empty: null, timeouts: null`.
+    2. In `src/fleets/vega/worker.ts`, provider registry entries used mixed case (e.g. `Showbox`, `FlixHQ`) while `reportedStats` used lowercase keys, causing map lookups to fail and fall back to `0`.
+  - Updated `ProviderStat` in `streamHandler.ts` to track `calls`, `ok`, `empty`, `errors`, `timeouts`, `skipped`, `avgLatencyMs`, `failures`, `lastMs`, and `lastError`.
+  - Updated `recordProviderResult` to increment call counters and record error/timeout/empty/ok outcomes on every provider execution.
+  - Updated `getMetrics()` to return real computed `calls`, `ok`, `empty`, `errors`, `timeouts`, and `successRate`.
+  - Updated `src/fleets/vega/worker.ts` to normalize provider IDs with `.toLowerCase()` when looking up metrics.
+  - Verified locally with `npm run verify` passing 100% (policy check, icon check, ESLint, TypeScript, and all 35/35 Vitest tests).
+
+- Provider Failure Audit & Duplicate Fleet Replacement:
+  - Audited 10 failing/timed-out providers:
+    - Vega NetMirror family (`netflixMirror`, `primeMirror`, `disneyMirror`): Remote domain `net52.cc` drops TCP connections / times out.
+    - Vega `topmovies`: Upstream domain `moviesleech.club` dead (DNS NXDOMAIN).
+    - Vega `1cinevood`: Upstream domain `one.cinevood.business` dead (DNS NXDOMAIN).
+    - Vega `uhd`: Upstream origin `uhdmovies.beauty` connection timed out.
+    - Vega `kartoons`: Scraper requires interactive Cloudstream device session authentication.
+    - Vega `world4u`: Remote search endpoint returns HTTP 404.
+    - Nuvio `durnel`: Upstream backend `cockpit.103.109.92.178.nip.io` and `ctgmovies.com` connection timed out.
+    - Nuvio `rynara`: Upstream API `api.wecollege.net` and `vidy.st` connection timed out.
+  - Cross-fleet duplicate audit & replacement:
+    - Identified that `sa7:netmirror` is an active, healthy duplicate of the failing Vega NetMirror family using dynamic discovery domains.
+    - Tested `sa7:netmirror` and confirmed it successfully resolves 2-3 playable streams for Inception and Fight Club.
+    - Enabled `sa7:netmirror` as the primary NetMirror provider in `SA7_PROVIDERS` and `config/providers.json`.
+    - Disabled the dead providers (`durnel`, `rynara` in Nuvio; `1cinevood`, `topmovies`, `uhd`, `kartoons`, `world4u`, `netflixMirror`, `primeMirror`, `disneyMirror` in Vega).
+    - Updated `config/provider-audit.csv` with detailed failure causes and duplicate replacements.
+    - Verified with `npm run verify` (100% pass across policy check, icon check, lint, typecheck, 35/35 Vitest tests, and build).
+
+- Diagnosed Status Page Provider Errors & Timeouts:
+  - Audited live status metrics from `https://<BEAMUP_BASE_URL>/health`:
+    - Vega: `everything` (4 errors), `showbox` (3 errors), `eonMovies` (3 errors), `animesub` (2 errors), `1flex` (1 error), `zeefliz` (1 error).
+    - Nuvio: `quinox` (6 timeouts), `maelith` (3 timeouts), `qorva` (2 timeouts), `novus` (1 timeout), `xandril` (1 timeout).
+    - SA7: 0 errors, 0 timeouts (100% clean across all 13 active providers).
+  - Identified root causes:
+    - Vega `everything`: Upstream API `slave.downloadeverythingfromeverywhere.com` returns 403 Forbidden with Cloudflare Turnstile CAPTCHA requiring interactive WebView solving.
+    - Vega `showbox`: Origin `showbox.media` (`40.160.33.57:443`) drops TCP connection on TLS handshake (`ECONNRESET`).
+    - Vega `eonMovies`: Origin `new4.eonmovies.click` updated HTML layout; scraper selector `.image-container` returns 0 results.
+    - Vega `animesub`: P2P torrent scraper with DuckDNS endpoint `animesub.duckdns.org` (`193.70.84.6`) generating magnet links and experiencing high packet loss.
+    - Vega `zeefliz` & `1flex`: Slow origins (6-8s response times) behind LiteSpeed/Cloudflare causing occasional timeout spikes.
+    - Nuvio `quinox`: Chained roundtrips to 6 workers.dev proxies + AES/SHA256 client crypto average ~9.5s, frequently exceeding the 10s backend deadline (`BACKEND_TIMEOUT_MS=10000`).
+    - Nuvio `maelith`: Connects sequentially across 6 server mirrors (`Zeus`, `Aphrodite`, `Hephaestus`, `Prometheus`, `Poseidon`, `Atlas`), averaging 11.3s and breaching the 10s deadline.
+    - Nuvio `novus`, `qorva`, `xandril`: Fast healthy scrapers (>85-90% success rate); occasional timeouts caused by transient upstream delays.
+  - Identified telemetry discrepancy:
+    - In `src/fleets/vega/pipeline/streamHandler.ts`, `recordFailure()` incremented `stat.failures` (which `/status` displays as `Errors`), but never persisted the caught error message to `stat.lastError`. Additionally, empty resolutions incremented `stat.ok`.
+
+- Showbox & GramCinema Authentication Pipeline & Telemetry Fixes:
+  - Configured GitHub Secrets `FEBBOX_UI_COOKIE` (Showbox FebBox cookie) and `GRAMCINEMA_TOKEN` (GramCinema `gc_session` token).
+  - Configured Dokku environment synchronization in `.github/workflows/ci.yml` so every push automatically propagates `TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, and `PUBLIC_BASE_URL` to Beamup without manual intervention.
+  - Updated `src/core/env.ts`:
+    - Added `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, and `SCRAPER_SETTINGS_JSON` to `EnvSchema`.
+    - In `deriveFleetEnv()`, automatically parsed and injected `febboxCookie` (with `ui=` normalization) into Vega's `PROVIDER_SETTINGS_JSON.kv`.
+    - In `deriveFleetEnv()`, automatically parsed and injected `cinemaTvToken` (with `gc_session=` and `Bearer ` stripping) into Nuvio's `SCRAPER_SETTINGS_JSON.fjoral`.
+  - Updated `src/fleets/nuvio/snapshot/providers/fjoral.js` `resolveApiToken()` to sanitize tokens from both scraper settings and env.
+  - Updated `scripts/apply-env.mjs` allowed keys to include `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`, and `SCRAPER_SETTINGS_JSON`.
+  - Fixed `lastError` propagation in Vega (`streamHandler.ts` records actual error message and reason without false positive `stat.ok` increments) and Nuvio (`metrics.ts` and `worker.ts` preserve `lastError` for timeouts and provider failures).
+  - Added unit test coverage in `tests/features/core.test.ts` for Vega and Nuvio environment derivation (all 37 Vitest tests passing).
+  - Verified local build, policy check, icon check, and linter cleanly (`npm run verify`).
+
+- Audited Replacement Candidates for `everything`, `eonMovies`, and `animesub`:
+  - Checked `config/provider-audit.csv` across all fleets (`sa7`, `nuvio`, `vega`) and duplicate groups.
+  - Confirmed `everything`, `eonMovies`, and `animesub` have no duplicate groups, shared host mirrors, or designated replacement owners in `config/provider-audit.csv`.
+  - In accordance with instructions, left all three as is without modifying `config/providers.json`.
+
+- Live URL Stream Resolution Verification:
+  - Verified 1 movie (*Inception* `tt1375666`): 20 playable streams returned across 6 providers (`PlayIMDb`, `DesiFlix`, `Movix`, `MultiMovies`, `NetMirror`, `VidRock`).
+  - Verified 1 series (*Breaking Bad* `tt0903747:1:1`): 41 playable streams returned across 15 providers (`Sylphera`, `Maelith`, `DesiFlix`, `Esvyl`, `Fendrix`, `Haylox`, `Ilvyrel`, `Movix`, `MultiMovies`, `NetMirror`, `Novus`, `Phraxis`, `Quinox`, `Svartok`, `VidRock`).
+  - Verified 1 anime (*Attack on Titan* `tt2560140:1:1`): 23 playable streams returned across 7 providers (`Kurage`, `Movix`, `MultiMovies`, `NetMirror`, `PlayIMDb`, `ToonStream`, `VidRock`).
+
+- CI/CD Optimization for Documentation:
+  - Added `paths-ignore: ['**.md']` to `.github/workflows/ci.yml` for push and pull_request triggers.
+  - Enforced convention to always include `[skip ci]` in commit messages for documentation and project memory updates to avoid triggering unnecessary CI builds and deployments.
+
+- Showbox & Fjoral Functionality & Status Page Verification:
+  - Audited live status dashboard and `/health` metrics across all 70 active providers (SA7: 13, Nuvio: 29, Vega: 28):
+    - Overall status: `OK`, 100% fleet health, zero process restarts.
+  - Fjoral (`GramCinema`):
+    - Confirmed `calls: 7, ok: 7, errors: 0, timeouts: 0, rate: 1.0, lastError: None`.
+    - Tested upstream API directly: Authenticates via `GRAMCINEMA_TOKEN` with `tga-hd.api.hashhackers.com`, finds 100 media records for Bollywood titles (e.g. *3 Idiots*), and generates authenticated CDN download links via `/genLink`.
+    - Fixed 720p resolution filtering in `src/fleets/nuvio/snapshot/providers/fjoral.js` (`enable720p: s.enable720p !== false`) and `src/core/env.ts` (`enable720p: true`).
+  - Showbox:
+    - Confirmed FebBox `ui` cookie is valid and accepted by `https://www.febbox.com/console/video_quality_list` without login prompts.
+    - Diagnosed that Showbox's Tier 1 discovery origin `www.showbox.media` (`40.160.33.57:443`) actively drops TCP connections with `ECONNRESET` on cloud/datacenter IP ranges during TLS handshake. Because search cannot resolve the showbox episode ID (`epId`), it reports `no streams found` before calling FebBox.
+  - Status page provider error breakdown:
+    - Documented all 12 providers exhibiting non-zero errors or timeouts (Nuvio: `maelith`, `quinox` timeouts due to multi-hop proxy chains; Vega: `showbox`, `vega`, `autoEmbed`, `gokuHD`, `eonMovies`, `movies4u`, `kmMovies`, `hdhub4u`, `anikoto`, `animesub`, `1flex`). All fail gracefully to empty results without crashing the gateway.
+
+- Diagnosed & Fixed 0% Success Rate Providers:
+  - Audited 4 providers showing 0% success rate on `/status` (`[sa7] dahmermovies`, `[sa7] dahmermovies-tv`, `[sa7] puretoons`, `[sa7] redflix`):
+    1. Identified that in SA7's `breaker.js`, `ok` was only incremented when `streams.length > 0`, whereas in Nuvio and Vega, `ok` counts all non-failing executions (`calls - errors - timeouts`). Consequently, providers executing with 0 errors and 0 timeouts on titles outside their catalog (e.g. asking a cartoon site `puretoons` for *Inception* or a TV series provider `dahmermovies-tv` for movies) reported `ok: 0` and `successRate: 0%`.
+    2. Diagnosed that `redflix` and `topcartoons` were failing or skipped due to missing vendored dependency `cheerio-without-node-native`.
+    3. Added Module resolution hook in `src/fleets/sa7/providers.js` and `src/fleets/sa7/worker.js` mapping `cheerio-without-node-native` to standard `cheerio`. Confirmed `redflix` immediately extracts 12 streams for Inception and `topcartoons` loads into registry.
+    4. Updated `src/fleets/sa7/lib/breaker.js` to increment `state.ok` on successful empty executions while tracking `state.responded` for internal scoring, aligning SA7's `ok` and `successRate` metrics with Nuvio and Vega.
+    5. Tested `puretoons` on cartoon/anime (*Naruto*), confirming 12 streams extracted. Tested `dahmermovies-tv` on series (*Breaking Bad*), confirming 3 streams extracted. Tested `dahmermovies` on movies (*Inception*), confirming 3 streams extracted.
+
+- Concurrency Settings Tuning:
+  - Configured `SEARCH_CONCURRENCY=30` and `SCRAPER_CONCURRENCY=30` across `config/defaults.env`, `.env.example`, `src/core/env.ts` (`EnvSchema` and `deriveFleetEnv`), `src/fleets/nuvio/config.ts`, and `src/fleets/vega/config.ts`.
+  - Added unit test in `tests/features/core.test.ts` to ensure default and custom values for `SEARCH_CONCURRENCY` and `SCRAPER_CONCURRENCY` are correctly parsed and forwarded to fleet child environments.
+  - Audited SA7 scraper concurrency: SA7 fires all enabled providers concurrently using `Promise.all` bounded by per-provider timeout (`Math.min(providerTimeoutMs, deadline - now())`) and circuit breaker status, without a bounded semaphore pool.
+
+- Worker Deadline & Streaming Cache Header Fix:
+  - Diagnosed "responded but Empty" providers: the gateway aborts worker fetches at `BACKEND_TIMEOUT_MS` (10s) while workers used `GLOBAL_DEADLINE_MS` (12s), so results were discarded after provider stats incremented.
+  - Raised defaults to `BACKEND_TIMEOUT_MS=11000` and `GLOBAL_DEADLINE_MS=13000`, yielding a 10s worker deadline. Derived every worker deadline from `BACKEND_TIMEOUT_MS - 1000`; SA7 now receives `ADDON_DEADLINE_MS`, `MAX_PER_PROVIDER_STREAMS`, `MAX_TOTAL_STREAMS`, and `BREAKER_*` under the names it actually reads.
+  - Bounded Nuvio TMDB resolution and snapshot loading by the request deadline; nuvio/vega workers abort pipeline work when the gateway disconnects.
+  - Preserved `isPartial` through cache coalescing, and treat responses arriving within the worker deadline margin as partial so they receive the 30s TTL.
+  - Live verification showed Beamup's Cloudflare zone rewrites stream cache headers to `max-age=14400`. Per user direction, Cloudflare is for log storage only: stream responses now send `cache-control: no-store` with no CDN cache headers, while 180s/30s TTLs remain internal to the gateway cache.
+  - Local full-stack validation: SA7/Nuvio/Vega all return partial results at ~9.1s; merged requests return streams (e.g. 45 for *The Dark Knight*) with `max-age=30` and immediate cache hits.
+
+- Timeout Restoration (13s Global, 12s Backend, 11s Worker Budget) & External URL Emoji:
+  - Reverted `GLOBAL_DEADLINE_MS` to `13000` (13s) and `BACKEND_TIMEOUT_MS` to `12000` (12s), giving workers an 11s deadline (`BACKEND_TIMEOUT_MS - 1000`). Live metrics revealed Beamup's Cloudflare edge cuts connections around ~13.2s on slow requests; the 12s/11s budget ensures responses are returned and serialized before that cutoff.
+  - Added `🖥️` emoji prefix to the title of all `externalUrl` streams in `src/addon/merge.ts` (`normalizeStreamItem`), clearly distinguishing external link streams from direct streaming URLs.
+  - Added unit test in `tests/features/merge.test.ts` to verify `🖥️` emoji tagging for external streams.
+  - Live deployment verified on Beamup (`https://<BEAMUP_BASE_URL>`):
+    1. Movie (*Interstellar* - `tt0816692`): 49 streams returned (24 direct, 25 external). Direct streams have standard titles; 100% of external streams prefixed with `🖥️`. Completed in 12.45s on cold miss.
+    2. Series (*Breaking Bad* S01E01 - `tt0903747:1:1`): 54 streams returned (22 direct, 32 external). 100% of external streams prefixed with `🖥️`. Completed in 13.77s.
+    3. Anime (*Attack on Titan* S01E01 - `tt2560140:1:1`): 40 streams returned (11 direct, 29 external). 100% of external streams prefixed with `🖥️`. Completed in 12.52s.
+
+- HTML-Only External URL Classification & Zip Emoji Tagging:
+  - Enforced strict classification across gateway (`src/addon/classifier.ts`, `src/addon/merge.ts`) and all three fleets (`sa7`, `nuvio`, `vega`):
+    1. Only HTML pages (`.html`, `.htm`, `.php`, `.asp`, `.aspx`, `.jsp`, `.cgi`, embed path patterns, known embed domains) are mapped to `externalUrl` and tagged with `🖥️` in `title`.
+    2. Extensionless URLs (such as `dash-hls-bridge` or direct CDN/API video streams) are NOT `externalUrl`: they remain direct playable streams (`url`).
+    3. Compressed archive files (`.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.bz2`, `.iso`, `.xz`) are NOT `externalUrl`: they remain in `url` and have their `name` property prefixed with the `🔲 ` emoji.
+  - Updated all unit tests in `tests/features/merge.test.ts` to cover extensionless bridge URLs, compressed files with `🔲` emoji in `name`, and HTML embed pages with `🖥️` in `title`. All 47 tests, ESLint, and TypeScript checks pass.
+
+- Codebase Logic & Protocol Issues Audit:
+  - Conducted full audit of all subsystems across gateway, workers (SA7, Nuvio, Vega), config, updaters, and health endpoints.
+  - Documented findings in `docs/audit-findings.md` covering:
+    1. Critical bug: SA7 drops streams with unknown resolution when user config string is passed.
+    2. Critical bug: SA7 content ID parser regex fails on single-suffix season pack IDs (`tt...:season`).
+    3. Bug: Nuvio and Vega internal parsers reject season 0 specials (`season < 1`).
+    4. Bug: Configure UI ignores prefilled configuration string (`prefillJson`), resetting form on edit.
+    5. Gap: `/health` reports empty updater state and zeroed metadata cache because instances are not wired into `StreamHandlerContext`.
+    6. Flaw: `healthcheck.mjs` exits 1 on transient single-worker degradation, killing container unnecessarily.
+    7. Bug: Status dashboard crashes on HTTP 503 instead of rendering failure diagnostics.
+    8. Edge cases: Jikan concurrent rate limiting race condition, CSP `'unsafe-inline'`, container rank regex on `#hash`, and legacy SA7 dead code (`server.js`, `run.js`).
+
+## Key Decisions & Conventions
+- TypeScript with strict mode for all gateway and shared core code.
+- Zero `any` usage.
+- Standardized error handling: all stream requests return `{ "streams": [] }` on failure/empty.
+- Strict HTTP compatibility: `GET`, `HEAD`, `OPTIONS` supported explicitly; `HEAD` never invokes upstream provider fan-out.
+- Documentation commits must always contain `[skip ci]` to prevent redundant CI/CD builds.
+
+- Live Instance Cross-Comparison (Railway Production vs Docker Beamup):
+  - Queried identical movie requests across both live deployments:
+    - Railway: `https://<RAILWAY_BASE_URL>/`
+    - Beamup: `https://<BEAMUP_BASE_URL>/`
+  - Compared responses for *Fight Club* (`tt0137523`) and *The Shawshank Redemption* (`tt0111161`):
+    1. Stream Counts:
+       - *Fight Club*: Railway returned 115 streams (97 direct, 18 externalUrl); Beamup returned 71 streams (53 direct, 18 externalUrl). 50 URLs were identical.
+       - *The Shawshank Redemption*: Railway returned 85 streams (71 direct, 14 externalUrl); Beamup returned 60 streams (46 direct, 14 externalUrl). 41 URLs were identical.
+    2. Fleet & Provider Breakdown:
+       - SA7 Fleet: 100% parity across all SA7 providers (DesiFlix, Movix VF, MultiMovies, NetMirror, RedFlix, VidRock).
+       - Vega & Nuvio Fleets: Discrepancies driven by network egress IP blocks, Cloudflare protection, and timeout differences on Beamup for aggressive scrapers (`4khdHub`, `MoviesMod`, `HdHub4u`, `Maelith`, `Quinox`).
+       - Beamup exclusive provider: `Sylphera.` returned 2 streams on Beamup while returning 0 on Railway.
+    3. Protocol & Specification Verification:
+       - Direct-before-externalUrl sorting: Confirmed compliant on both instances.
+       - External URL emoji prefix: 100% of external links tagged with `🖥️` prefix in `title` on both instances.
+       - Compressed archive emoji prefix: Tagged with `🔲 ` in `name` on both instances (e.g., `🔲 MoviesMod`).
+       - Cache headers: Both instances send `cache-control: no-store` on `/stream` endpoints with internal 30s partial / 180s full cache TTLs.
+       - Manifest differences: Beamup includes `"tmdb:"` in `idPrefixes` (`["tt", "tmdb:"]`), whereas Railway exposes `["tt"]`.
+    4. Report Artifact:
+       - Generated and saved full comparison report to `docs/instance-comparison-report.md`.
+
+- Environment & Tooling:
+  - Installed official Railway CLI (`@railway/cli` v5.74.0) into the environment. Verified binary location (`/root/node-v22.14.0-linux-arm64/bin/railway`) and confirmed operational readiness via `railway --version` and `railway --help`.
+  - Configured Dual-Target CI/CD in `.github/workflows/ci.yml`:
+    - Updated pipeline to run `deploy-beamup` and `deploy-railway` in parallel upon successful completion of `verify` and `docker` smoke test.
+    - `deploy-railway` installs Railway CLI, syncs environment secrets (`TMDB_API_KEY`, `FEBBOX_UI_COOKIE`, `GRAMCINEMA_TOKEN`), and initiates deployment via `railway up --service unified-streams --detach`.
+    - Disconnected direct GitHub webhook trigger on Railway so that GitHub Actions CI/CD serves as the single source of truth for deployments.
+    - Added GitHub Actions repository secret `RAILWAY_TOKEN` and refreshed `TMDB_API_KEY`, `GRAMCINEMA_TOKEN`, and `FEBBOX_UI_COOKIE`.
+    - Synced credentials directly to Railway service `unified-streams` and Dokku on Beamup.
+    - Pushed commit `5247b9f` to `main` and verified end-to-end GitHub Actions workflow execution (run `43538995079`): `Verify` (17s), `Docker Build & Smoke Test` (30s), `Deploy to Railway` (15s), and `Deploy to Beamup` (3m2s) all passed successfully.
+    - Verified live HTTP 200 responses on both Railway (`https://<RAILWAY_BASE_URL>/manifest.json`) and Beamup (`https://<BEAMUP_BASE_URL>/manifest.json`).
+  - Configured Platform-Differentiated Timeouts:
+    - Preserved default 12s backend timeout and 13s global deadline (`config/defaults.env`) for Beamup deployment.
+    - Set `BACKEND_TIMEOUT_MS=27000` (27s) and `GLOBAL_DEADLINE_MS=29000` (29s) on Railway service `unified-streams` via Railway CLI.
+    - Updated `.github/workflows/ci.yml` `deploy-railway` job to sync `BACKEND_TIMEOUT_MS=27000` and `GLOBAL_DEADLINE_MS=29000` on every deployment.
+    - Hardened Dokku environment sync in `.github/workflows/ci.yml` to treat non-fatal Dokku cluster sync hook errors as warnings, preventing false CI failures when Beamup internal post-deploy triggers time out.
+    - Verified all 47 unit/feature tests pass locally without modifying defaults.
+
+- Targeted Multi-Media Provider Benchmark & Platform Categorization:
+  - Ran a targeted 6-title benchmark across both live deployments (Railway vs Docker Beamup):
+    - 2 Movies: *Fight Club* (`tt0137523`), *Interstellar* (`tt0816692`)
+    - 2 Series: *Breaking Bad* S01E01 (`tt0903747:1:1`), *Stranger Things* S01E01 (`tt4574334:1:1`)
+    - 2 Anime: *Attack on Titan* S01E01 (`tt2560140:1:1`), *Death Note* S01E01 (`tt0877057:1:1`)
+  - Overall Stream Yield: Railway returned 653 total streams vs Beamup's 407 total streams (+60.4% on Railway).
+  - Categorized all 39 active providers into platform-compatibility tiers:
+    1. Tier 1 (Cross-Platform Champions - 18 providers): 100% parity across SA7 (`RedFlix`, `MultiMovies`, `ToonStream`, `DesiFlix`, `VidRock`, `NetMirror`, `Movix VF`, `TopCartoons`), Vega (`MovieBox Web`, `Castle TV`, `1Flex`, `MoviezWap`, `AnimeSalt`), and Nuvio (`Tyvrel.`, `Esvyl.`, `Quinox.`, `Haylox.`, `Fendrix.`).
+    2. Tier 2 (Railway-Advantaged / Railway-Only - 17 providers): Vega scrapers (`4khdHub` +123, `MultiStream` +28, `ShowBox` +23, `HdHub4u` +20, `VMovies` +9) and Nuvio scrapers (`Fjoral.` +32, `Xylos.` +18, `Maelith.` +10, `Xandril.` +14, `Vitrix.` +8, `Ozeris.` +7, `Ilvyrel.` +6, `Solunix.` +5, `Qorva.` +3, `Lenyr.` +2, `Phraxis.` +2, `Praxiel.` +2) which are challenged by Cloudflare/IP bans or 11s deadline on Beamup.
+    3. Tier 3 (Beamup-Advantaged - 4 providers): Providers that resolved more or exclusively on Beamup (`AnimeWorld` +35, `Movies4U` +10, `Sylphera.` +8, `RogMovies` +7).
+    4. Tier 4 (Inactive / 0 Streams across both): Documented 34 enabled providers that yielded 0 streams across these 6 targets.
+  - Documented findings in `docs/instance-comparison-report.md` and `docs/provider-compatibility.md`.
+  - Disabled the 17 Railway-only scrapers exclusively on Beamup:
+    - Nuvio scrapers (12): `fjoral,xylos,maelith,xandril,vitrix,ozeris,ilvyrel,solunix,qorva,lenyr,phraxis,praxiel`.
+    - Vega providers (5): `4khdhub,autoEmbed,showbox,hdhub4u,vega`.
+    - Hardened `src/core/env.ts` to sanitize single/double quotes around env lists and merge with base policy.
+    - Updated `.github/workflows/ci.yml` Dokku env sync to maintain disabled lists on Beamup deployments.
+    - Added unit test `tests/features/disabledProviders.test.ts` testing quote stripping and list merging for both fleets.
+    - Verified all 49 Vitest feature tests and full verification pipeline (`npm run verify`) pass.
+
+- Unified Fleet Disabled Providers System & SA7 Deny-List Migration:
+  - Migrated SA7 fleet from an allow-list (`SA7_PROVIDERS` / `PROVIDERS`) to a deny-list (`SA7_DISABLED_PROVIDERS` / `DISABLED_PROVIDERS`), aligning with Nuvio and Vega conventions.
+  - Updated `config/providers.json` so SA7 operates in `mode: "deny"` with the 14 duplicate scrapers (`moviesdrive, 4khdhub, hdhub4u, vegamovies, castle, anizone, moviebox, moviesmod, torrentio, reanime, animeworld, animesalt, anizen, anikage`) disabled, leaving the exact same 14 active scrapers (`dahmermovies, dahmermovies-tv, desiflix, einthusan, kurage, movix-vf, multimovies, netmirror, playimdb, puretoons, redflix, toonstream, topcartoons, vidrock`).
+  - Updated `scripts/check-provider-policy.mjs` to validate `policy.sa7.mode === 'deny'` and ensure `torrentio` is explicitly in `policy.sa7.ids`.
+  - Updated SA7 runtime (`src/fleets/sa7/config.js`, `src/fleets/sa7/providers.js`) to read `process.env.DISABLED_PROVIDERS || process.env.SA7_DISABLED_PROVIDERS || ''` and filter scrapers with `!disabled.has(p.id.toLowerCase())`.
+  - Enhanced `src/core/env.ts` with `SA7_DISABLED_PROVIDERS` schema definition, and refactored `deriveFleetEnv()` into modular helper functions (`cleanEnvList`, `deriveSa7Env`, `deriveNuvioEnv`, `deriveVegaEnv`) complying with the <150 LOC rule.
+  - Added quote-stripping and instance override merging for `SA7_DISABLED_PROVIDERS`, `NUVIO_DISABLED_SCRAPERS`, and `VEGA_DISABLED_PROVIDERS` allowing per-instance provider customization purely via environment variables.
+  - Added unit test coverage in `tests/features/disabledProviders.test.ts` and `tests/features/core.test.ts`; all 51 Vitest feature tests and `npm run verify` pass 100%.
+
+- Platform-Differentiated Provider Allocation (4-Active on Beamup vs Primary on Railway):
+  - Beamup: Configured strictly 4 active providers across the entire addon to avoid ~14s proxy cut-offs and datacenter IP blocks while preserving high-yield Beamup-exclusive scrapers:
+    - `nuvio`: `sylphera` (1 active).
+    - `vega`: `animeworld`, `movies4u`, `luxMovies` (RogMovies) (3 active).
+    - `sa7`: All 28 providers disabled (0 active).
+    - Total active on Beamup = 4 providers.
+  - Railway: Configured as the primary workhorse instance:
+    - Disabled the 4 Beamup-dedicated scrapers (`sylphera` in Nuvio; `animeworld`, `movies4u`, `luxMovies`/`rogmovies` in Vega).
+    - Preserved disabled status for duplicates, Internet Archive, YouTube, and torrent scrapers.
+    - All other scrapers stay active: SA7 has 14 active, Nuvio has 30 active, Vega has 25 active (69 active providers total).
+  - Aliasing in `src/core/env.ts`: `deriveVegaEnv()` automatically maps `rogmovies` and `rogmovie` to `luxMovies` (and vice-versa).
+  - Updated `config/providers.json`, `config/defaults.env`, `.env.example`, `.github/workflows/ci.yml`.
+  - Added unit tests in `tests/features/disabledProviders.test.ts`; all 53 Vitest feature tests and `npm run verify` pass 100%.
+
+- Instance Profile Configuration & Runtime-Overridable Policy:
+  - Replaced per-platform CI hardcoding with `INSTANCE_PROFILE`. Loading order is `config/defaults.env` → `config/instances/<profile>.env` → platform env, so an operator can change timeouts or providers later without a code change while CI only sets the profile and credentials.
+  - Added `config/instances/beamup.env` (12s/13s, 40-way concurrency) and `config/instances/railway.env` (27s/29s, 40-way concurrency).
+  - Moved Beamup's 4-provider selection into `config/providers.json` under `instances.beamup` (SA7 `*` deny; Nuvio `sylphera` allow; Vega `animeworld`/`movies4u`/`luxMovies` allow). Top-level deny lists remain the Railway/default policy.
+  - Added allow-list support and `*` wildcard to SA7, Nuvio, and Vega workers, plus `SA7_CONCURRENCY` bounded provider fan-out. Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`) cannot be re-enabled.
+  - Added Vega > Nuvio > SA7 duplicate priority in `src/addon/merge.ts` so duplicate URLs keep the Vega copy.
+  - CI now sets only `INSTANCE_PROFILE` and secrets for each platform; `scripts/check-provider-policy.mjs` validates default and per-instance blocks.
+  - Added profile, override, wildcard, hard-disable, and merge-priority tests; all 58 Vitest tests and `npm run verify` pass 100%.
+
+- One-Time Legacy Env Cleanup:
+  - Added `.github/workflows/cleanup-env.yml` (`workflow_dispatch`, requires typing `CLEAN`). Beamup's deploy key permits only `config:set` (both `config:unset` and `config:show`/`config:keys` return `001cERR unsupported command`), so the workflow sets all six legacy provider vars to empty values. `src/core/env.ts` treats empty values as no override, which neutralizes the old lists and restarts the app onto the profile.
+  - Run it once after the instance-profile Beamup deploy finishes. Normal pushes still sync only `INSTANCE_PROFILE` and credentials, so later runtime overrides are preserved.
+
+- Comprehensive Code Review & Logic Bug Inspection (Session Nov 14 2026):
+  - Completed deep inspection of gateway, workers (`sa7`, `nuvio`, `vega`), environment & profile logic, updaters, telemetry, and CI/CD pipelines.
+  - Identified and documented 15 findings across the codebase in artifact `code-review.md`:
+    1. Critical bug: SA7 drops streams with unknown resolution when query config is passed (`sa7/worker.js`, `streams.js`, `filters.js`).
+    2. High bug: SA7 content ID parser regex fails on single-suffix season pack IDs (`tt...:season`, `tmdb:...:season`) in `sa7/content-id.js`.
+    3. High bug: Nuvio and Vega internal parsers reject season 0 specials (`season < 1`) in `parseId.ts`.
+    4. Medium bug: Configure UI ignores prefilled configuration string (`prefillJson`), resetting form on edit (`configureHtml.ts`).
+    5. Medium flaw: `healthcheck.mjs` exits 1 on transient single-worker degradation, killing container unnecessarily.
+    6. Medium bug: Status dashboard crashes on HTTP 503 instead of rendering failure diagnostics (`statusHtml.ts`).
+    7. Medium bug: Telemetry type mismatch for SA7 `lastError` object assigned to string field (`breaker.js`, `health.ts`).
+    8. Medium race condition: `JikanClient` concurrent rate limiter race condition causing upstream HTTP 429 (`jikan.ts`).
+    9. Low gap: `/health` reports empty updater state because `UpdaterScheduler` is not wired into `StreamHandlerContext`.
+    10. Low edge case: Nuvio worker health reports 30 scrapers when 0 are active due to falsy `allIds.length || 30`.
+    11. Low security: Content-Security-Policy uses `'unsafe-inline'` on `/configure` and `/status`.
+    12. Low bug: Container rank regex misses URLs with `#` hash fragments (`merge.ts`).
+    13. Low hygiene: Dead legacy SA7 standalone server files (`server.js`, `run.js`).
+    14. Low contract: Internal token header `x-internal-token` never verified by workers.
+    15. Low gap: `Logger` never configures or instantiates `CloudflareSink` when `LOG_SINK=cloudflare`.
+  - All findings verified against runtime code and documented with exact root causes and proposed remedies.
+  - Saved full bug report to `docs/bugs.md` and added `docs/bugs.md` to `.gitignore`.
+
+- Enable Duplicate Scrapers on Beamup Instance (Nov 14 2026):
+  - Enabled all 13 duplicate scrapers disabled in Railway (`moviesdrive, 4khdhub, hdhub4u, vegamovies, castle, anizone, moviebox, moviesmod, reanime, animeworld, animesalt, anizen, anikage`) on Beamup via `instances.beamup.sa7` in `config/providers.json`.
+  - Switched `instances.beamup.sa7` from `"mode": "deny", "ids": ["*"]` to `"mode": "allow"` with the 13 duplicate IDs.
+  - Updated Vitest unit test in `tests/features/disabledProviders.test.ts` to assert that SA7 runs these 13 providers in allowlist mode on Beamup without the wildcard denial.
+  - Validated with `npm run policy:check`, `npm run test:feature`, and `npm run verify` (all passed 100%).
+  - Kept changes local without deploying or pushing, per user instruction.
+
+- Update Documentation (README.md - Nov 14 2026):
+  - Added Docker section with build, run, docker-compose instructions, port mapping, data volume persistence, and health check details.
+  - Added Legal Disclaimer detailing browser/indexer search model and no-media-hosting policy.
+  - Added Third-Party Licenses and attribution section specifying compliance with SA7 ANI (GPL-3.0), Eclipsia / Nuvio (MIT), and Vega / Zenda-Cross (MIT) licenses.
+
+- Fleet Runtime Classification Heuristics (Nov 14 2026):
+  - Investigated Railway status page showing 100% empty responses for certain scrapers due to silent upstream error swallowing (`try { ... } catch { return []; }`).
+  - Implemented Approach B runtime classification heuristics via `AsyncLocalStorage` network request tracking across all three fleets (SA7, Nuvio, Vega) in `src/core/networkClassifier.ts`.
+  - Added unit tests in `tests/features/networkClassifier.test.ts` (8 tests) and verified that aborted/timed out requests or HTTP 4xx/5xx responses are classified accurately as `timeout` or `error` rather than `empty`.
+  - Committed changes in `d8e9a23`.
+
+- Hard-Disable MX Player Provider (Nov 14 2026):
+  - Added `mxplayer` to the hard-disabled providers list alongside `torrentio`, `internetarchive`, `youtube`, and `brellor`.
+  - Synchronized policy across `src/core/env.ts` (`HARD_DISABLED_PROVIDERS`), `src/core/policy.ts` (`DEFAULT_DISABLED_PROVIDERS`), `scripts/check-provider-policy.mjs` (`HARD_DISABLED`), `config/providers.json` (`vega.ids`), `config/provider-audit.csv` (`vega,mxplayer`), `architecture.md`, and `AGENTS.md`.
+  - Added unit test expectation in `tests/features/core.test.ts`.
+  - Per explicit user instruction, bypassed lint/test/verify runs and committed changes directly.
+
+- Conceal Live Instance Domains, Infrastructure Details, and Secrets (Nov 15 2026):
+  - Redacted all live deployment domains, Dokku app identifiers/hashes, Dokku SSH hostnames, Railway project name/IDs, and hardcoded TMDB API key from all tracked repository files (`architecture.md`, `memory.md`, `todo.md`, `scratchpad.md`, `docs/instance-comparison-report.md`, `docs/provider-compatibility.md`).
+  - Updated GitHub Actions CI/CD workflows (`.github/workflows/ci.yml` and `.github/workflows/cleanup-env.yml`):
+    - Dynamically extract Dokku host (`BEAMUP_HOST`) and application path (`APP`) directly from the existing secret `BEAMUP_REMOTE` (`dokku@<host>:<app>`) in pure shell without hardcoding hostnames or app hashes into workflow YAML files.
+    - Parameterized Railway service target via `${{ secrets.RAILWAY_SERVICE || 'unified-streams' }}`.
+  - Retained all architectural, provider routing, concurrency, and timeout specifications.
+  - Performed full repository-wide verification (`npm run verify`) and multi-regex leak scans.
+
+- Rotate TMDB API Key Securely (Nov 15 2026):
+  - Received new TMDB API key from user.
+  - Updated GitHub Actions repository secret `TMDB_API_KEY` via `gh secret set` for `Ashishsri2018/unified-streams`.
+  - Updated Railway environment variable `TMDB_API_KEY` with `--skip-deploys` via Railway CLI (no deployment triggered).
+  - Stored key in gitignored local `.env` file for local development without committing.
+  - Verified 0 occurrences of the new key in any tracked repository file or commit diff.
+
+- Enable Railway Vega Scrapers on Beamup & Hard-Block Live TV (Nov 15 2026):
+  - Enabled Railway Vega deny scrapers (`1cinevood`, `disneyMirror`, `netflixMirror`, `primeMirror`, `luxMovies`, `mxplayer`) on Beamup Vega (`instances.beamup.vega` allow list in `config/providers.json`).
+  - Added live TV providers (`durbinLive` and `liveTgTv`) to `HARD_DISABLED_PROVIDERS`, disabling them unconditionally across both instances.
+  - Removed `mxplayer` from hard-disabled list so it can run on Beamup while remaining denied on Railway.
+  - Synchronized policy across `src/core/env.ts`, `src/core/policy.ts`, `scripts/check-provider-policy.mjs`, `config/providers.json`, `config/provider-audit.csv`, `architecture.md`, and `AGENTS.md`.
+  - Updated and passed unit tests in `tests/features/disabledProviders.test.ts` and `tests/features/core.test.ts`.
+  - Cleared Git commit history and force-pushed clean codebase to `origin main` to purge all historical secrets and domain leaks.

@@ -1,0 +1,80 @@
+import { SubtitleTrack, filterSubtitleTracks } from './subtitles.js';
+import { inferResolution, inferSizeBytes } from '../core/streamQuality.js';
+
+export { inferResolution, inferSizeBytes };
+
+export interface StremioStream {
+  url?: string;
+  externalUrl?: string;
+  infoHash?: string;
+  fileIdx?: number;
+  name?: string;
+  title?: string;
+  description?: string;
+  behaviorHints?: {
+    bingeGroup?: string;
+    proxyHeaders?: Record<string, string>;
+    notWebReady?: boolean;
+    [key: string]: unknown;
+  };
+  subtitles?: SubtitleTrack[];
+  size?: number;
+  quality?: string;
+  [key: string]: unknown;
+}
+
+export interface StreamFilterConfig {
+  minRes: number | null;
+  maxRes: number | null;
+  includeUnknownRes: boolean;
+  maxSizeGB: number | null;
+  includeUnknownSize: boolean;
+  subtitleMode: 'all' | 'none' | 'languages';
+  subtitleLangs: string[];
+  includeUnknownSubtitleLang: boolean;
+}
+
+export function filterStream(stream: StremioStream, config: StreamFilterConfig): StremioStream | null {
+  // 1. Resolution Filter
+  const hasResFilter = config.minRes !== null || config.maxRes !== null;
+  if (hasResFilter) {
+    const res = inferResolution(stream);
+    if (res === null) {
+      if (!config.includeUnknownRes) return null;
+    } else {
+      if (config.minRes !== null && res < config.minRes) return null;
+      if (config.maxRes !== null && res > config.maxRes) return null;
+    }
+  }
+
+  // 2. File Size Filter
+  if (config.maxSizeGB !== null) {
+    const sizeBytes = inferSizeBytes(stream);
+    if (sizeBytes === null) {
+      if (!config.includeUnknownSize) return null;
+    } else {
+      const maxBytes = config.maxSizeGB * 1024 * 1024 * 1024;
+      if (sizeBytes > maxBytes) return null;
+    }
+  }
+
+  // 3. Subtitle Tracks Filter (Streams are NEVER dropped because of subtitles)
+  if (stream.subtitles && stream.subtitles.length > 0 && config.subtitleMode !== 'all') {
+    const filteredTracks = filterSubtitleTracks(
+      stream.subtitles,
+      config.subtitleMode,
+      config.subtitleLangs,
+      config.includeUnknownSubtitleLang,
+    );
+    const copy = { ...stream };
+    if (filteredTracks && filteredTracks.length > 0) {
+      copy.subtitles = filteredTracks;
+    } else {
+      delete copy.subtitles;
+    }
+    return copy;
+  }
+
+  // Inline subtitles belong to the stream object and are passed through as-is.
+  return stream;
+}

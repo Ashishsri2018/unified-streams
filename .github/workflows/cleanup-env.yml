@@ -1,0 +1,49 @@
+name: Cleanup Legacy Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type CLEAN to unset legacy provider env vars on Beamup'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  clean-beamup:
+    name: Unset legacy Beamup provider env vars
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'CLEAN'
+    steps:
+      - name: Configure SSH
+        env:
+          BEAMUP_SSH_PRIVATE_KEY: ${{ secrets.BEAMUP_SSH_PRIVATE_KEY }}
+          BEAMUP_REMOTE: ${{ secrets.BEAMUP_REMOTE }}
+        run: |
+          set -e
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$BEAMUP_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          BEAMUP_HOST="${BEAMUP_REMOTE#*@}"
+          BEAMUP_HOST="${BEAMUP_HOST%:*}"
+          ssh-keyscan -H "$BEAMUP_HOST" >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Unset legacy provider variables
+        env:
+          BEAMUP_REMOTE: ${{ secrets.BEAMUP_REMOTE }}
+        run: |
+          set -euo pipefail
+          BEAMUP_HOST="${BEAMUP_REMOTE#*@}"
+          BEAMUP_HOST="${BEAMUP_HOST%:*}"
+          APP="${BEAMUP_REMOTE#*:}"
+
+          # Beamup's deploy key permits config:set but rejects config:unset and
+          # config:show. Empty values are treated as "no override" by
+          # src/core/env.ts, so this neutralizes the legacy lists and restarts
+          # the app onto config/instances/beamup.env + instances.beamup policy.
+          ssh -o StrictHostKeyChecking=no "dokku@$BEAMUP_HOST" \
+            "config:set $APP SA7_ENABLED_PROVIDERS= SA7_DISABLED_PROVIDERS= NUVIO_ENABLED_SCRAPERS= NUVIO_DISABLED_SCRAPERS= VEGA_ENABLED_PROVIDERS= VEGA_DISABLED_PROVIDERS="
+          echo "Done. Beamup now uses config/instances/beamup.env and instances.beamup policy."
