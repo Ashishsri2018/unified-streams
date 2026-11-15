@@ -603,3 +603,11 @@
   - Synchronized policy across `src/core/env.ts`, `src/core/policy.ts`, `scripts/check-provider-policy.mjs`, `config/providers.json`, `config/provider-audit.csv`, `architecture.md`, and `AGENTS.md`.
   - Updated and passed unit tests in `tests/features/disabledProviders.test.ts` and `tests/features/core.test.ts`.
   - Cleared Git commit history and force-pushed clean codebase to `origin main` to purge all historical secrets and domain leaks.
+
+- Live Series Stream Verification (Nov 15 2026):
+  - Tested series resolution for *Breaking Bad* S01E01 (`tt0903747:1:1`):
+    - Railway production returned 234 streams (220 direct, 14 external) across MultiStream (81), 4khdHub (62), 1Flex (17), MoviesMod (11), MultiMovies (11), ShowBox (9), Esvyl. (7), Fjoral. (5).
+    - Beamup production returned 6 streams (VegaMovies: 3, Sylphera.: 2, Castle: 1).
+  - Tested series resolution for *Stranger Things* S01E01 (`tt4574334:1:1`):
+    - Railway production returned 114 streams across 1Flex (17), AnimeSalt (12), MultiMovies (10), Esvyl. (9), ToonStream (9), ShowBox (6), Fjoral. (6), Hexion. (6), MoviesDrive (6), Xylos. (5).
+    - Verified subsequent gateway cache hit returns in <7s.
