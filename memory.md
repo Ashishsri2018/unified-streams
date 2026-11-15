@@ -1,5 +1,27 @@
 # Unified Streams Memory Log
 
+- Fix URL Classification: Extensionless Streams to `url`, Expanded Media Extensions & Archives (Session Nov 15 2026):
+  - Investigated issue where direct media stream `https://media.satella.buzz/e/aw7-LEwFQNvJKVTJ...` was routed to `externalUrl` with `🖥️` prefix instead of direct `url`.
+  - HTTP probing confirmed `https://media.satella.buzz/e/...` returns `HTTP 200`, `Content-Type: video/mp4`, `Content-Length: 1.4 GB`, and `Accept-Ranges: bytes` — a direct playable media stream.
+  - Root Cause Diagnosed:
+    1. In `src/core/urlClassifier.ts` and `src/fleets/sa7/lib/url-classifier.js`, `EMBED_OR_WEB_PATTERNS` contained overly broad regexes `/\/e\/[a-zA-Z0-9_-]+/i` and `/\/v\/[a-zA-Z0-9_-]+/i`.
+    2. Because the URL path `/e/...` had no media file extension, `isDirectMediaUrl()` returned `false`.
+    3. `isWebPage()` matched the `/e/` regex and classified it as an embed page (`isExternalUrl() === true`), causing `normalizeStreamItem` in `src/addon/merge.ts` to convert it to `externalUrl` with `🖥️`.
+  - Solutions Implemented:
+    1. `src/core/urlClassifier.ts` & `src/fleets/sa7/lib/url-classifier.js`:
+       - Removed `/\/e\/[a-zA-Z0-9_-]+/i` and `/\/v\/[a-zA-Z0-9_-]+/i` from `EMBED_OR_WEB_PATTERNS`. Genuine embed hosts using `/e/` or `/v/` (Streamtape, Doodstream, Mixdrop, FileLions, etc.) remain correctly classified via `KNOWN_EMBED_DOMAINS`.
+       - Extensionless links on arbitrary CDNs and streaming endpoints default to `url` for native in-app Stremio playback.
+       - Expanded `DIRECT_MEDIA_PATTERN` to support additional media containers and audio formats: `3gp`, `3g2`, `ogv`, `ogg`, `mpg`, `mpeg`, `wmv`, `asf`, `vob`, `m2ts`, `mp3`, `aac`, `flac`, `wav`, `m4a`, `opus`.
+       - Expanded `ARCHIVE_EXTENSIONS` to support `tgz`, `tbz2`, `zst` in addition to `zip`, `rar`, `7z`, `tar`, `gz`, `bz2`, `iso`, `xz`. Verified archives route to `externalUrl` with `🔲` name and `🖥️` title markers.
+    2. `tests/features/urlClassifier.test.ts`:
+       - Added tests for extensionless streams (Satella Buzz, `/v/`, `/stream/`, `/playback/`) verifying `isExternalUrl === false` and preservation of `url` at gateway without `🖥️`.
+       - Added tests for `3gp` and extended media formats verifying `isDirectMediaUrl === true` and preservation of `url`.
+       - Added tests for archive extensions (`zip`, `rar`, `7z`, `tar`, `tgz`, `bz2`, `tbz2`, `iso`, `xz`, `zst`) verifying `isArchiveUrl === true`, `isExternalUrl === true`, and gateway markers `🔲` / `🖥️`.
+       - Added tests for known embed domains with `/e/` and `/v/` (Streamtape, Doodstream, Mixdrop, FileLions) verifying they remain in `externalUrl`.
+    3. Cleaned up stale `dist/` build directory to prevent workers from loading stale compiled modules.
+    4. Verified test suite via `npm run test:feature` (25/25 test files passed, 148/148 tests passed), `npm run typecheck` (clean), and `npm run lint` (clean). Did not run verify/build or deploy per user instructions.
+
+
 - Fix Vega Exclusive-OR Rejection on Forwarded TMDB IDs (Session Nov 15 2026):
   - Investigated user report of "nothing from vega" despite SA7 and Nuvio returning 38 streams for *Love, Death & Robots* (`tt9561862:1:1`).
   - Diagnosed root cause in `src/fleets/vega/pipeline/streamHandler.ts`:

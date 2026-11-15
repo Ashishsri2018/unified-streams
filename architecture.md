@@ -62,7 +62,13 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
   - `cache.ts`: Gateway response cache with coalescing and TTL policies.
   - `contentId.ts` & `metadata.ts` & `jikan.ts`: ID parsing and upstream metadata resolution. Canonical year parser (`parseCanonicalYear`) sanitizes Cinemeta year ranges (such as `"2019–"` with unicode en-dash `\u2013`) into pure 4-digit integers to enforce RFC ByteString compliance for HTTP headers.
   - `policy.ts`: Provider policy enforcement and verification.
-  - `urlClassifier.ts`: Single source of truth for URL & stream classification (direct media pattern matching, streaming API endpoints like `/api/watch/m3u8`, web embed/player detection, archive detection, blocker URL drops, and stream key canonicalization).
+  - `urlClassifier.ts`: Single source of truth for URL & stream classification:
+    * Direct playable media recognition across standard extensions (`mp4`, `mkv`, `m4v`, `webm`, `avi`, `mov`, `flv`, `m3u8`, `mpd`, `ts`, `3gp`, `3g2`, `ogv`, `ogg`, `mpg`, `mpeg`, `wmv`, `asf`, `vob`, `m2ts`, `mp3`, `aac`, `flac`, `wav`, `m4a`, `opus`) and streaming API endpoints like `/api/watch/m3u8`.
+    * Extensionless links on media CDNs (e.g. `media.satella.buzz/e/...`, `/v/...`, `/stream/...`, `/play/...`) default to `url` for native in-app Stremio playback.
+    * Web embed and player page detection (HTML extensions `.html`/`.php`/etc., `/embed/`, `/player/`, `/watch/`, `/iframe/`, Telegram links, and `KNOWN_EMBED_DOMAINS` like Streamtape, Doodstream, Mixdrop, FileLions) route to `externalUrl` with `🖥️` prefix.
+    * Compressed archive detection (`.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.tgz`, `.bz2`, `.tbz2`, `.iso`, `.xz`, `.zst`) routes to `externalUrl` with `🔲` name and `🖥️` title markers.
+    * Blocker and anti-bot URL filtering (`/slowdown`, `/ratelimit`, `/antibot`).
+    * Stream key canonicalization and normalization for cross-fleet deduplication.
   - `streamQuality.ts`: Single canonical implementation of resolution inference (8K down to 240p), quality sorting rank, container format ranking (`mp4`/`mkv` > other > `m3u8`/`mpd`), and file size parsing (`parseSizeBytes`, `inferSizeBytes`).
   - `streamHeaders.ts`: Upstream proxy header sanitization (stripping hop-by-hop and `Proxy-*` headers, CRLF injection protection), placeholder host identification (`example.com`, `localhost`, etc.), and safe HTTP URL parsing.
   - `subtitles.ts`: Centralized subtitle track formatting, ISO base code mapping for global and Indic languages, and user preference filtering.

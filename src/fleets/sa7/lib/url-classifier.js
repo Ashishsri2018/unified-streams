@@ -11,15 +11,14 @@ try {
   core = null;
 }
 
-const ARCHIVE_EXTENSIONS = /\.(zip|rar|7z|tar|gz|bz2|iso|xz)($|\?|&|#)/i;
+const ARCHIVE_EXTENSIONS = /\.(zip|rar|7z|tar|gz|bz2|iso|xz|tgz|tbz2|zst)($|\?|&|#)/i;
 const BLOCKER_URL_PATTERN = /\/(slowdown|ratelimit|antibot)\b/i;
-const DIRECT_MEDIA_PATTERN = /(?:\.|\/)(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts)(?:$|[?&#/])/i;
+const DIRECT_MEDIA_PATTERN =
+  /(?:\.|\/)(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])/i;
 const HTML_EXTENSIONS = /\.(html?|php|aspx?|jsp|cgi)($|\?|&|#)/i;
 
 const EMBED_PATH_PATTERNS = [
   /\/embed(?:\/|\?|$)/i,
-  /\/e\/[a-zA-Z0-9_-]+/i,
-  /\/v\/[a-zA-Z0-9_-]+/i,
   /\/iframe(?:\/|\?|$)/i,
   /\/player(?:\/|\?|$)/i,
   /\/watch(?:\/|\?|$)/i,

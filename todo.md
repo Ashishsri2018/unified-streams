@@ -119,6 +119,7 @@
   - [x] Add comprehensive automated tests in `tests/features/subtitles.test.ts` and `tests/features/subtitlesFilter.test.ts`
 
   - [x] Unify URL and stream classification in `src/core/urlClassifier.ts`, resolving `/api/watch/m3u8` misclassification as `externalUrl` and centralizing rules across fleets and gateway
+  - [x] Fix URL classification for extensionless streams, expanded media formats (3gp, 3g2, ogv, ogg, wmv, asf, mpg, mpeg, m2ts, vob, mp3, flac), and archive formats (zip, rar, 7z, tar, tgz, tbz2, zst); ensure extensionless CDN streams stay in `url` for in-app Stremio playback
   - [x] Implement fleet runtime classification heuristics (`src/core/networkClassifier.ts`, `src/fleets/sa7/lib/tracker.js`, `nuvio/pipeline.ts`, `vega/streamHandler.ts`) to accurately classify swallowed network/API failures as error/timeout without touching provider code
   - [x] Consolidate all 8 gateway-fleet code duplications and architectural redundancies (`src/core/streamQuality.ts`, `src/core/streamHeaders.ts`, `src/core/subtitles.ts`, `contentId.ts`, metadata forwarding) and prune `docs/gateway-fleet-duplications.md`
   - [x] Fix SA7 unknown resolution dropping bug on configured requests (`src/fleets/sa7/worker.js`)

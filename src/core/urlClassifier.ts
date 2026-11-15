@@ -8,19 +8,18 @@
  * - Canonical stream key normalization for cross-fleet deduplication
  */
 
-export const ARCHIVE_EXTENSIONS = /\.(zip|rar|7z|tar|gz|bz2|iso|xz)($|\?|&|#)/i;
+export const ARCHIVE_EXTENSIONS = /\.(zip|rar|7z|tar|gz|bz2|iso|xz|tgz|tbz2|zst)($|\?|&|#)/i;
 export const BLOCKER_URL_PATTERN = /\/(slowdown|ratelimit|antibot)\b/i;
 
-// Direct media extensions or path segments (e.g. .m3u8, /m3u8, .mp4, /mp4, .mpd, /mpd)
-export const DIRECT_MEDIA_PATTERN = /(?:\.|\/)(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts)(?:$|[?&#/])/i;
+// Direct media extensions or path segments (e.g. .m3u8, /m3u8, .mp4, /mp4, .mpd, /mpd, .3gp, etc.)
+export const DIRECT_MEDIA_PATTERN =
+  /(?:\.|\/)(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])/i;
 export const HTML_EXTENSIONS = /\.(html?|php|aspx?|jsp|cgi)($|\?|&|#)/i;
 
 export const EMBED_OR_WEB_PATTERNS = [
   /\/embed(?:\/|\?|$)/i,
   /\/player(?:\/|\?|$)/i,
   /\/watch(?:\/|\?|$)/i,
-  /\/e\/[a-zA-Z0-9_-]+/i,
-  /\/v\/[a-zA-Z0-9_-]+/i,
   /\/iframe(?:\/|\?|$)/i,
   /\/tg\/(?:go|bot)\b/i,
   /t\.me\//i,
