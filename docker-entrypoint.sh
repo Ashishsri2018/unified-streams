@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 set -e
 
+# Reduce glibc malloc arena overhead for the multi-process Node runtime.
+# Must be set before Node starts; setting it at runtime has no effect.
+export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-1}"
+
 # Ensure data directories exist
 mkdir -p "${DATA_DIR:-/data}/tmp" \
          "${DATA_DIR:-/data}/sa7" \

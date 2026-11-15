@@ -21,7 +21,8 @@ ENV NODE_ENV=production \
     PORT=7000 \
     DATA_DIR=/data \
     HOME=/data \
-    TMPDIR=/data/tmp
+    TMPDIR=/data/tmp \
+    MALLOC_ARENA_MAX=1
 
 RUN mkdir -p /data/tmp \
     && apt-get update \
