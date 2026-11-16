@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Inline `stream.subtitles` tracks are no longer filtered or rewritten by the gateway; provider subtitle tracks pass through unchanged.
 
 ### Fixed
+- Gateway-to-worker loopback requests now use the native `fetch` instead of Vega's process-wide provider transport shim. Previously those calls inherited Vega's `HTTP_TIMEOUT_MS` (15s) and were aborted long before the configured Railway `BACKEND_TIMEOUT_MS` (27s), so slower fleets returned empty/partial results for series like *The 100*. The fix covers SA7, Nuvio, and Vega, plus worker reload/health calls.
 - A `mal:` movie request whose AnimeAPI mapping is a TV title no longer queries the TMDB movie endpoint, and TMDB title search no longer accepts an unrelated first result.
 - The `/status` dashboard now renders a 503 `/health` response instead of showing "unreachable"; those responses still carry a full, renderable health report.
 - SA7 `lastError` objects are normalized to readable strings in `/health`, `/stats`, and `/status` instead of showing `[object Object]`.

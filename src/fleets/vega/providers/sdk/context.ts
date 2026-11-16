@@ -8,6 +8,7 @@ import type {
 } from "axios";
 import * as cheerio from "cheerio";
 import type { NetworkTracker } from "../../../../core/networkClassifier.js";
+import { nativeFetch } from "../../util/nativeFetch.js";
 import type {
   CookieJarApi,
   HttpRequestOptions,
@@ -154,6 +155,16 @@ class TransportResponse {
 }
 
 let previousServedUrls: UrlsSnapshot | null = null;
+
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "::1" ||
+    /^127(?:\.\d{1,3}){3}$/.test(host)
+  );
+}
 
 function isSnapshotUrl(url: URL): boolean {
   if (url.hostname.toLowerCase() !== RAW_GITHUB_HOST) return false;
@@ -458,10 +469,17 @@ export function installGlobalFetch(options: {
   };
   if (!globalRecord.providerGlobal) globalRecord.providerGlobal = globalThis;
 
-  const shim = async (input: string | URL | Request, init?: RequestInit): Promise<TransportResponse> => {
+  const shim = async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ): Promise<TransportResponse | Response> => {
     const request = typeof Request !== "undefined" && input instanceof Request ? input : null;
     const rawUrl = request ? request.url : input instanceof URL ? input.toString() : String(input);
     const parsedUrl = new URL(rawUrl);
+
+    if (isLoopbackHost(parsedUrl.hostname)) {
+      return nativeFetch(input, init);
+    }
 
     if (isSnapshotUrl(parsedUrl)) {
       const active = options.getActiveUrls();
