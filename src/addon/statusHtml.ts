@@ -259,8 +259,16 @@ function render(data) {
 async function refresh() {
   try {
     const response = await fetch("/health", { cache: "no-store" });
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    render(await response.json());
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error("HTTP " + response.status + " (invalid JSON)");
+    }
+    if (!data || typeof data !== "object") {
+      throw new Error("HTTP " + response.status + " (invalid payload)");
+    }
+    render(data);
   } catch (error) {
     overall.className = "badge error";
     overall.innerHTML = '<span class="dot"></span><span>unreachable</span>';
@@ -286,7 +294,7 @@ export function renderStatusPage(options: StatusPageOptions): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${options.addonName} - Status</title>
-<style>${css}</style>
+<style nonce="${options.scriptNonce}">${css}</style>
 </head>
 <body>
 <main>

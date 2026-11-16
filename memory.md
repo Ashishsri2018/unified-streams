@@ -38,6 +38,7 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Live series checks:** *Breaking Bad* S01E01 returned 234 streams on Railway vs 6 on Beamup; *Stranger Things* S01E01 returned 114 on Railway. Gateway cache hits returned in <7s.
 
 ## Recent sessions (Nov 16 2026)
+- **Final todo sweep:** removed the three operational entries from `todo.md`; verified configure prefill and SA7 `server.js`/`run.js` removal were already resolved. Switched the Docker healthcheck to a `HEAD /health` liveness probe, made `/status` render 503 health payloads, nonced inline `<style>` and dropped `'unsafe-inline'` from `style-src`, and normalized SA7 object-shaped `lastError` values in gateway health aggregation. Local lint/typecheck/feature tests only; no deploy.
 - **Rate-limit cleanup:** removed the dead Vega token-bucket `RateLimiter` (`src/fleets/vega/addon/rateLimit.ts`) and its six unused `STREAM_*`/`PROXY_*` config fields from `src/fleets/vega/config.ts`; closed the matching `todo.md` item. It was never wired into any handler, so no live behavior changed. Local lint/typecheck/feature tests only; build/verify skipped by request.
 
 ## Key Decisions & Conventions

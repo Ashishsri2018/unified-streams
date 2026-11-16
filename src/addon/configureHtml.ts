@@ -15,7 +15,7 @@ export function renderConfigurePageHtml(
   <meta name="theme-color" content="#070b14">
   <title>Unified Streams — Configure</title>
   <link rel="icon" type="image/x-icon" href="${baseUrl}/favicon.ico">
-  <style>
+  <style nonce="${scriptNonce}">
     :root {
       color-scheme: dark;
       --bg: #070b14;

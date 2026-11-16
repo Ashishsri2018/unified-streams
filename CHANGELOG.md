@@ -4,11 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Changed
+- The Docker healthcheck is now a pure liveness probe (`HEAD /health`) and no longer parses the health report body, so a transient single-fleet restart cannot falsely mark the container unhealthy.
+- HTML pages now apply their CSP nonce to inline `<style>` as well as `<script>`, and `'unsafe-inline'` was removed from `style-src`.
+- Closed the remaining `todo.md` items: dropped the three operational entries, and verified configure prefill and SA7 `server.js`/`run.js` removal were already resolved.
 - Removed the unused Vega client rate limiter (`RateLimiter`) and its six dead `STREAM_*`/`PROXY_*` rate-limit configuration fields. No requests were ever rate-limited; this deletes unused code only.
 - Redesigned `/configure` with grouped stream filters, provider fleet cards, a live human-readable filter summary, inline validation, and a clearer install flow.
 - Inline `stream.subtitles` tracks are no longer filtered or rewritten by the gateway; provider subtitle tracks pass through unchanged.
 
 ### Fixed
+- The `/status` dashboard now renders a 503 `/health` response instead of showing "unreachable"; those responses still carry a full, renderable health report.
+- SA7 `lastError` objects are normalized to readable strings in `/health`, `/stats`, and `/status` instead of showing `[object Object]`.
 - Automatic provider updates now work for SA7: the scheduler downloads `SA7ANI/cb-providers` into `DATA_DIR/sa7/cb-providers`, seeds that directory from the bundled snapshot, swaps files atomically, and points the worker at the updated manifest. The scheduler also waits for worker readiness before the startup update, treats a failed reload as a failed check without advancing the stored SHA, and retries after 5 minutes.
 - Route archives (`.zip`, `.rar`, `.7z`, etc.) to `externalUrl` because mobile players cannot open them; they keep the `🔲` name prefix and gain the `🖥️` title prefix. Extensionless URLs (such as `dash-hls-bridge` or direct CDN endpoints) remain direct playable streams in `url`.
 - Revert timeout defaults to `GLOBAL_DEADLINE_MS=13000` and `BACKEND_TIMEOUT_MS=12000` (11s worker budget), ensuring cold requests return before Beamup's ~13.2s proxy cutoff and preventing Cloudflare 504 gateway timeouts.

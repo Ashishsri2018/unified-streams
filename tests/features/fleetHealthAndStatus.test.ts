@@ -153,6 +153,32 @@ describe('fleet health and manifest normalization', () => {
       expect(nuvioComp.error).toContain('Remote head fetch failed');
     });
 
+    it('normalizes object-shaped lastError values to readable strings', () => {
+      const objectError = { outcome: 'error', message: 'SA7 upstream exploded', at: 123 };
+      const fleets = {
+        sa7: {
+          fleet: 'sa7',
+          ok: true,
+          status: 'degraded',
+          startedAt: new Date().toISOString(),
+          uptimeSec: 100,
+          snapshot: { sha: 'abc', fetchedAt: new Date().toISOString(), ageMs: 1000, refreshing: false, lastError: objectError },
+          providers: {
+            total: 1,
+            circuits: { open: 0, halfOpen: 0 },
+            stats: [{ id: 'sa7-prov', state: 'open', calls: 1, ok: 0, errors: 1, lastError: objectError }],
+          },
+          metrics: { requests: 10, cacheHits: 0, cacheMisses: 10, emptyResults: 0, deadlineHits: 0, settleHits: 0, providerFailures: 0 },
+        },
+      } as unknown as Record<string, WorkerHealth | { error: string }>;
+
+      const result = aggregateFleetProviders(fleets, Date.now());
+      expect(result.providers.stats[0]?.lastError).toBe('SA7 upstream exploded');
+      expect(result.components[0]?.status).toBe('degraded');
+      expect(result.components[0]?.error).toContain('SA7 upstream exploded');
+      expect(result.components[0]?.error).not.toContain('[object Object]');
+    });
+
     it('marks fleet as error when unreachable or 0 providers available', () => {
       const fleets: Record<string, WorkerHealth | { error: string }> = {
         sa7: { error: 'ECONNREFUSED 127.0.0.1:7001' },

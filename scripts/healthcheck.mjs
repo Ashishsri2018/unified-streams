@@ -7,14 +7,8 @@ const timer = setTimeout(() => {
 }, 5000);
 
 try {
-  const res = await fetch(url, { signal: controller.signal });
-  if (res.ok) {
-    const json = await res.json();
-    if (json.status !== 'error') {
-      process.exit(0);
-    }
-  }
-  process.exit(1);
+  const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+  process.exit(res.ok ? 0 : 1);
 } catch {
   process.exit(1);
 } finally {

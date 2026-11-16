@@ -35,7 +35,7 @@ export function handleConfigure(req: Request, res: Response, configuredPublicUrl
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader(
     'Content-Security-Policy',
-    `default-src 'self'; script-src 'nonce-${nonce}'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:;`,
+    `default-src 'self'; script-src 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}' https:; img-src 'self' data: https:;`,
   );
   res.setHeader('Access-Control-Allow-Origin', '*');
 

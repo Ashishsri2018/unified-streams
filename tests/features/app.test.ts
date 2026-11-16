@@ -146,8 +146,9 @@ describe('gateway HTTP endpoints and contract', () => {
     const csp = res.headers['content-security-policy'];
     const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
     expect(nonce).toBeTruthy();
-    expect(csp).not.toContain("default-src 'self' 'unsafe-inline'");
+    expect(csp).not.toContain("'unsafe-inline'");
     expect(res.text).toContain(`<script nonce="${nonce}">`);
+    expect(res.text).toContain(`<style nonce="${nonce}">`);
   });
 
   it('GET /:config/configure prefills the saved configuration', async () => {
@@ -296,8 +297,9 @@ describe('gateway HTTP endpoints and contract', () => {
     const csp = resGet.headers['content-security-policy'];
     const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
     expect(nonce).toBeTruthy();
-    expect(csp).not.toContain("default-src 'self' 'unsafe-inline'");
+    expect(csp).not.toContain("'unsafe-inline'");
     expect(resGet.text).toContain(`<script nonce="${nonce}">`);
+    expect(resGet.text).toContain(`<style nonce="${nonce}">`);
   });
 
   it('GET /health aggregates providers and components across all fleets', async () => {

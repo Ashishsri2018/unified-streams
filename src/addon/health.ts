@@ -11,6 +11,23 @@ import {
 import { StreamHandlerContext } from './stream.js';
 import { logger } from '../core/logger.js';
 
+function normalizeLastError(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'string') return value.slice(0, 300);
+  if (value instanceof Error) return (value.message || String(value)).slice(0, 300);
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if (typeof record.message === 'string' && record.message) return record.message.slice(0, 300);
+    if (typeof record.outcome === 'string' && record.outcome) return record.outcome.slice(0, 300);
+    try {
+      return JSON.stringify(value).slice(0, 300);
+    } catch {
+      return '[unserializable error]';
+    }
+  }
+  return String(value).slice(0, 300);
+}
+
 export function aggregateFleetProviders(
   fleets: Record<string, WorkerHealth | { error: string }>,
   startedAt: number,
@@ -34,9 +51,9 @@ export function aggregateFleetProviders(
       : Math.floor((Date.now() - startedAt) / 1000);
 
     const providerTotal = !isError && fleetHealth.providers ? (fleetHealth.providers.total || 0) : 0;
-    const snapshotError = !isError && fleetHealth.snapshot ? fleetHealth.snapshot.lastError : null;
+    const snapshotError = !isError && fleetHealth.snapshot ? normalizeLastError(fleetHealth.snapshot.lastError) : null;
     const fleetUpdater = updater ? updater[name] : undefined;
-    const updaterError = fleetUpdater?.lastError || null;
+    const updaterError = fleetUpdater ? normalizeLastError(fleetUpdater.lastError) : null;
     const circuitsOpen = !isError && fleetHealth.providers?.circuits ? fleetHealth.providers.circuits.open : 0;
 
     let status: 'ok' | 'degraded' | 'error';
@@ -97,7 +114,7 @@ export function aggregateFleetProviders(
             skipped: stat.skipped ?? 0,
             successRate: stat.successRate ?? null,
             avgMs: stat.avgMs ?? null,
-            lastError: stat.lastError ?? null,
+            lastError: normalizeLastError(stat.lastError),
           });
         }
       }
