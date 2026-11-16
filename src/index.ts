@@ -19,6 +19,7 @@ import {
 import { createVegaHandlers } from './fleets/vega/worker.js';
 import { createNuvioHandlers } from './fleets/nuvio/worker.js';
 import { logger } from './core/logger.js';
+import { installConsoleGuard } from './core/logging/consoleGuard.js';
 import { StremioStream } from './addon/filters.js';
 
 type Fleet = 'sa7' | 'nuvio' | 'vega';
@@ -80,6 +81,10 @@ async function main(): Promise<void> {
   const env = loadAppEnv();
   const startedAt = Date.now();
   ensureFleetDirs(env);
+
+  const uninstallConsoleGuard = installConsoleGuard({
+    onSuppressed: (count) => logger.warn('console.suppressed', { count }),
+  });
 
   logger.info('gateway.starting', {
     port: env.PORT,
@@ -148,6 +153,7 @@ async function main(): Promise<void> {
     server.close();
     scheduler.stop();
     await stopFleets();
+    uninstallConsoleGuard();
     await logger.close();
     process.exit(0);
   };
