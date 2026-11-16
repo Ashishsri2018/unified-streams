@@ -13,8 +13,8 @@ npm run test:feature
 npx vitest run tests/features/app.test.ts -t "GET and HEAD /"   # single test
 npm run lint
 npm run typecheck
-npm run build        # tsc + copy vendored fleet assets into dist
-npm run verify       # policy -> icon -> lint -> typecheck -> all tests -> build
+npm run build        # CI only: tsc + copy vendored fleet assets into dist
+npm run verify       # CI only: policy -> icon -> lint -> typecheck -> all tests -> build
 ```
 - ESLint ignores `src/fleets/sa7/**` and vendored fleet snapshots/baselines; `tsc` also excludes SA7 and `tests/`. SA7 edits must be plain JS.
 - `npm run dev` prefers `dist/fleets/*/worker.js` when present, so it can run stale compiled workers. Rebuild or delete `dist/` after changing worker source.
@@ -33,11 +33,13 @@ npm run verify       # policy -> icon -> lint -> typecheck -> all tests -> build
 - Cache only non-empty gateway results: 180s complete, 30s partial, coalesced. Stream responses themselves are `no-store`.
 - Only HTML pages and archives (`.zip`, `.rar`, `.7z`, etc.) go in `externalUrl`; direct playable media and extensionless links stay in `url`. Archives carry both the `🔲` name prefix and the `🖥️` title prefix applied in `src/addon/merge.ts`.
 - SA7 reads providers from `DATA_DIR/sa7/cb-providers` (seeded from the bundled vendor snapshot); the updater replaces that copy atomically and then reloads the worker. Do not update bundled assets at runtime.
+- Client/user rate limiting is not required and must not be added. Do not introduce per-IP/per-user token buckets, 429 throttles, or rate-limit config/env fields; unrelated internal throttles (provider concurrency, Jikan/console rate limits, circuit breakers) are fine.
 - New HTTP/config/env input should pass Zod; `any` is a lint error. Redact secrets and full stream URLs in logs.
 
 ## Tests, CI, and deploys
 - Tests are feature/unit tests under `tests/features/`; they mock workers and do not require Docker or upstream network. Live stream behavior needs real credentials/network.
 - The GitHub Actions workflow is the source of truth for `verify` (policy, icon, lint, typecheck, all Vitest tests, build) and the Docker build/smoke test run there. Local Vitest runs are allowed for iteration, but do not treat other local-only checks as sufficient evidence.
+- Never run `npm run build` or `npm run verify` locally; leave them to GitHub Actions. For local checks use `npm run lint`, `npm run typecheck`, and `npm run test:feature`.
 - Do not deploy to Beamup, Railway, or Cloudflare unless explicitly asked. A push to `main` triggers the production deploy workflow, so do not push unless explicitly allowed.
 - `deploy-cloudflare.yml` is manual and only deploys the optional log ingest Worker.
 - Docker runtime needs `config/`, `assets/`, `scripts/`, plus vendored `sa7`, `nuvio/snapshot`, and `vega/providers-baseline` copied into `dist` by `scripts/copy-fleet-assets.mjs`.

@@ -9,7 +9,6 @@ Completed work is recorded in `CHANGELOG.md` and `memory.md`.
 - [ ] Hydrate prefilled configuration in `src/addon/configureHtml.ts`.
 - [ ] `scripts/healthcheck.mjs`: don't terminate the container during transient single-worker restarts.
 - [ ] Fix the `/status` dashboard 503 crash in `src/addon/statusHtml.ts`.
-- [ ] Serialize requests in `src/core/jikan.ts` to avoid upstream rate-limit races.
 - [ ] Generate CSP nonces for HTML pages and remove `'unsafe-inline'`.
 - [ ] Remove dead SA7 files (`server.js`, `run.js`).
 - [ ] Normalize SA7 `lastError` objects to strings in `src/addon/health.ts`.

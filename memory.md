@@ -37,6 +37,9 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Railway CLI logs:** `railway status` showed the service online; HTTP and error logs showed healthy Nuvio/Vega extraction. Expected warnings: Turnstile requirement for Vega `everything` (no headless solver) and high log throughput during scraper bursts.
 - **Live series checks:** *Breaking Bad* S01E01 returned 234 streams on Railway vs 6 on Beamup; *Stranger Things* S01E01 returned 114 on Railway. Gateway cache hits returned in <7s.
 
+## Recent sessions (Nov 16 2026)
+- **Rate-limit cleanup:** removed the dead Vega token-bucket `RateLimiter` (`src/fleets/vega/addon/rateLimit.ts`) and its six unused `STREAM_*`/`PROXY_*` config fields from `src/fleets/vega/config.ts`; closed the matching `todo.md` item. It was never wired into any handler, so no live behavior changed. Local lint/typecheck/feature tests only; build/verify skipped by request.
+
 ## Key Decisions & Conventions
 - TypeScript strict mode, zero `any`; all stream failures return `{ "streams": [] }` with HTTP 200.
 - Explicit `GET`/`HEAD`/`OPTIONS`; `HEAD` never triggers provider fan-out; `/subtitles*` is always 404.

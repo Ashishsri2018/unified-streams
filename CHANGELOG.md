@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 ### Changed
+- Removed the unused Vega client rate limiter (`RateLimiter`) and its six dead `STREAM_*`/`PROXY_*` rate-limit configuration fields. No requests were ever rate-limited; this deletes unused code only.
 - Redesigned `/configure` with grouped stream filters, provider fleet cards, a live human-readable filter summary, inline validation, and a clearer install flow.
 - Inline `stream.subtitles` tracks are no longer filtered or rewritten by the gateway; provider subtitle tracks pass through unchanged.
 
