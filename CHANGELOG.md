@@ -3,7 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+### Added
+- `mal:` stream IDs now resolve end-to-end: AnimeAPI supplies the canonical IMDb/TMDB mapping, with Jikan title/year plus TMDB search as fallback, and the gateway fan-out uses the rewritten ID with season/episode suffixes preserved. The manifest always advertises `mal:`.
+
 ### Changed
+- MAL metadata resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped to 500–2000ms: 1s on Beamup, 2s on Railway), so worker deadlines and the ~13s Beamup proxy budget are unchanged.
 - The Docker healthcheck is now a pure liveness probe (`HEAD /health`) and no longer parses the health report body, so a transient single-fleet restart cannot falsely mark the container unhealthy.
 - HTML pages now apply their CSP nonce to inline `<style>` as well as `<script>`, and `'unsafe-inline'` was removed from `style-src`.
 - Closed the remaining `todo.md` items: dropped the three operational entries, and verified configure prefill and SA7 `server.js`/`run.js` removal were already resolved.

@@ -57,7 +57,6 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
       addonVersion: ctx.addonVersion,
       baseUrl,
       hasTmdb: Boolean(ctx.hasTmdb),
-      hasMal: Boolean(ctx.hasMal),
     });
     res.status(200).json(manifest);
   };

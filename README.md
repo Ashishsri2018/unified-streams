@@ -7,7 +7,7 @@ Unified Stremio stream addon combining SA7, Nuvio, and Vega provider fleets behi
 - **Three Internal Fleets**: SA7, Nuvio, and Vega run as loopback worker processes (`127.0.0.1`).
 - **One Stream Cache**: Response cache at the gateway with 180s TTL for full results and 30s TTL for partial results. Non-empty results only.
 - **Unified Filtering**: Gateway filtering for resolution ranges and file size caps. Inline subtitle tracks returned with a stream are passed through unchanged.
-- **Full ID Support**: Resolves IMDb (`tt`), TMDB (`tmdb:`), and MyAnimeList (`mal:`).
+- **Full ID Support**: Resolves IMDb (`tt`) and TMDB (`tmdb:`) directly. `mal:` IDs are mapped to a canonical IMDb/TMDB ID via AnimeAPI (Jikan + TMDB search fallback) before fleet fan-out; the manifest advertises all three prefixes.
 - **HTTP/1.1 Strict Compatibility**: Explicit `GET`, `HEAD`, and `OPTIONS` handling across all endpoints.
 - **In-Process Updaters**: 20-24 hour jittered background refresh for provider definitions without external cron dependencies.
 

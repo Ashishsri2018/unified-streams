@@ -33,7 +33,7 @@ export const EnvSchema = z.object({
   UPDATE_INTERVAL_MAX_HOURS: z.coerce.number().int().min(1).default(24),
   CINEMETA_URL: z.string().url().default('https://v3-cinemeta.strem.io'),
   TMDB_URL: z.string().url().default('https://api.themoviedb.org/3'),
-  MAL_ENABLED: z.preprocess((val) => val === 'true' || val === true || val === '1', z.boolean()).default(false),
+  ANIMEAPI_URL: z.string().url().default('https://animeapi.my.id'),
   JIKAN_URL: z.string().url().default('https://api.jikan.moe/v4'),
   JIKAN_MAX_RPS: z.coerce.number().int().min(1).default(3),
   JIKAN_MAX_RPM: z.coerce.number().int().min(1).default(60),
@@ -107,6 +107,14 @@ export function loadAppEnv(customEnv: NodeJS.ProcessEnv = process.env): AppEnv {
 }
 
 export const WORKER_DEADLINE_MARGIN_MS = 1000;
+
+export const MAL_RESOLVE_MIN_MS = 500;
+export const MAL_RESOLVE_MAX_MS = 2000;
+
+export function deriveMalResolveBudgetMs(env: AppEnv): number {
+  const headroom = env.GLOBAL_DEADLINE_MS - env.BACKEND_TIMEOUT_MS;
+  return Math.max(MAL_RESOLVE_MIN_MS, Math.min(MAL_RESOLVE_MAX_MS, headroom));
+}
 
 // These classes are disabled for every fleet and every instance regardless of
 // the selected provider policy. Only an explicit policy change to this list

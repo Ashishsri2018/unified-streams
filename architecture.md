@@ -45,7 +45,7 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
   - `logger.ts` & `logging/`: Structured event logging, sinks, redaction.
   - `telemetry.ts`: Canonical health and stats metrics aggregation.
   - `cache.ts`: Gateway response cache with coalescing and TTL policies.
-  - `contentId.ts` & `metadata.ts` & `jikan.ts`: ID parsing and upstream metadata resolution. Canonical year parser (`parseCanonicalYear`) sanitizes Cinemeta year ranges (such as `"2019–"` with unicode en-dash `\u2013`) into pure 4-digit integers to enforce RFC ByteString compliance for HTTP headers.
+  - `contentId.ts` & `metadata.ts` & `jikan.ts` & `animeapi.ts`: ID parsing and upstream metadata resolution. `mal:` IDs are mapped to a canonical IMDb/TMDB ID via AnimeAPI (`ANIMEAPI_URL`), with Jikan + TMDB title search fallback; the gateway rewrites the ID (preserving season/episode suffixes) before fleet fan-out. Canonical year parser (`parseCanonicalYear`) sanitizes Cinemeta year ranges (such as `"2019–"` with unicode en-dash `\u2013`) into pure 4-digit integers to enforce RFC ByteString compliance for HTTP headers.
   - `policy.ts`: Provider policy enforcement and verification.
   - `urlClassifier.ts`: Single source of truth for URL & stream classification:
     * Direct playable media recognition across standard extensions (`mp4`, `mkv`, `m4v`, `webm`, `avi`, `mov`, `flv`, `m3u8`, `mpd`, `ts`, `3gp`, `3g2`, `ogv`, `ogg`, `mpg`, `mpeg`, `wmv`, `asf`, `vob`, `m2ts`, `mp3`, `aac`, `flac`, `wav`, `m4a`, `opus`) and streaming API endpoints like `/api/watch/m3u8`.
@@ -100,6 +100,7 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
   - **Beamup Deployment**: `config/instances/beamup.env` sets `BACKEND_TIMEOUT_MS=12000` (12s), `GLOBAL_DEADLINE_MS=13000` (13s), and derived worker deadline `11000` (11s) to fit strictly within Beamup's ~14s reverse proxy cut-off.
   - **Railway Deployment**: `config/instances/railway.env` sets `BACKEND_TIMEOUT_MS=27000` (27s), `GLOBAL_DEADLINE_MS=29000` (29s), and derived worker deadline `26000` (26s), taking advantage of Railway's support for extended connection durations to yield streams from slower scrapers (e.g. `4khdHub`, `Maelith`).
   - Both profiles set 40-way concurrency (`SEARCH_CONCURRENCY`, `SCRAPER_CONCURRENCY`, `SA7_CONCURRENCY`).
+  - MAL resolution is bounded by `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped to 500–2000ms: 1s Beamup, 2s Railway). This uses only the existing gap before the worker fetch, so the worker budget is untouched; on expiry the gateway returns `{ "streams": [] }` without fan-out.
 - **Dual CI/CD Deployment Pipeline (`.github/workflows/ci.yml`)**:
   - Runs on `main` push and manual `workflow_dispatch`.
   - Stages:

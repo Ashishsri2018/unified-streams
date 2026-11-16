@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { parseContentId } from '../core/contentId.js';
+import { parseContentId, type ParsedContentId } from '../core/contentId.js';
 import { decodeUserConfig, toFilterConfig } from './userConfig.js';
 import { GatewayStreamCache } from '../core/cache.js';
 import { WorkerClient } from '../core/workerClient.js';
@@ -18,7 +18,6 @@ export interface StreamHandlerContext {
   gitCommit?: string;
   publicBaseUrl?: string;
   hasTmdb?: boolean;
-  hasMal?: boolean;
   maxStreams: number;
   globalDeadlineMs: number;
   workerTimeoutMs: number;
@@ -32,6 +31,11 @@ export interface StreamHandlerContext {
 // used for log delivery only; caching stays in the gateway.
 function setStreamCacheHeaders(res: Response): void {
   res.setHeader('Cache-Control', 'no-store');
+}
+
+function canonicalIdSuffix(parsed: ParsedContentId): string {
+  if (parsed.season === undefined) return '';
+  return parsed.episode === undefined ? `:${parsed.season}` : `:${parsed.season}:${parsed.episode}`;
 }
 
 export async function handleStreamRoute(
@@ -80,6 +84,7 @@ export async function handleStreamRoute(
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {
       // Resolve canonical metadata once in the gateway to eliminate redundant upstream calls
       let forwardedMeta: ForwardedMetadata | undefined;
+      let forwardId = rawId;
       if (parsedId.family === 'tmdb') {
         const numericTmdb = Number(parsedId.cleanId.slice('tmdb:'.length));
         if (Number.isSafeInteger(numericTmdb) && numericTmdb > 0) {
@@ -99,10 +104,22 @@ export async function handleStreamRoute(
               tmdbId: resolved.tmdbId ?? forwardedMeta?.tmdbId,
               imdbId: resolved.imdbId ?? forwardedMeta?.imdbId,
             };
+            if (parsedId.family === 'mal') {
+              const suffix = canonicalIdSuffix(parsedId);
+              if (resolved.imdbId) {
+                forwardId = `${resolved.imdbId}${suffix}`;
+              } else if (resolved.tmdbId && resolved.tmdbId > 0) {
+                forwardId = `tmdb:${resolved.tmdbId}${suffix}`;
+              }
+            }
           }
         } catch {
           // Proceed with existing metadata on resolver error
         }
+      }
+
+      if (parsedId.family === 'mal' && forwardId === rawId) {
+        return { value: { streams: [] }, isPartial: false };
       }
 
       const selectedFleets = userConfig.backends.filter((b) => ctx.workers[b]);
@@ -111,7 +128,7 @@ export async function handleStreamRoute(
         const worker = ctx.workers[fleetName];
         const resStream = await worker.fetchStream(
           rawType,
-          rawId,
+          forwardId,
           rawConfig,
           workerTimeoutMs,
           requestId,

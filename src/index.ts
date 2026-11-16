@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import v8 from 'node:v8';
 import { createRequire } from 'node:module';
-import { loadAppEnv, deriveFleetEnv, type AppEnv } from './core/env.js';
+import { deriveMalResolveBudgetMs, loadAppEnv, deriveFleetEnv, type AppEnv } from './core/env.js';
 import { ensureFleetDirs } from './core/fleetBootstrap.js';
 import { GatewayStreamCache } from './core/cache.js';
 import { WorkerClient } from './core/workerClient.js';
@@ -130,6 +130,8 @@ async function main(): Promise<void> {
     tmdbUrl: env.TMDB_URL,
     jikanMaxRps: env.JIKAN_MAX_RPS,
     jikanMaxRpm: env.JIKAN_MAX_RPM,
+    animeApiUrl: env.ANIMEAPI_URL,
+    malResolveBudgetMs: deriveMalResolveBudgetMs(env),
   });
 
   const ctx = {
@@ -140,7 +142,6 @@ async function main(): Promise<void> {
     gitCommit: env.GIT_COMMIT,
     publicBaseUrl: env.PUBLIC_BASE_URL,
     hasTmdb: Boolean(env.TMDB_API_KEY),
-    hasMal: env.MAL_ENABLED,
     maxStreams: env.MAX_STREAMS,
     globalDeadlineMs: env.GLOBAL_DEADLINE_MS,
     workerTimeoutMs: env.BACKEND_TIMEOUT_MS,

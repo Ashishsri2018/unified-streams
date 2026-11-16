@@ -1,3 +1,5 @@
+import { AnimeApiClient } from './animeapi.js';
+import { IMDB_ID_PATTERN } from './contentId.js';
 import { JikanClient } from './jikan.js';
 
 export interface CanonicalMetadata {
@@ -33,6 +35,8 @@ export class MetadataResolver {
   private readonly tmdbUrl: string;
   private readonly tmdbApiKey?: string;
   private readonly jikan: JikanClient;
+  private readonly animeApi: AnimeApiClient;
+  private readonly malResolveBudgetMs: number;
   private readonly posTtlMs = 86400000; // 24 hours
   private readonly negTtlMs = 60000;    // 60 seconds
   private readonly maxEntries = 5000;
@@ -47,12 +51,16 @@ export class MetadataResolver {
       tmdbUrl?: string;
       jikanMaxRps?: number;
       jikanMaxRpm?: number;
+      animeApiUrl?: string;
+      malResolveBudgetMs?: number;
     },
   ) {
     this.cinemetaUrl = cinemetaUrl.replace(/\/+$/, '');
     this.tmdbUrl = (options?.tmdbUrl ?? 'https://api.themoviedb.org/3').replace(/\/+$/, '');
     this.tmdbApiKey = tmdbApiKey;
     this.jikan = new JikanClient(jikanUrl, options?.jikanMaxRps, options?.jikanMaxRpm);
+    this.malResolveBudgetMs = Math.max(250, options?.malResolveBudgetMs ?? 2000);
+    this.animeApi = new AnimeApiClient(options?.animeApiUrl, this.malResolveBudgetMs);
   }
 
   private getCached(key: string): CanonicalMetadata | null | undefined {
@@ -111,7 +119,7 @@ export class MetadataResolver {
     }
   }
 
-  async resolveTmdb(type: 'movie' | 'series', tmdbNumericId: number): Promise<CanonicalMetadata | null> {
+  async resolveTmdb(type: 'movie' | 'series', tmdbNumericId: number, signal?: AbortSignal): Promise<CanonicalMetadata | null> {
     const cacheKey = `tmdb:${type}:${tmdbNumericId}`;
     const cached = this.getCached(cacheKey);
     if (cached !== undefined) return cached;
@@ -121,10 +129,16 @@ export class MetadataResolver {
       return null;
     }
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const onAbort = () => controller.abort();
+    if (signal?.aborted) controller.abort();
+    else signal?.addEventListener('abort', onAbort, { once: true });
+
     try {
       const endpoint = type === 'movie' ? 'movie' : 'tv';
       const url = `${this.tmdbUrl}/${endpoint}/${tmdbNumericId}?api_key=${this.tmdbApiKey}&external_source=imdb_id`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) {
         this.setCache(cacheKey, null);
         return null;
@@ -138,7 +152,7 @@ export class MetadataResolver {
         title,
         year,
         type,
-        imdbId: d.imdb_id,
+        imdbId: typeof d.imdb_id === 'string' && IMDB_ID_PATTERN.test(d.imdb_id) ? d.imdb_id : undefined,
         tmdbId: tmdbNumericId,
       };
       this.setCache(cacheKey, meta);
@@ -146,6 +160,44 @@ export class MetadataResolver {
     } catch {
       this.setCache(cacheKey, null);
       return null;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    }
+  }
+
+  private async searchTmdbByTitle(
+    type: 'movie' | 'series',
+    title: string,
+    year: number | undefined,
+    signal: AbortSignal,
+  ): Promise<number | undefined> {
+    if (!title || !this.tmdbApiKey) return undefined;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const onAbort = () => controller.abort();
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+
+    try {
+      const endpoint = type === 'movie' ? 'movie' : 'tv';
+      const params = new URLSearchParams();
+      params.set('api_key', this.tmdbApiKey);
+      params.set('query', title);
+      if (year !== undefined) params.set(type === 'movie' ? 'year' : 'first_air_date_year', String(year));
+      const res = await fetch(`${this.tmdbUrl}/search/${endpoint}?${params.toString()}`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) return undefined;
+      const json = (await res.json()) as { results?: Array<{ id?: unknown }> };
+      const id = json.results?.[0]?.id;
+      return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : undefined;
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
     }
   }
 
@@ -154,19 +206,54 @@ export class MetadataResolver {
     const cached = this.getCached(cacheKey);
     if (cached !== undefined) return cached;
 
-    const anime = await this.jikan.getAnime(malNumericId);
-    if (!anime) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.malResolveBudgetMs);
+
+    try {
+      const mapping = await this.animeApi.getMapping(malNumericId, controller.signal);
+      if (mapping && (mapping.imdbId || mapping.tmdbId)) {
+        const meta: CanonicalMetadata = {
+          title: mapping.title ?? '',
+          type,
+          imdbId: mapping.imdbId,
+          tmdbId: mapping.tmdbId,
+        };
+        if (!meta.title && meta.tmdbId) {
+          const detail = await this.resolveTmdb(type, meta.tmdbId, controller.signal);
+          if (detail) {
+            meta.title = detail.title;
+            meta.year = detail.year;
+            meta.imdbId = detail.imdbId ?? meta.imdbId;
+          }
+        }
+        this.setCache(cacheKey, meta);
+        return meta;
+      }
+
+      const anime = await this.jikan.getAnime(malNumericId, this.malResolveBudgetMs, controller.signal);
+      if (!anime) {
+        this.setCache(cacheKey, null);
+        return null;
+      }
+
+      const title = anime.titleEnglish || anime.title;
+      let imdbId: string | undefined;
+      let tmdbId = await this.searchTmdbByTitle(type, title, anime.year, controller.signal);
+      if (tmdbId) {
+        const detail = await this.resolveTmdb(type, tmdbId, controller.signal);
+        imdbId = detail?.imdbId;
+        tmdbId = detail?.tmdbId ?? tmdbId;
+      }
+
+      const meta: CanonicalMetadata = { title, year: anime.year, type, imdbId, tmdbId };
+      this.setCache(cacheKey, meta);
+      return meta;
+    } catch {
       this.setCache(cacheKey, null);
       return null;
+    } finally {
+      clearTimeout(timer);
     }
-
-    const meta: CanonicalMetadata = {
-      title: anime.titleEnglish || anime.title,
-      year: anime.year,
-      type,
-    };
-    this.setCache(cacheKey, meta);
-    return meta;
   }
 
   async resolveContent(type: 'movie' | 'series', parsed: { family: string; cleanId: string }): Promise<CanonicalMetadata | null> {

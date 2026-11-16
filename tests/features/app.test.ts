@@ -49,6 +49,7 @@ describe('gateway HTTP endpoints and contract', () => {
     workers: mockWorkers,
     addonVersion: '1.0.0',
     policyVersion: '1.0.0',
+    hasTmdb: true,
     maxStreams: 1000,
     globalDeadlineMs: 12000,
     workerTimeoutMs: 10000,
@@ -73,6 +74,7 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(resGet.status).toBe(200);
     expect(resGet.body.id).toBe('org.unifiedstreams.addon');
     expect(resGet.body.resources).toEqual(['stream']);
+    expect(resGet.body.idPrefixes).toEqual(['tt', 'tmdb:', 'mal:']);
     expect(resGet.headers['cache-control']).toBe('public, max-age=300');
     expect(resGet.headers['access-control-allow-origin']).toBe('*');
 

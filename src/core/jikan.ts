@@ -63,11 +63,14 @@ export class JikanClient {
     if (expired > 0) this.requestTimes = this.requestTimes.slice(expired);
   }
 
-  async getAnime(malNumericId: number, timeoutMs = 8000): Promise<JikanAnimeData | null> {
+  async getAnime(malNumericId: number, timeoutMs = 8000, signal?: AbortSignal): Promise<JikanAnimeData | null> {
     await this.waitForSlot();
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const onAbort = () => controller.abort();
+    if (signal?.aborted) controller.abort();
+    else signal?.addEventListener('abort', onAbort, { once: true });
 
     try {
       const res = await fetch(`${this.baseUrl}/anime/${malNumericId}`, {
@@ -95,6 +98,7 @@ export class JikanClient {
       return null;
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 }
