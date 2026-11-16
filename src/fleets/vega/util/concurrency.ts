@@ -12,14 +12,16 @@ export class Semaphore {
       return () => this.release();
     }
     await new Promise<void>((resolve) => this.waiters.push(resolve));
-    this.active += 1;
     return () => this.release();
   }
 
   private release(): void {
-    this.active -= 1;
     const next = this.waiters.shift();
-    if (next) next();
+    if (next) {
+      next();
+      return;
+    }
+    this.active -= 1;
   }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {

@@ -6,8 +6,12 @@ import { WorkerSnapshot } from '../telemetry.js';
 import { logger } from '../logger.js';
 
 const RETRY_DELAY_MS = 5 * 60 * 1000;
+const MAX_RETRIES = 3;
 const WORKER_READY_TIMEOUT_MS = 30_000;
 const WORKER_READY_POLL_MS = 1_000;
+
+type Fleet = 'sa7' | 'nuvio' | 'vega';
+type CheckOutcome = 'ok' | 'failed' | 'skipped';
 
 export interface SchedulerOptions {
   dataDir: string;
@@ -21,8 +25,9 @@ export class UpdaterScheduler {
   private readonly options: SchedulerOptions;
   private readonly workers: Record<'sa7' | 'nuvio' | 'vega', WorkerClient>;
   private readonly stateStores: Record<'sa7' | 'nuvio' | 'vega', UpdaterStateStore>;
-  private readonly timers = new Map<'sa7' | 'nuvio' | 'vega', NodeJS.Timeout>();
-  private readonly refreshing = new Set<string>();
+  private readonly timers = new Map<Fleet, NodeJS.Timeout>();
+  private readonly refreshing = new Set<Fleet>();
+  private readonly retryCounts = new Map<Fleet, number>();
 
   constructor(
     workers: Record<'sa7' | 'nuvio' | 'vega', WorkerClient>,
@@ -40,7 +45,7 @@ export class UpdaterScheduler {
   private calculateJitterMs(): number {
     const minMs = this.options.minHours * 3600 * 1000;
     const maxMs = this.options.maxHours * 3600 * 1000;
-    return Math.floor(minMs + Math.random() * (maxMs - minMs));
+    return Math.floor(minMs + Math.random() * Math.max(0, maxMs - minMs));
   }
 
   start(): void {
@@ -72,7 +77,7 @@ export class UpdaterScheduler {
   }
 
   private async runScheduledCheck(
-    fleet: 'sa7' | 'nuvio' | 'vega',
+    fleet: Fleet,
     waitForReady: boolean,
   ): Promise<void> {
     if (waitForReady && !(await this.waitForWorker(fleet))) {
@@ -81,16 +86,33 @@ export class UpdaterScheduler {
         lastError: 'Worker was not ready for the initial update',
       });
       logger.warn('updater.failed', { fleet, error: 'worker_not_ready' });
-      this.scheduleRetry(fleet);
+      this.recordFailure(fleet);
       return;
     }
 
-    const ok = await this.checkFleet(fleet);
-    if (ok) {
+    const outcome = await this.runCheck(fleet);
+    if (outcome === 'skipped') return;
+    if (outcome === 'ok') {
       this.scheduleNext(fleet);
-    } else {
-      this.scheduleRetry(fleet);
+      return;
     }
+    this.recordFailure(fleet);
+  }
+
+  private recordFailure(fleet: Fleet): void {
+    const attempts = (this.retryCounts.get(fleet) ?? 0) + 1;
+    if (attempts > MAX_RETRIES) {
+      logger.warn('updater.retry.exhausted', { fleet, attempts: attempts - 1 });
+      this.scheduleNext(fleet);
+      return;
+    }
+    this.retryCounts.set(fleet, attempts);
+    logger.info('updater.retry', {
+      fleet,
+      attempt: attempts,
+      maxAttempts: MAX_RETRIES,
+    });
+    this.scheduleRetry(fleet);
   }
 
   private async waitForWorker(fleet: 'sa7' | 'nuvio' | 'vega'): Promise<boolean> {
@@ -105,7 +127,8 @@ export class UpdaterScheduler {
     return false;
   }
 
-  private scheduleNext(fleet: 'sa7' | 'nuvio' | 'vega'): void {
+  private scheduleNext(fleet: Fleet): void {
+    this.retryCounts.delete(fleet);
     const delayMs = this.calculateJitterMs();
     this.stateStores[fleet].update({ nextRun: Date.now() + delayMs });
     this.setTimer(fleet, delayMs, false);
@@ -116,8 +139,13 @@ export class UpdaterScheduler {
     this.setTimer(fleet, RETRY_DELAY_MS, false);
   }
 
-  async checkFleet(fleet: 'sa7' | 'nuvio' | 'vega'): Promise<boolean> {
-    if (this.refreshing.has(fleet)) return false;
+  async checkFleet(fleet: Fleet): Promise<boolean> {
+    const outcome = await this.runCheck(fleet);
+    return outcome === 'ok';
+  }
+
+  private async runCheck(fleet: Fleet): Promise<CheckOutcome> {
+    if (this.refreshing.has(fleet)) return 'skipped';
     this.refreshing.add(fleet);
 
     logger.info('updater.started', { fleet });
@@ -135,13 +163,13 @@ export class UpdaterScheduler {
       if (!remoteHead) {
         this.stateStores[fleet].update({ lastCheck: Date.now(), lastError: 'Remote head fetch failed' });
         logger.warn('updater.failed', { fleet, error: 'Remote head fetch failed' });
-        return false;
+        return 'failed';
       }
 
       if (current.sha && current.sha === remoteHead.sha) {
         this.stateStores[fleet].update({ lastCheck: Date.now(), lastError: null });
         logger.info('updater.head.resolved', { fleet, sha: remoteHead.sha, status: 'unchanged' });
-        return true;
+        return 'ok';
       }
 
       await this.installUpdate(fleet, remoteHead.sha);
@@ -155,12 +183,12 @@ export class UpdaterScheduler {
       });
 
       logger.info('updater.installed', { fleet, sha: remoteHead.sha });
-      return true;
+      return 'ok';
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.stateStores[fleet].update({ lastCheck: Date.now(), lastError: msg });
       logger.error('updater.failed', err, { fleet });
-      return false;
+      return 'failed';
     } finally {
       this.refreshing.delete(fleet);
     }
@@ -190,7 +218,13 @@ export class UpdaterScheduler {
     }
 
     const health = await this.workers[fleet].getHealth(2000);
-    if (!('error' in health) && health.snapshot?.sha && health.snapshot.sha !== sha) {
+    if ('error' in health) {
+      throw new Error(`${fleet} worker health check failed: ${health.error}`);
+    }
+    if (!health.ok) {
+      throw new Error(`${fleet} worker reported unhealthy after reload`);
+    }
+    if (fleet === 'sa7' && health.snapshot?.sha && health.snapshot.sha !== sha) {
       throw new Error(
         `${fleet} worker still reports snapshot ${health.snapshot.sha}, expected ${sha}`,
       );

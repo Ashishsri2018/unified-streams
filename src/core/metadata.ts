@@ -30,6 +30,7 @@ interface CacheItem {
 export class MetadataResolver {
   private cache = new Map<string, CacheItem>();
   private readonly cinemetaUrl: string;
+  private readonly tmdbUrl: string;
   private readonly tmdbApiKey?: string;
   private readonly jikan: JikanClient;
   private readonly posTtlMs = 86400000; // 24 hours
@@ -38,10 +39,20 @@ export class MetadataResolver {
   private hits = 0;
   private misses = 0;
 
-  constructor(cinemetaUrl = 'https://v3-cinemeta.strem.io', tmdbApiKey?: string, jikanUrl?: string) {
+  constructor(
+    cinemetaUrl = 'https://v3-cinemeta.strem.io',
+    tmdbApiKey?: string,
+    jikanUrl?: string,
+    options?: {
+      tmdbUrl?: string;
+      jikanMaxRps?: number;
+      jikanMaxRpm?: number;
+    },
+  ) {
     this.cinemetaUrl = cinemetaUrl.replace(/\/+$/, '');
+    this.tmdbUrl = (options?.tmdbUrl ?? 'https://api.themoviedb.org/3').replace(/\/+$/, '');
     this.tmdbApiKey = tmdbApiKey;
-    this.jikan = new JikanClient(jikanUrl);
+    this.jikan = new JikanClient(jikanUrl, options?.jikanMaxRps, options?.jikanMaxRpm);
   }
 
   private getCached(key: string): CanonicalMetadata | null | undefined {
@@ -112,7 +123,7 @@ export class MetadataResolver {
 
     try {
       const endpoint = type === 'movie' ? 'movie' : 'tv';
-      const url = `https://api.themoviedb.org/3/${endpoint}/${tmdbNumericId}?api_key=${this.tmdbApiKey}&external_source=imdb_id`;
+      const url = `${this.tmdbUrl}/${endpoint}/${tmdbNumericId}?api_key=${this.tmdbApiKey}&external_source=imdb_id`;
       const res = await fetch(url);
       if (!res.ok) {
         this.setCache(cacheKey, null);
@@ -121,7 +132,7 @@ export class MetadataResolver {
       const d = (await res.json()) as { title?: string; name?: string; release_date?: string; first_air_date?: string; imdb_id?: string };
       const title = d.title || d.name || '';
       const dateStr = d.release_date || d.first_air_date || '';
-      const year = dateStr ? parseInt(dateStr.slice(0, 4), 10) : undefined;
+      const year = dateStr ? parseCanonicalYear(dateStr) : undefined;
 
       const meta: CanonicalMetadata = {
         title,

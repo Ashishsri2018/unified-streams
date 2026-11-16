@@ -5,6 +5,7 @@ import type {
   MediaType,
   TmdbApi,
 } from "../types.js";
+import { IMDB_ID_PATTERN } from "../../../core/contentId.js";
 import { TtlCache } from "../util/cache.js";
 import { withTimeout } from "../util/concurrency.js";
 import { nativeFetch } from "../util/nativeFetch.js";
@@ -14,7 +15,6 @@ const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_LANGUAGE = "en-US";
 const MAX_VIDEOS = 10_000;
 const MAX_EPISODES_PER_SEASON = 1000;
-const IMDB_ID = /^tt\d{7,10}$/;
 
 export interface TmdbClientOptions {
   apiKey: string;
@@ -135,7 +135,7 @@ export class TmdbClient implements TmdbApi {
     const rawImdbId = trimString(
       type === "movie" ? payload.imdb_id : external?.imdb_id,
     );
-    const imdbId = IMDB_ID.test(rawImdbId) ? rawImdbId : null;
+    const imdbId = IMDB_ID_PATTERN.test(rawImdbId) ? rawImdbId : null;
 
     const meta: CinemetaMeta = {
       id: imdbId ?? `tmdb:${tmdbId}`,

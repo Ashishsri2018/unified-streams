@@ -12,14 +12,16 @@ export class Semaphore {
       return () => this.release();
     }
     await new Promise<void>((resolve) => this.waiters.push(resolve));
-    this.active += 1;
     return () => this.release();
   }
 
   private release(): void {
-    this.active -= 1;
     const next = this.waiters.shift();
-    if (next) next();
+    if (next) {
+      next();
+      return;
+    }
+    this.active -= 1;
   }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
@@ -74,19 +76,44 @@ export class TimeoutError extends Error {
   }
 }
 
-export function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): Promise<T> {
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label = "operation",
+  signal?: AbortSignal,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new TimeoutError(`${label} aborted`));
+      return;
+    }
+    let onAbort: (() => void) | undefined;
     const timer = setTimeout(() => {
+      cleanup();
       reject(new TimeoutError(`${label} timed out after ${ms}ms`));
     }, Math.max(1, ms));
     timer.unref?.();
+
+    function cleanup(): void {
+      clearTimeout(timer);
+      if (onAbort && signal) signal.removeEventListener("abort", onAbort);
+    }
+
+    if (signal) {
+      onAbort = () => {
+        cleanup();
+        reject(signal?.reason ?? new TimeoutError(`${label} aborted`));
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+
     promise.then(
       (value) => {
-        clearTimeout(timer);
+        cleanup();
         resolve(value);
       },
       (error) => {
-        clearTimeout(timer);
+        cleanup();
         reject(error);
       },
     );

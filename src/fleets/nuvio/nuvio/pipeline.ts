@@ -110,6 +110,7 @@ async function collectStreams(options: {
   perProviderTimeoutMs: number;
   logger: LoggerLike;
   attempt?: (id: string) => boolean;
+  signal?: AbortSignal;
   run: (scraper: LoadedScraper) => Promise<unknown[]>;
 }): Promise<CollectResult> {
   const {
@@ -119,6 +120,7 @@ async function collectStreams(options: {
     perProviderTimeoutMs,
     logger,
     attempt,
+    signal,
     run,
   } = options;
   const results: CollectedStreams[] = [];
@@ -134,6 +136,10 @@ async function collectStreams(options: {
       cursor += 1;
       if (index >= scrapers.length) return;
       const scraper = scrapers[index] as LoadedScraper;
+      if (signal?.aborted) {
+        done = true;
+        return;
+      }
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
         done = true;
@@ -153,6 +159,7 @@ async function collectStreams(options: {
             Promise.resolve(run(scraper)),
             timeoutMs,
             scraper.entry.id,
+            signal,
           ),
         );
         const latencyMs = Date.now() - startedAt;
@@ -196,19 +203,22 @@ async function collectStreams(options: {
           });
         }
       } catch (error) {
+        const aborted = Boolean(signal?.aborted);
         const isTimeout = error instanceof TimeoutError;
         stats.push({
           id: scraper.entry.id,
           ok: false,
           streams: 0,
           latencyMs: Date.now() - startedAt,
-          error: isTimeout ? "timeout" : "error",
-          lastError: isTimeout ? "timeout" : errorMessage(error),
+          error: aborted ? "deadline" : isTimeout ? "timeout" : "error",
+          lastError: aborted ? "request aborted" : isTimeout ? "timeout" : errorMessage(error),
         });
-        logger.debug("nuvio_scraper_failed", {
-          scraper: scraper.entry.id,
-          error: errorMessage(error),
-        });
+        if (!aborted) {
+          logger.debug("nuvio_scraper_failed", {
+            scraper: scraper.entry.id,
+            error: errorMessage(error),
+          });
+        }
       }
     }
   };
@@ -487,6 +497,7 @@ export class StreamPipeline {
         perProviderTimeoutMs: this.config.scraperTimeoutMs,
         logger: this.logger,
         attempt: (id) => this.metrics.attempt(id),
+        signal,
         run: (scraper) =>
           scraper.getStreams(
             tmdbId,

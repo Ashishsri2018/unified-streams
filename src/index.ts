@@ -18,7 +18,7 @@ import {
 } from './core/internalServer.js';
 import { createVegaHandlers } from './fleets/vega/worker.js';
 import { createNuvioHandlers } from './fleets/nuvio/worker.js';
-import { logger } from './core/logger.js';
+import { configureLoggerFromEnv, logger } from './core/logger.js';
 import { installConsoleGuard } from './core/logging/consoleGuard.js';
 import { StremioStream } from './addon/filters.js';
 
@@ -79,6 +79,7 @@ async function startFleets(env: AppEnv): Promise<() => Promise<void>> {
 
 async function main(): Promise<void> {
   const env = loadAppEnv();
+  configureLoggerFromEnv(env);
   const startedAt = Date.now();
   ensureFleetDirs(env);
 
@@ -94,9 +95,7 @@ async function main(): Promise<void> {
   });
 
   process.on('unhandledRejection', (reason) => {
-    logger.error('process.unhandled_rejection', {
-      error: reason instanceof Error ? reason.message : String(reason),
-    });
+    logger.error('process.unhandled_rejection', reason);
   });
   process.on('uncaughtException', (error) => {
     logger.error('process.uncaught_exception', {
@@ -127,13 +126,21 @@ async function main(): Promise<void> {
   const stopFleets = await startFleets(env);
   scheduler.start();
 
-  const metadataResolver = new MetadataResolver(env.CINEMETA_URL, env.TMDB_API_KEY);
+  const metadataResolver = new MetadataResolver(env.CINEMETA_URL, env.TMDB_API_KEY, env.JIKAN_URL, {
+    tmdbUrl: env.TMDB_URL,
+    jikanMaxRps: env.JIKAN_MAX_RPS,
+    jikanMaxRpm: env.JIKAN_MAX_RPM,
+  });
 
   const ctx = {
     cache,
     workers,
     addonVersion: env.ADDON_VERSION,
     policyVersion: '1.0.0',
+    gitCommit: env.GIT_COMMIT,
+    publicBaseUrl: env.PUBLIC_BASE_URL,
+    hasTmdb: Boolean(env.TMDB_API_KEY),
+    hasMal: env.MAL_ENABLED,
     maxStreams: env.MAX_STREAMS,
     globalDeadlineMs: env.GLOBAL_DEADLINE_MS,
     workerTimeoutMs: env.BACKEND_TIMEOUT_MS,

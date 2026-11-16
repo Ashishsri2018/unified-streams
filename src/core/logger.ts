@@ -1,5 +1,8 @@
+import type { AppEnv } from './env.js';
 import { LogEvent, LogLevel, ServiceName } from './logging/events.js';
 import { LogQueue } from './logging/queue.js';
+import { CloudflareSink } from './logging/cloudflareSink.js';
+import type { LogSink } from './logging/sink.js';
 import { StdoutSink } from './logging/stdoutSink.js';
 
 export interface LoggerOptions {
@@ -96,6 +99,16 @@ export class Logger {
     });
   }
 
+  configure(options: Partial<LoggerOptions>, sinks: LogSink[]): void {
+    this.queue.dispose();
+    this.options = { ...this.options, ...options };
+    this.queue = new LogQueue(sinks, {
+      maxSize: this.options.queueMax,
+      batchSize: this.options.batchSize,
+      flushIntervalMs: this.options.flushMs,
+    });
+  }
+
   getQueueMetrics() {
     return this.queue.getMetrics();
   }
@@ -110,3 +123,27 @@ export class Logger {
 }
 
 export const logger = new Logger();
+
+export function configureLoggerFromEnv(env: AppEnv): void {
+  const sinks: LogSink[] =
+    env.LOG_SINK === 'cloudflare' && env.CLOUDFLARE_LOG_ENDPOINT
+      ? [
+          new CloudflareSink({
+            endpoint: env.CLOUDFLARE_LOG_ENDPOINT,
+            token: env.CLOUDFLARE_LOG_TOKEN,
+          }),
+        ]
+      : [new StdoutSink(env.LOG_FORMAT === 'pretty')];
+
+  logger.configure(
+    {
+      minLevel: env.LOG_LEVEL,
+      sampleRate: env.LOG_SAMPLE_RATE,
+      slowMs: env.LOG_SLOW_MS,
+      queueMax: env.LOG_QUEUE_MAX,
+      batchSize: env.LOG_BATCH_SIZE,
+      flushMs: env.LOG_FLUSH_MS,
+    },
+    sinks,
+  );
+}

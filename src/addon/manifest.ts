@@ -3,7 +3,6 @@ export interface ManifestOptions {
   baseUrl: string;
   hasTmdb: boolean;
   hasMal: boolean;
-  userConfigEncoded?: string;
 }
 
 export interface StremioManifest {

@@ -163,18 +163,19 @@ export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: nu
 
   const { providers, components } = aggregateFleetProviders(fleets, startedAt, latencies, updater);
 
+  const hasError = components.length > 0 && components.every((c) => c.status === 'error');
   const isDegraded = components.some((c) => c.status !== 'ok');
-  const status: HealthStatus = isDegraded ? 'degraded' : 'ok';
+  const status: HealthStatus = hasError ? 'error' : isDegraded ? 'degraded' : 'ok';
 
   const cacheStats = ctx.cache.getStats();
   const queueMetrics = logger.getQueueMetrics();
 
   return {
-    ok: !isDegraded,
+    ok: status === 'ok',
     status,
     addon: 'Unified Streams',
     version: ctx.addonVersion,
-    commit: process.env.GIT_COMMIT || 'development',
+    commit: ctx.gitCommit || 'development',
     startedAt: new Date(startedAt).toISOString(),
     uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
     checkedAt: new Date().toISOString(),
@@ -220,13 +221,12 @@ export async function handleHealth(
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  if (req.method === 'HEAD') {
-    res.status(200).end();
-    return;
-  }
-
   const report = await buildHealthReport(ctx, startedAt);
   const httpStatus = report.status === 'error' ? 503 : 200;
+  if (req.method === 'HEAD') {
+    res.status(httpStatus).end();
+    return;
+  }
   res.status(httpStatus).json(report);
 }
 

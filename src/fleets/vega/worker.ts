@@ -83,7 +83,7 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
         ...(Number.isFinite(metaYear) ? { year: metaYear } : {}),
       });
     }
-    if (Number.isSafeInteger(metaTmdb) && metaTmdb > 0 && 'imdbId' in streamRequest) {
+    if (Number.isSafeInteger(metaTmdb) && metaTmdb > 0) {
       streamRequest = { ...streamRequest, tmdbId: metaTmdb };
     }
 

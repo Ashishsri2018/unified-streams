@@ -18,6 +18,7 @@ import type {
   StremioSubtitle,
 } from "../types.js";
 import { contentIdOf, requestLogFields } from "../addon/parseId.js";
+import { IMDB_ID_PATTERN } from "../../../core/contentId.js";
 import { isProviderEnabled } from "../../../core/policy.js";
 import { ProviderTelemetry } from "../../../core/providerTelemetry.js";
 import { TtlCache } from "../util/cache.js";
@@ -155,7 +156,7 @@ function parseRequest(value: unknown): StreamRequest | null {
       ? request.tmdbId
       : null;
   if (imdbId === null && tmdbId === null) return null;
-  if (imdbId !== null && !/^tt\d{7,10}$/.test(imdbId)) return null;
+  if (imdbId !== null && !IMDB_ID_PATTERN.test(imdbId)) return null;
 
   const providers = parseProviderList(request.providers);
   const disabledProviders = parseProviderList(request.disabledProviders);
@@ -718,7 +719,7 @@ export class StreamPipeline implements StreamHandlerApi {
     const resolvedImdbId =
       "imdbId" in request
         ? request.imdbId
-        : /^tt\d{7,10}$/.test(metaImdbId)
+        : IMDB_ID_PATTERN.test(metaImdbId)
           ? metaImdbId
           : null;
 

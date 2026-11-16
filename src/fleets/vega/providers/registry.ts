@@ -123,12 +123,12 @@ export class ProviderRegistry implements ProviderRegistryApi {
     this.listeners.clear();
 
     const snapshots = Array.from(this.tracked.keys());
+    this.active = null;
+    this.previous = null;
     for (const snapshot of snapshots) {
       this.purgeSnapshot(snapshot);
     }
     this.tracked.clear();
-    this.active = null;
-    this.previous = null;
     this.logger.debug("provider_registry_disposed");
   }
 
@@ -169,7 +169,17 @@ export class ProviderRegistry implements ProviderRegistryApi {
       clearTimeout(meta.graceTimer);
       meta.graceTimer = undefined;
     }
+    const rootStillReferenced =
+      this.active?.rootDir === snapshot.rootDir ||
+      this.previous?.rootDir === snapshot.rootDir ||
+      [...this.tracked.entries()].some(
+        ([other, otherMeta]) =>
+          other !== snapshot &&
+          !otherMeta.purged &&
+          other.rootDir === snapshot.rootDir,
+      );
     this.tracked.delete(snapshot);
+    if (rootStillReferenced) return;
     try {
       unloadProviderModules(snapshot.rootDir);
     } catch (error) {

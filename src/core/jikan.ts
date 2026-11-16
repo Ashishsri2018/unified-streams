@@ -14,29 +14,53 @@ export interface JikanAnimeData {
 export class JikanClient {
   private readonly baseUrl: string;
   private readonly maxRps: number;
-  private queue: Array<() => Promise<void>> = [];
-  private lastRequestTimes: number[] = [];
-  private isProcessing = false;
+  private readonly maxRpm: number;
+  private requestTimes: number[] = [];
+  private queue: Promise<void> = Promise.resolve();
 
-  constructor(baseUrl = 'https://api.jikan.moe/v4', maxRps = 3) {
+  constructor(baseUrl = 'https://api.jikan.moe/v4', maxRps = 3, maxRpm = 60) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
-    this.maxRps = maxRps;
+    this.maxRps = Math.max(1, maxRps);
+    this.maxRpm = Math.max(1, maxRpm);
   }
 
   private async waitForSlot(): Promise<void> {
+    const acquire = this.queue.then(() => this.reserveSlot());
+    this.queue = acquire.then(
+      () => undefined,
+      () => undefined,
+    );
+    await acquire;
+  }
+
+  private async reserveSlot(): Promise<void> {
     const minIntervalMs = Math.ceil(1000 / this.maxRps);
-    const now = Date.now();
-    const last = this.lastRequestTimes[this.lastRequestTimes.length - 1] || 0;
-    const elapsed = now - last;
+    let now = Date.now();
+    let waitMs = 0;
 
-    if (elapsed < minIntervalMs) {
-      await new Promise((resolve) => setTimeout(resolve, minIntervalMs - elapsed));
+    const last = this.requestTimes[this.requestTimes.length - 1];
+    if (last !== undefined) waitMs = Math.max(waitMs, minIntervalMs - (now - last));
+
+    this.prune(now);
+    if (this.requestTimes.length >= this.maxRpm) {
+      waitMs = Math.max(waitMs, (this.requestTimes[0] ?? now) + 60_000 - now);
+    }
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      now = Date.now();
     }
 
-    this.lastRequestTimes.push(Date.now());
-    if (this.lastRequestTimes.length > 60) {
-      this.lastRequestTimes.shift();
+    this.prune(now);
+    this.requestTimes.push(now);
+  }
+
+  private prune(now: number): void {
+    const cutoff = now - 60_000;
+    let expired = 0;
+    while (expired < this.requestTimes.length && (this.requestTimes[expired] ?? 0) <= cutoff) {
+      expired += 1;
     }
+    if (expired > 0) this.requestTimes = this.requestTimes.slice(expired);
   }
 
   async getAnime(malNumericId: number, timeoutMs = 8000): Promise<JikanAnimeData | null> {

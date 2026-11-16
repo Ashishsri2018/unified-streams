@@ -15,7 +15,7 @@ export interface ParsedContentId {
 }
 
 const FORBIDDEN_CHARS = /[/?#]|\.\./;
-const TT_PATTERN = /^tt(\d{7,12})$/;
+export const IMDB_ID_PATTERN = /^tt(\d{7,12})$/;
 const TMDB_PATTERN = /^tmdb:(\d{1,10})$/;
 const MAL_PATTERN = /^mal:(\d{1,10})$/;
 
@@ -109,7 +109,7 @@ function parseImdbId(
   parts: string[],
 ): ParsedContentId | null {
   const baseId = parts[0];
-  if (!TT_PATTERN.test(baseId)) return null;
+  if (!IMDB_ID_PATTERN.test(baseId)) return null;
 
   return parseStandardSuffixes(type, raw, baseId, 'tt', parts.slice(1));
 }

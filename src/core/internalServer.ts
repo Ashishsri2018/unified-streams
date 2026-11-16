@@ -86,12 +86,11 @@ export function createInternalServer(host: string, instance: FleetInstance): htt
         return await handlers.reload(req, res, requestId);
       }
     } catch (error) {
-      return sendJson(
-        res,
-        200,
-        { streams: [], error: error instanceof Error ? error.message : String(error) },
-        requestId,
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      if (pathname.startsWith('/internal/stream/')) {
+        return sendJson(res, 200, { streams: [], error: message }, requestId);
+      }
+      return sendJson(res, 500, { error: message }, requestId);
     }
 
     return sendJson(res, 404, { error: 'Not Found' }, requestId);

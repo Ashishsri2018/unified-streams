@@ -115,7 +115,23 @@ function createCollector({
   async function runProviders(contentId, type, season, episode) {
     const deadline = now() + deadlineMs;
     const mediaType = type === 'series' ? 'tv' : 'movie';
-    const tmdbId = tmdbIdOf(contentId) ?? (await resolveTmdbId(contentId, type));
+    let tmdbId = tmdbIdOf(contentId);
+    if (!tmdbId) {
+      const lookupTimeoutMs = Math.max(
+        minProviderTimeoutMs,
+        Math.min(providerTimeoutMs, deadline - now())
+      );
+      try {
+        tmdbId = await withTimeout(
+          Promise.resolve().then(() => resolveTmdbId(contentId, type)),
+          lookupTimeoutMs,
+          'tmdb lookup'
+        );
+      } catch (err) {
+        logger.warn(`[streams] TMDB lookup failed for ${contentId}: ${err.message}`);
+        return [];
+      }
+    }
     if (!tmdbId) {
       logger.warn(`[streams] no TMDB id resolved for ${contentId}`);
       return [];

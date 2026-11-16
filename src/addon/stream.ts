@@ -15,6 +15,10 @@ export interface StreamHandlerContext {
   workers: Record<'sa7' | 'nuvio' | 'vega', WorkerClient>;
   addonVersion: string;
   policyVersion: string;
+  gitCommit?: string;
+  publicBaseUrl?: string;
+  hasTmdb?: boolean;
+  hasMal?: boolean;
   maxStreams: number;
   globalDeadlineMs: number;
   workerTimeoutMs: number;

@@ -93,6 +93,13 @@ export class LogQueue {
     return this.queue.length;
   }
 
+  dispose(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
   async close(): Promise<void> {
     if (this.timer) {
       clearInterval(this.timer);

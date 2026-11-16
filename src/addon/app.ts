@@ -52,13 +52,12 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
     res.setHeader('Access-Control-Allow-Origin', '*');
     if (req.method === 'HEAD') return res.status(200).end();
 
-    const baseUrl = getPublicBaseUrl(req, process.env.PUBLIC_BASE_URL);
+    const baseUrl = getPublicBaseUrl(req, ctx.publicBaseUrl);
     const manifest = buildManifest({
       addonVersion: ctx.addonVersion,
       baseUrl,
-      hasTmdb: Boolean(process.env.TMDB_API_KEY),
-      hasMal: process.env.MAL_ENABLED === 'true',
-      userConfigEncoded: req.params.config,
+      hasTmdb: Boolean(ctx.hasTmdb),
+      hasMal: Boolean(ctx.hasMal),
     });
     res.status(200).json(manifest);
   };
@@ -66,8 +65,8 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
   app.head(['/manifest.json', '/:config/manifest.json'], handleManifestRoute);
 
   // Configure routes
-  app.get(['/configure', '/:config/configure'], (req, res) => handleConfigure(req, res, process.env.PUBLIC_BASE_URL));
-  app.head(['/configure', '/:config/configure'], (req, res) => handleConfigure(req, res, process.env.PUBLIC_BASE_URL));
+  app.get(['/configure', '/:config/configure'], (req, res) => handleConfigure(req, res, ctx.publicBaseUrl));
+  app.head(['/configure', '/:config/configure'], (req, res) => handleConfigure(req, res, ctx.publicBaseUrl));
 
   // Stream routes
   app.get(['/stream/:type/:id.json', '/:config/stream/:type/:id.json'], (req, res) => handleStreamRoute(req, res, ctx));
@@ -80,8 +79,8 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
   app.get('/stats', (req, res) => handleStats(req, res, ctx, startedAt));
   app.head('/stats', (req, res) => handleStats(req, res, ctx, startedAt));
 
-  app.get('/status', (req, res) => handleStatusPage(req, res, ctx, startedAt, process.env.PUBLIC_BASE_URL));
-  app.head('/status', (req, res) => handleStatusPage(req, res, ctx, startedAt, process.env.PUBLIC_BASE_URL));
+  app.get('/status', (req, res) => handleStatusPage(req, res, ctx, startedAt, ctx.publicBaseUrl));
+  app.head('/status', (req, res) => handleStatusPage(req, res, ctx, startedAt, ctx.publicBaseUrl));
 
   // Branding asset routes
   app.get('/logo.png', handleLogoPng);
