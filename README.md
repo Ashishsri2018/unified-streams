@@ -14,6 +14,26 @@ Unified Stremio stream addon combining SA7, Nuvio, and Vega provider fleets behi
 ## Architecture
 See [architecture.md](architecture.md) for detailed component architecture and request flow.
 
+## Content IDs
+
+The manifest advertises the `tt`, `tmdb:`, and `mal:` prefixes. Stream requests use `/stream/{movie|series}/{id}.json`.
+
+| ID type | Movie | Series | Example |
+|---|---|---|---|
+| IMDb | `tt...` | `tt...:S:E` or `tt...:S` (season pack) | `tt0111161` |
+| TMDB | `tmdb:N` | `tmdb:N:S:E` or `tmdb:N:S` (season pack) | `tmdb:1399:1:1` |
+| MyAnimeList | `mal:N` | `mal:N:E` (season 1) or `mal:N:S:E` | `mal:1535:1:1` |
+
+MAL series require at least one numeric suffix: `mal:N:E` is season 1, episode E; `mal:N:S:E` is season S, episode E. Unlike IMDb/TMDB, a single suffix is interpreted as an episode, not a season pack.
+
+### How MAL IDs work
+
+- The gateway queries AnimeAPI (`GET {ANIMEAPI_URL}/myanimelist/{id}`) for an IMDb/TMDB mapping.
+- If no mapping is found, it falls back to Jikan (title/year) plus a TMDB title search.
+- The MAL ID is rewritten to the canonical `tt...` or `tmdb:N` ID (preserving season/episode suffixes) before fan-out, so all three fleets handle it with their normal IMDb/TMDB logic. If resolution fails, the response is HTTP 200 with `{ "streams": [] }` and no worker fan-out.
+- `ANIMEAPI_URL` defaults to `https://animeapi.my.id` and can be overridden in `config/defaults.env` or a per-instance env file.
+- Resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped to 500–2000ms: 1s on Beamup, 2s on Railway), so worker deadlines and platform proxy limits are unchanged.
+
 ## Running with Docker
 
 Unified Streams is packaged as a single, self-contained multi-stage Docker container running Node 22 on an unprivileged `node` user with `dumb-init`. The container bundles the public gateway along with all three internal fleet worker runtimes.
@@ -59,6 +79,7 @@ services:
       - LOG_LEVEL=info
       # Optional API keys and secrets:
       # - TMDB_API_KEY=your_tmdb_key
+      # - ANIMEAPI_URL=https://animeapi.my.id
       # - FEBBOX_UI_COOKIE=your_febbox_cookie
       # - GRAMCINEMA_TOKEN=your_gramcinema_token
       # - KARTOONS_TOKEN=your_kartoons_token
