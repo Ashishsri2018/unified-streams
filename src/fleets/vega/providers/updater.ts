@@ -1,7 +1,11 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { AppConfig } from "../config.js";
-import { isProviderEnabled, selectEnabledProviders } from "../../../core/policy.js";
+import {
+  isProviderEnabled,
+  selectEnabledProviders,
+  type ProviderSelection,
+} from "../../../core/policy.js";
 import type {
   HealthProviderStatus,
   HealthReport,
@@ -99,6 +103,18 @@ function failureSummary(
   const label = `${failures.length}/${total} provider update(s) failed`;
   if (!first) return label;
   return `${label}: ${first.slice(0, 300)}`;
+}
+
+export function installFailureSummary(
+  entries: ReadonlyArray<UpstreamProviderEntry>,
+  selection: ProviderSelection,
+  loadedCount: number,
+): string | null {
+  const enabledCount = entries.filter((entry) =>
+    isProviderEnabled(entry.value, selection),
+  ).length;
+  if (enabledCount <= loadedCount) return null;
+  return `${enabledCount - loadedCount}/${enabledCount} provider(s) failed to install`;
 }
 
 function stripBom(text: string): string {
@@ -903,10 +919,11 @@ export class Updater {
         if (target.etagUpdate !== undefined) draft.headEtag = target.etagUpdate;
         draft.providers = providerState;
         draft.lastSuccess = now;
-        draft.lastError =
-          data.entries.length > loaded.size
-            ? `${data.entries.length - loaded.size}/${data.entries.length} provider(s) failed to install`
-            : null;
+        draft.lastError = installFailureSummary(
+          data.entries,
+          selection,
+          loaded.size,
+        );
         draft.nextCheck = isoAfter(this.computeNextCheckMs());
       });
       this.failureCount = 0;
