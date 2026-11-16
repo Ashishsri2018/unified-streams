@@ -4,6 +4,8 @@ import { z } from 'zod';
 
 type Fleet = 'sa7' | 'nuvio' | 'vega';
 
+export const DEFAULT_ANIMEAPI_URL = 'https://animeapi.my.id';
+
 export const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(7000),
   DATA_DIR: z.string().default('/data'),
@@ -33,7 +35,7 @@ export const EnvSchema = z.object({
   UPDATE_INTERVAL_MAX_HOURS: z.coerce.number().int().min(1).default(24),
   CINEMETA_URL: z.string().url().default('https://v3-cinemeta.strem.io'),
   TMDB_URL: z.string().url().default('https://api.themoviedb.org/3'),
-  ANIMEAPI_URL: z.string().url().default('https://animeapi.my.id'),
+  ANIMEAPI_URL: z.string().url().default(DEFAULT_ANIMEAPI_URL),
   JIKAN_URL: z.string().url().default('https://api.jikan.moe/v4'),
   JIKAN_MAX_RPS: z.coerce.number().int().min(1).default(3),
   JIKAN_MAX_RPM: z.coerce.number().int().min(1).default(60),
@@ -108,12 +110,22 @@ export function loadAppEnv(customEnv: NodeJS.ProcessEnv = process.env): AppEnv {
 
 export const WORKER_DEADLINE_MARGIN_MS = 1000;
 
+export const RESOLVE_MIN_MS = 250;
+export const METADATA_RESOLVE_MAX_MS = 5000;
 export const MAL_RESOLVE_MIN_MS = 500;
 export const MAL_RESOLVE_MAX_MS = 2000;
 
-export function deriveMalResolveBudgetMs(env: AppEnv): number {
+function deriveResolveBudgetMs(env: AppEnv, minMs: number, maxMs: number): number {
   const headroom = env.GLOBAL_DEADLINE_MS - env.BACKEND_TIMEOUT_MS;
-  return Math.max(MAL_RESOLVE_MIN_MS, Math.min(MAL_RESOLVE_MAX_MS, headroom));
+  return Math.max(minMs, Math.min(maxMs, headroom));
+}
+
+export function deriveMetadataResolveBudgetMs(env: AppEnv): number {
+  return deriveResolveBudgetMs(env, RESOLVE_MIN_MS, METADATA_RESOLVE_MAX_MS);
+}
+
+export function deriveMalResolveBudgetMs(env: AppEnv): number {
+  return deriveResolveBudgetMs(env, MAL_RESOLVE_MIN_MS, MAL_RESOLVE_MAX_MS);
 }
 
 // These classes are disabled for every fleet and every instance regardless of

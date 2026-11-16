@@ -28,11 +28,11 @@ MAL series require at least one numeric suffix: `mal:N:E` is season 1, episode E
 
 ### How MAL IDs work
 
-- The gateway queries AnimeAPI (`GET {ANIMEAPI_URL}/myanimelist/{id}`) for an IMDb/TMDB mapping.
-- If no mapping is found, it falls back to Jikan (title/year) plus a TMDB title search.
+- The gateway queries AnimeAPI (`GET {ANIMEAPI_URL}/myanimelist/{id}`) for an IMDb/TMDB mapping, using at most 40% of the resolution budget so the fallback still has time to run. AnimeAPI's `themoviedb_type` selects the TMDB endpoint when a TMDB ID is used.
+- If no mapping is found, it falls back to Jikan (title/year) plus a ranked TMDB title search. The TMDB detail call is skipped when too little budget remains; the search result still yields a `tmdb:N` ID.
 - The MAL ID is rewritten to the canonical `tt...` or `tmdb:N` ID (preserving season/episode suffixes) before fan-out, so all three fleets handle it with their normal IMDb/TMDB logic. If resolution fails, the response is HTTP 200 with `{ "streams": [] }` and no worker fan-out.
 - `ANIMEAPI_URL` defaults to `https://animeapi.my.id` and can be overridden in `config/defaults.env` or a per-instance env file.
-- Resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped to 500–2000ms: 1s on Beamup, 2s on Railway), so worker deadlines and platform proxy limits are unchanged.
+- Resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped: 500–2000ms for MAL, 250–5000ms for other metadata; 1s/2s MAL on Beamup/Railway), so worker deadlines and platform proxy limits are unchanged. Budget expiries and transient upstream failures are not cached as misses; only definitive 404s keep the 60s negative TTL, while other failures use a 5s TTL.
 
 ## Running with Docker
 

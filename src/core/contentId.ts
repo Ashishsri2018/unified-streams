@@ -5,6 +5,11 @@
 
 export type ContentIdFamily = 'tt' | 'tmdb' | 'mal';
 
+export function canonicalIdSuffix(parsed: ParsedContentId): string {
+  if (parsed.season === undefined) return '';
+  return parsed.episode === undefined ? `:${parsed.season}` : `:${parsed.season}:${parsed.episode}`;
+}
+
 export interface ParsedContentId {
   family: ContentIdFamily;
   rawId: string;

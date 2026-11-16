@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { parseContentId, type ParsedContentId } from '../core/contentId.js';
+import { canonicalIdSuffix, parseContentId } from '../core/contentId.js';
 import { decodeUserConfig, toFilterConfig } from './userConfig.js';
 import { GatewayStreamCache } from '../core/cache.js';
 import { WorkerClient } from '../core/workerClient.js';
@@ -31,11 +31,6 @@ export interface StreamHandlerContext {
 // used for log delivery only; caching stays in the gateway.
 function setStreamCacheHeaders(res: Response): void {
   res.setHeader('Cache-Control', 'no-store');
-}
-
-function canonicalIdSuffix(parsed: ParsedContentId): string {
-  if (parsed.season === undefined) return '';
-  return parsed.episode === undefined ? `:${parsed.season}` : `:${parsed.season}:${parsed.episode}`;
 }
 
 export async function handleStreamRoute(
@@ -80,6 +75,8 @@ export async function handleStreamRoute(
 
   const cacheKey = `${rawConfig}:${rawType}:${rawId}:${ctx.policyVersion}:${ctx.addonVersion}`;
 
+  const requestController = new AbortController();
+
   try {
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {
       // Resolve canonical metadata once in the gateway to eliminate redundant upstream calls
@@ -96,7 +93,11 @@ export async function handleStreamRoute(
 
       if (ctx.metadataResolver) {
         try {
-          const resolved = await ctx.metadataResolver.resolveContent(rawType, parsedId);
+          const resolved = await ctx.metadataResolver.resolveContent(
+            rawType,
+            parsedId,
+            requestController.signal,
+          );
           if (resolved) {
             forwardedMeta = {
               title: resolved.title,

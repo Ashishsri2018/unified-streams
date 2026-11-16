@@ -3,7 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import v8 from 'node:v8';
 import { createRequire } from 'node:module';
-import { deriveMalResolveBudgetMs, loadAppEnv, deriveFleetEnv, type AppEnv } from './core/env.js';
+import {
+  deriveMalResolveBudgetMs,
+  deriveMetadataResolveBudgetMs,
+  loadAppEnv,
+  deriveFleetEnv,
+  type AppEnv,
+} from './core/env.js';
 import { ensureFleetDirs } from './core/fleetBootstrap.js';
 import { GatewayStreamCache } from './core/cache.js';
 import { WorkerClient } from './core/workerClient.js';
@@ -132,6 +138,7 @@ async function main(): Promise<void> {
     jikanMaxRpm: env.JIKAN_MAX_RPM,
     animeApiUrl: env.ANIMEAPI_URL,
     malResolveBudgetMs: deriveMalResolveBudgetMs(env),
+    metadataBudgetMs: deriveMetadataResolveBudgetMs(env),
   });
 
   const ctx = {

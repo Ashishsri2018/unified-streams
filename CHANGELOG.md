@@ -7,7 +7,8 @@ All notable changes to this project will be documented in this file.
 - `mal:` stream IDs now resolve end-to-end: AnimeAPI supplies the canonical IMDb/TMDB mapping, with Jikan title/year plus TMDB search as fallback, and the gateway fan-out uses the rewritten ID with season/episode suffixes preserved. The manifest always advertises `mal:`.
 
 ### Changed
-- MAL metadata resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped to 500–2000ms: 1s on Beamup, 2s on Railway), so worker deadlines and the ~13s Beamup proxy budget are unchanged.
+- MAL metadata resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped to 500–2000ms: 1s on Beamup, 2s on Railway), with AnimeAPI capped at 40% of that budget so the Jikan/TMDB fallback can still complete. The same headroom now bounds all metadata lookups, not just MAL.
+- MAL resolution honours AnimeAPI's `themoviedb_type`, ranks TMDB search results by title/year instead of taking the first hit, skips the TMDB detail call when the budget is nearly exhausted, and no longer negatively caches budget expiries or transient failures (definitive 404s keep a 60s TTL, other failures use 5s). AnimeAPI responses are size-capped.
 - The Docker healthcheck is now a pure liveness probe (`HEAD /health`) and no longer parses the health report body, so a transient single-fleet restart cannot falsely mark the container unhealthy.
 - HTML pages now apply their CSP nonce to inline `<style>` as well as `<script>`, and `'unsafe-inline'` was removed from `style-src`.
 - Closed the remaining `todo.md` items: dropped the three operational entries, and verified configure prefill and SA7 `server.js`/`run.js` removal were already resolved.
@@ -16,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Inline `stream.subtitles` tracks are no longer filtered or rewritten by the gateway; provider subtitle tracks pass through unchanged.
 
 ### Fixed
+- A `mal:` movie request whose AnimeAPI mapping is a TV title no longer queries the TMDB movie endpoint, and TMDB title search no longer accepts an unrelated first result.
 - The `/status` dashboard now renders a 503 `/health` response instead of showing "unreachable"; those responses still carry a full, renderable health report.
 - SA7 `lastError` objects are normalized to readable strings in `/health`, `/stats`, and `/status` instead of showing `[object Object]`.
 - Automatic provider updates now work for SA7: the scheduler downloads `SA7ANI/cb-providers` into `DATA_DIR/sa7/cb-providers`, seeds that directory from the bundled snapshot, swaps files atomically, and points the worker at the updated manifest. The scheduler also waits for worker readiness before the startup update, treats a failed reload as a failed check without advancing the stored SHA, and retries after 5 minutes.

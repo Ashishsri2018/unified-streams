@@ -100,7 +100,7 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
   - **Beamup Deployment**: `config/instances/beamup.env` sets `BACKEND_TIMEOUT_MS=12000` (12s), `GLOBAL_DEADLINE_MS=13000` (13s), and derived worker deadline `11000` (11s) to fit strictly within Beamup's ~14s reverse proxy cut-off.
   - **Railway Deployment**: `config/instances/railway.env` sets `BACKEND_TIMEOUT_MS=27000` (27s), `GLOBAL_DEADLINE_MS=29000` (29s), and derived worker deadline `26000` (26s), taking advantage of Railway's support for extended connection durations to yield streams from slower scrapers (e.g. `4khdHub`, `Maelith`).
   - Both profiles set 40-way concurrency (`SEARCH_CONCURRENCY`, `SCRAPER_CONCURRENCY`, `SA7_CONCURRENCY`).
-  - MAL resolution is bounded by `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped to 500–2000ms: 1s Beamup, 2s Railway). This uses only the existing gap before the worker fetch, so the worker budget is untouched; on expiry the gateway returns `{ "streams": [] }` without fan-out.
+  - Metadata resolution is bounded by `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (MAL clamped to 500–2000ms: 1s Beamup, 2s Railway; other lookups 250–5000ms). This uses only the existing gap before the worker fetch, so the worker budget is untouched. AnimeAPI is capped at 40% of the MAL budget, the Jikan/TMDB fallback consumes the remainder, and `themoviedb_type` chooses the TMDB endpoint. Budget expiries and transient failures are not negatively cached; only 404s keep the 60s TTL. On failure the gateway returns `{ "streams": [] }` without fan-out.
 - **Dual CI/CD Deployment Pipeline (`.github/workflows/ci.yml`)**:
   - Runs on `main` push and manual `workflow_dispatch`.
   - Stages:
