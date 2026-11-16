@@ -1,76 +1,24 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
-export interface FleetPolicy {
-  mode: 'allow' | 'deny';
-  ids: string[];
+export interface ProviderSelection {
+  enabled: readonly string[];
+  disabled: readonly string[];
 }
 
-export interface ProviderPolicyConfig {
-  sa7: FleetPolicy;
-  nuvio: FleetPolicy;
-  vega: FleetPolicy;
+function normalizeList(values: readonly string[]): Set<string> {
+  return new Set(values.map((value) => String(value).trim().toLowerCase()).filter(Boolean));
 }
 
-const DEFAULT_DISABLED_PROVIDERS = new Set([
-  'torrentio',
-  'internetarchive',
-  'youtube',
-  'brellor',
-  'durbinlive',
-  'livetgtv',
-]);
+export function isProviderEnabled(id: string, selection: ProviderSelection): boolean {
+  const key = String(id).trim().toLowerCase();
+  const disabled = normalizeList(selection.disabled);
+  if (disabled.has('*') || disabled.has(key)) return false;
+  if (selection.enabled.length === 0) return true;
+  return normalizeList(selection.enabled).has(key);
+}
 
-export class ProviderPolicy {
-  private config: ProviderPolicyConfig;
-
-  constructor(customConfig?: ProviderPolicyConfig) {
-    if (customConfig) {
-      this.config = customConfig;
-    } else {
-      this.config = this.loadFromFile();
-    }
-  }
-
-  private loadFromFile(): ProviderPolicyConfig {
-    const policyPath = path.resolve(process.cwd(), 'config', 'providers.json');
-    if (!fs.existsSync(policyPath)) {
-      return {
-        sa7: { mode: 'allow', ids: [] },
-        nuvio: { mode: 'deny', ids: [] },
-        vega: { mode: 'deny', ids: [] },
-      };
-    }
-    const raw = fs.readFileSync(policyPath, 'utf-8');
-    return JSON.parse(raw) as ProviderPolicyConfig;
-  }
-
-  isProviderEnabled(fleet: 'sa7' | 'nuvio' | 'vega', providerId: string): boolean {
-    const cleanId = providerId.trim().toLowerCase();
-
-    // Default disabled classes are never enabled by policy
-    if (DEFAULT_DISABLED_PROVIDERS.has(cleanId)) {
-      return false;
-    }
-
-    const fleetPolicy = this.config[fleet];
-    if (!fleetPolicy) return false;
-
-    const list = new Set(fleetPolicy.ids.map((id) => id.toLowerCase()));
-
-    if (fleetPolicy.mode === 'allow') {
-      return list.has(cleanId);
-    } else {
-      // mode === 'deny'
-      return !list.has(cleanId);
-    }
-  }
-
-  getEffectiveProviders(fleet: 'sa7' | 'nuvio' | 'vega', availableIds: string[]): string[] {
-    return availableIds.filter((id) => this.isProviderEnabled(fleet, id));
-  }
-
-  getPolicyConfig(): ProviderPolicyConfig {
-    return JSON.parse(JSON.stringify(this.config)) as ProviderPolicyConfig;
-  }
+export function selectEnabledProviders<T>(
+  entries: readonly T[],
+  selection: ProviderSelection,
+  getId: (entry: T) => string,
+): T[] {
+  return entries.filter((entry) => isProviderEnabled(getId(entry), selection));
 }

@@ -16,7 +16,7 @@
     "policy:check": "node scripts/check-provider-policy.mjs",
     "check:icon": "node scripts/check-icon.mjs",
     "build": "tsc -p tsconfig.json && node scripts/copy-fleet-assets.mjs",
-    "start": "MALLOC_ARENA_MAX=1 node dist/index.js",
+    "start": "sh docker-entrypoint.sh node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "verify": "npm run policy:check && npm run check:icon && npm run lint && npm run typecheck && npm run test && npm run build"
   },

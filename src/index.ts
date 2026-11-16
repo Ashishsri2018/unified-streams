@@ -1,22 +1,102 @@
 import http from 'node:http';
-import { loadAppEnv } from './core/env.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import v8 from 'node:v8';
+import { createRequire } from 'node:module';
+import { loadAppEnv, deriveFleetEnv, type AppEnv } from './core/env.js';
+import { ensureFleetDirs } from './core/fleetBootstrap.js';
 import { GatewayStreamCache } from './core/cache.js';
 import { WorkerClient } from './core/workerClient.js';
 import { MetadataResolver } from './core/metadata.js';
 import { createGatewayApp } from './addon/app.js';
 import { UpdaterScheduler } from './core/updater/scheduler.js';
-import { Supervisor } from './supervisor.js';
+import {
+  closeServer,
+  createInternalServer,
+  listen,
+  type FleetInstance,
+} from './core/internalServer.js';
+import { createVegaHandlers } from './fleets/vega/worker.js';
+import { createNuvioHandlers } from './fleets/nuvio/worker.js';
 import { logger } from './core/logger.js';
 import { StremioStream } from './addon/filters.js';
+
+type Fleet = 'sa7' | 'nuvio' | 'vega';
+const FLEET_PORTS: Record<Fleet, number> = { sa7: 7001, nuvio: 7002, vega: 7003 };
+const nodeRequire = createRequire(import.meta.url);
+
+function loadSa7Factory(): (env: NodeJS.ProcessEnv) => FleetInstance {
+  const distWorker = path.resolve(process.cwd(), 'dist/fleets/sa7/worker.js');
+  const srcWorker = path.resolve(process.cwd(), 'src/fleets/sa7/worker.js');
+  const runningFromSource = import.meta.url.endsWith('.ts');
+  const modulePath =
+    runningFromSource && fs.existsSync(srcWorker)
+      ? srcWorker
+      : fs.existsSync(distWorker)
+        ? distWorker
+        : srcWorker;
+  const sa7 = nodeRequire(modulePath) as {
+    createSa7Handlers: (env: NodeJS.ProcessEnv) => FleetInstance;
+  };
+  return sa7.createSa7Handlers;
+}
+
+async function startFleets(env: AppEnv): Promise<() => Promise<void>> {
+  const createSa7 = loadSa7Factory();
+  const servers: http.Server[] = [];
+  const disposers: Array<() => Promise<void>> = [];
+
+  for (const fleet of Object.keys(FLEET_PORTS) as Fleet[]) {
+    const port = FLEET_PORTS[fleet];
+    const fleetEnv = deriveFleetEnv(env, fleet, port);
+    const instance: FleetInstance =
+      fleet === 'sa7'
+        ? createSa7(fleetEnv)
+        : fleet === 'nuvio'
+          ? createNuvioHandlers(fleetEnv)
+          : await createVegaHandlers(fleetEnv);
+    const server = createInternalServer('127.0.0.1', instance);
+    await listen(server, port, '127.0.0.1');
+    servers.push(server);
+    if (instance.dispose) disposers.push(instance.dispose);
+    logger.info('fleet.internal_listening', { fleet, port });
+  }
+
+  return async () => {
+    for (const dispose of disposers) {
+      try {
+        await dispose();
+      } catch (error) {
+        logger.debug('fleet.dispose_failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    await Promise.all(servers.map(closeServer));
+  };
+}
 
 async function main(): Promise<void> {
   const env = loadAppEnv();
   const startedAt = Date.now();
+  ensureFleetDirs(env);
 
   logger.info('gateway.starting', {
     port: env.PORT,
     version: env.ADDON_VERSION,
     dataDir: env.DATA_DIR,
+    heapLimitMb: Math.round(v8.getHeapStatistics().heap_size_limit / (1024 * 1024)),
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    logger.error('process.unhandled_rejection', {
+      error: reason instanceof Error ? reason.message : String(reason),
+    });
+  });
+  process.on('uncaughtException', (error) => {
+    logger.error('process.uncaught_exception', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 
   const cache = new GatewayStreamCache<{ streams: StremioStream[] }>({
@@ -39,8 +119,7 @@ async function main(): Promise<void> {
     updateOnStart: env.UPDATE_ON_START,
   });
 
-  const supervisor = new Supervisor(env);
-  supervisor.start();
+  const stopFleets = await startFleets(env);
   scheduler.start();
 
   const metadataResolver = new MetadataResolver(env.CINEMETA_URL, env.TMDB_API_KEY);
@@ -68,7 +147,7 @@ async function main(): Promise<void> {
     logger.info('gateway.shutting_down', { signal });
     server.close();
     scheduler.stop();
-    await supervisor.stop();
+    await stopFleets();
     await logger.close();
     process.exit(0);
   };

@@ -3,6 +3,24 @@ const path = require('path');
 const Module = require('module');
 const config = require('./config');
 
+let corePolicy = null;
+try {
+  corePolicy = require(path.resolve(process.cwd(), 'dist/core/policy.js'));
+} catch {
+  corePolicy = null;
+}
+
+function isProviderEnabled(id, selection) {
+  if (corePolicy && typeof corePolicy.isProviderEnabled === 'function') {
+    return corePolicy.isProviderEnabled(id, selection);
+  }
+  const key = String(id).trim().toLowerCase();
+  const disabled = new Set((selection.disabled || []).map((value) => String(value).toLowerCase()));
+  const enabled = (selection.enabled || []).map((value) => String(value).toLowerCase());
+  if (disabled.has('*') || disabled.has(key)) return false;
+  return enabled.length === 0 || enabled.includes(key);
+}
+
 if (!Module._cheerioHooked) {
   Module._cheerioHooked = true;
   const origResolve = Module._resolveFilename;
@@ -52,18 +70,13 @@ function clearProviderModuleCache(dir) {
 
 function buildRegistry() {
   const manifest = JSON.parse(fs.readFileSync(config.providerManifest, 'utf8'));
-  const disabled = new Set([
-    ...DISABLED_PROVIDER_IDS,
-    ...(config.disabledProviders || []),
-  ]);
-  const enabled = new Set(config.enabledProviders || []);
-  const disableAll = disabled.has('*');
+  const selection = {
+    enabled: config.enabledProviders || [],
+    disabled: [...DISABLED_PROVIDER_IDS, ...(config.disabledProviders || [])],
+  };
   const entries = (manifest.providers || []).filter((p) => {
     if (p.enabled === false) return false;
-    const id = p.id.toLowerCase();
-    if (disableAll || disabled.has(id)) return false;
-    if (enabled.size > 0 && !enabled.has(id)) return false;
-    return true;
+    return isProviderEnabled(p.id, selection);
   });
 
   const next = [];
@@ -77,7 +90,7 @@ function buildRegistry() {
     }
   }
 
-  const disabledList = [...disabled].join(', ') || 'none';
+  const disabledList = selection.disabled.join(', ') || 'none';
   console.log(
     `[providers] loaded ${next.length}/${entries.length} (disabled: ${disabledList})`
   );

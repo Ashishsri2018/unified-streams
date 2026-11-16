@@ -231,8 +231,8 @@ export class SnapshotManager {
       throw new Error("manifest.json exceeds the size limit");
     }
     const manifest = parseNuvioManifest(manifestBytes);
-    const entries = selectScrapers(manifest, this.config.disabledScrapers, this.config.enabledScrapers);
-    if (entries.length === 0) {
+    const entries = manifest.scrapers;
+    if (selectScrapers(manifest, this.config.disabledScrapers, this.config.enabledScrapers).length === 0) {
       throw new Error("manifest.json has no enabled scrapers");
     }
 
@@ -285,8 +285,13 @@ export class SnapshotManager {
   }
 
   private async evaluateSnapshot(data: SnapshotData): Promise<LoadedScraper[]> {
+    const compileEntries = selectScrapers(
+      data.manifest,
+      this.config.disabledScrapers,
+      this.config.enabledScrapers,
+    );
     const results = await mapLimit<SnapshotData["entries"][number], LoadResult>(
-      data.entries,
+      compileEntries,
       LOAD_CONCURRENCY,
       async (entry) => {
         const buffer = data.files.get(entry.filename);
@@ -380,12 +385,16 @@ export class SnapshotManager {
     try {
       const manifestBytes = await fs.readFile(path.join(dir, "manifest.json"));
       const manifest = parseNuvioManifest(manifestBytes);
-      const entries = selectScrapers(manifest, this.config.disabledScrapers, this.config.enabledScrapers);
+      const entries = manifest.scrapers;
       const files = new Map<string, Buffer>();
       for (const entry of entries) {
-        const buffer = await fs.readFile(path.join(dir, entry.filename));
-        if (buffer.length < 1 || buffer.length > MAX_PROVIDER_BYTES) continue;
-        files.set(entry.filename, buffer);
+        try {
+          const buffer = await fs.readFile(path.join(dir, entry.filename));
+          if (buffer.length < 1 || buffer.length > MAX_PROVIDER_BYTES) continue;
+          files.set(entry.filename, buffer);
+        } catch {
+          continue;
+        }
       }
       if (files.size === 0) return null;
 

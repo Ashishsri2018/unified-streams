@@ -1,0 +1,89 @@
+{
+  "sa7": {
+    "mode": "deny",
+    "ids": [
+      "moviesdrive",
+      "4khdhub",
+      "hdhub4u",
+      "vegamovies",
+      "castle",
+      "anizone",
+      "moviebox",
+      "moviesmod",
+      "torrentio",
+      "reanime",
+      "animeworld",
+      "animesalt",
+      "anizen",
+      "anikage"
+    ]
+  },
+  "nuvio": {
+    "mode": "deny",
+    "ids": [
+      "bdix-cf",
+      "bdix-df",
+      "bdix-fh",
+      "brellor",
+      "sylphera"
+    ]
+  },
+  "vega": {
+    "mode": "deny",
+    "ids": [
+      "torrentio",
+      "internetArchive",
+      "youtube",
+      "animeworld",
+      "movies4u",
+      "1cinevood",
+      "disneyMirror",
+      "netflixMirror",
+      "primeMirror",
+      "luxMovies",
+      "mxplayer",
+      "durbinLive",
+      "liveTgTv"
+    ]
+  },
+  "instances": {
+    "beamup": {
+      "sa7": {
+        "mode": "allow",
+        "ids": [
+          "moviesdrive",
+          "4khdhub",
+          "hdhub4u",
+          "vegamovies",
+          "castle",
+          "anizone",
+          "moviebox",
+          "moviesmod",
+          "reanime",
+          "animeworld",
+          "animesalt",
+          "anizen",
+          "anikage"
+        ]
+      },
+      "nuvio": {
+        "mode": "allow",
+        "ids": ["sylphera"]
+      },
+      "vega": {
+        "mode": "allow",
+        "ids": [
+          "animeworld",
+          "movies4u",
+          "luxMovies",
+          "mod",
+          "1cinevood",
+          "disneyMirror",
+          "netflixMirror",
+          "primeMirror",
+          "mxplayer"
+        ]
+      }
+    }
+  }
+}

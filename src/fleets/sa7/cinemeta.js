@@ -105,11 +105,16 @@ function createMetadataResolver({
   return { resolveTmdbId, cacheStats, prime };
 }
 
-const defaultResolver = createMetadataResolver();
+let defaultResolver = null;
+
+function getDefaultResolver() {
+  if (!defaultResolver) defaultResolver = createMetadataResolver();
+  return defaultResolver;
+}
 
 module.exports = {
   createMetadataResolver,
-  resolveTmdbId: defaultResolver.resolveTmdbId,
-  cacheStats: defaultResolver.cacheStats,
-  prime: defaultResolver.prime,
+  resolveTmdbId: (...args) => getDefaultResolver().resolveTmdbId(...args),
+  cacheStats: (...args) => getDefaultResolver().cacheStats(...args),
+  prime: (...args) => getDefaultResolver().prime(...args),
 };

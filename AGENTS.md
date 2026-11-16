@@ -3,7 +3,7 @@
 ## Start here
 - Single root npm package; Node 22 (`.nvmrc`), ESM, TypeScript `NodeNext`. Run commands from the repo root: config, policy, and asset paths resolve from `process.cwd()`.
 - Current architecture: `src/addon/` is the only public gateway, `src/core/` is shared runtime, and `src/fleets/{sa7,nuvio,vega}` are loopback workers on ports 7001-7003.
-- Read root `architecture.md` for current deployment/provider policy. `docs/architecture.md` and `BUILD_PLAN.md` are older design docs; trust code and CI when they disagree.
+- Read root `architecture.md` for current deployment/provider policy. It is the only architecture doc; trust code and CI when they disagree.
 
 ## Commands
 ```bash

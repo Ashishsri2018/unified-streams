@@ -1,4 +1,5 @@
 import type { NuvioManifest, NuvioScraperEntry } from "../types.js";
+import { selectEnabledProviders } from "../../../core/policy.js";
 
 const SAFE_ID = /^[A-Za-z0-9_.-]+$/;
 const PROVIDER_FILE = /^providers\/[A-Za-z0-9_.-]+\.js$/;
@@ -107,13 +108,9 @@ export function selectScrapers(
   disabledIds: Iterable<string>,
   enabledIds: Iterable<string> = [],
 ): NuvioScraperEntry[] {
-  const disabled = new Set(disabledIds);
-  if (disabled.has("*")) return [];
-  const enabled = new Set(enabledIds);
-  return manifest.scrapers.filter(
-    (scraper) =>
-      scraper.enabled &&
-      !disabled.has(scraper.id) &&
-      (enabled.size === 0 || enabled.has(scraper.id)),
+  return selectEnabledProviders(
+    manifest.scrapers.filter((scraper) => scraper.enabled),
+    { enabled: Array.from(enabledIds), disabled: Array.from(disabledIds) },
+    (scraper) => scraper.id,
   );
 }

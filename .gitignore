@@ -7,3 +7,5 @@ coverage/
 .DS_Store
 /data/
 docs/bugs.md
+bugs.md
+memory-improvement.md

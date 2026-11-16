@@ -1,38 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { ProviderPolicy } from '../../src/core/policy.js';
+import { isProviderEnabled, selectEnabledProviders } from '../../src/core/policy.js';
 import { CircuitBreaker, clampTimeout } from '../../src/core/concurrency.js';
 import { deriveFleetEnv, loadAppEnv } from '../../src/core/env.js';
 
 describe('provider policy and concurrency', () => {
-  it('enforces allow and deny modes in provider policy', () => {
-    const policy = new ProviderPolicy({
-      sa7: { mode: 'allow', ids: ['vidrock', 'desiflix'] },
-      nuvio: { mode: 'deny', ids: ['bad_provider'] },
-      vega: { mode: 'deny', ids: ['torrentio'] },
-    });
+  it('enforces shared allow and deny provider selection', () => {
+    expect(isProviderEnabled('vidrock', { enabled: ['vidrock', 'desiflix'], disabled: [] })).toBe(true);
+    expect(isProviderEnabled('unknown', { enabled: ['vidrock', 'desiflix'], disabled: [] })).toBe(false);
+    expect(isProviderEnabled('moviesdrive', { enabled: [], disabled: ['moviesdrive'] })).toBe(false);
+    expect(isProviderEnabled('vidrock', { enabled: [], disabled: ['moviesdrive'] })).toBe(true);
+    expect(isProviderEnabled('vidrock', { enabled: [], disabled: ['*'] })).toBe(false);
+    expect(isProviderEnabled('VIDROCK', { enabled: ['vidrock'], disabled: [] })).toBe(true);
+    expect(isProviderEnabled('vidrock', { enabled: [], disabled: ['VIDROCK'] })).toBe(false);
 
-    // SA7 (allow mode)
-    expect(policy.isProviderEnabled('sa7', 'vidrock')).toBe(true);
-    expect(policy.isProviderEnabled('sa7', 'unknown')).toBe(false);
-
-    // SA7 (deny mode)
-    const denyPolicy = new ProviderPolicy({
-      sa7: { mode: 'deny', ids: ['moviesdrive'] },
-      nuvio: { mode: 'deny', ids: ['bad_provider'] },
-      vega: { mode: 'deny', ids: ['torrentio'] },
-    });
-    expect(denyPolicy.isProviderEnabled('sa7', 'moviesdrive')).toBe(false);
-    expect(denyPolicy.isProviderEnabled('sa7', 'vidrock')).toBe(true);
-
-    // Nuvio (deny mode)
-    expect(policy.isProviderEnabled('nuvio', 'bad_provider')).toBe(false);
-    expect(policy.isProviderEnabled('nuvio', 'good_provider')).toBe(true);
-
-    // Default disabled scrapers are always disabled
-    expect(policy.isProviderEnabled('vega', 'torrentio')).toBe(false);
-    expect(policy.isProviderEnabled('vega', 'youtube')).toBe(false);
-    expect(policy.isProviderEnabled('vega', 'durbinlive')).toBe(false);
-    expect(policy.isProviderEnabled('vega', 'livetgtv')).toBe(false);
+    const entries = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    expect(
+      selectEnabledProviders(entries, { enabled: [], disabled: ['b'] }, (entry) => entry.id),
+    ).toEqual([{ id: 'a' }, { id: 'c' }]);
   });
 
   it('circuit breaker transitions between closed, open, and half-open', () => {

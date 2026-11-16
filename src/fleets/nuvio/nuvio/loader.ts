@@ -140,20 +140,8 @@ async function collectDefaults(onSettings: unknown): Promise<Record<string, unkn
   return defaults;
 }
 
-function sameValues(
-  left: Record<string, unknown>,
-  right: Record<string, unknown>,
-): boolean {
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-  if (leftKeys.length !== rightKeys.length) return false;
-  return leftKeys.every(
-    (key) => key in right && JSON.stringify(left[key]) === JSON.stringify(right[key]),
-  );
-}
-
 export async function loadScraper(options: LoadScraperOptions): Promise<LoadedScraper> {
-  const overrides = { ...options.envSettings };
+  const settings: Record<string, unknown> = { ...options.envSettings };
   const base = {
     code: options.code,
     tmdbApiKey: options.tmdbApiKey,
@@ -161,22 +149,14 @@ export async function loadScraper(options: LoadScraperOptions): Promise<LoadedSc
     filename: options.entry.filename,
   };
 
-  let evaluated = evaluateModule({ ...base, settings: overrides });
+  const evaluated = evaluateModule({ ...base, settings });
   if (typeof evaluated.getStreams !== "function") {
     throw new Error(`${options.entry.id} does not export getStreams()`);
   }
 
   const defaults = await collectDefaults(evaluated.onSettings);
-  let effective = overrides;
-  if (Object.keys(defaults).length > 0) {
-    const merged = { ...defaults, ...overrides };
-    if (!sameValues(merged, overrides)) {
-      effective = merged;
-      evaluated = evaluateModule({ ...base, settings: effective });
-      if (typeof evaluated.getStreams !== "function") {
-        throw new Error(`${options.entry.id} does not export getStreams()`);
-      }
-    }
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!(key in settings)) settings[key] = value;
   }
 
   const getStreams = evaluated.getStreams as (
@@ -188,7 +168,7 @@ export async function loadScraper(options: LoadScraperOptions): Promise<LoadedSc
 
   return {
     entry: options.entry,
-    settings: effective,
+    settings,
     getStreams: async (tmdbId, mediaType, season, episode) => {
       const result = await getStreams(tmdbId, mediaType, season, episode);
       return Array.isArray(result) ? result : [];

@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { AppConfig } from "../config.js";
+import { isProviderEnabled, selectEnabledProviders } from "../../../core/policy.js";
 import type {
   HealthProviderStatus,
   HealthReport,
@@ -498,12 +499,17 @@ export class Updater {
     startedAt: number,
   ): Promise<UpdateSummary> {
     const state = this.stateStore.get();
+    const selection = {
+      enabled: this.config.enabledProviders,
+      disabled: this.config.disabledProviders,
+    };
     const pendingValues = Object.entries(state.providers)
       .filter(
         ([, entry]) => entry.status === "pending" || entry.sha !== target.sha,
       )
       .map(([value]) => value)
-      .filter((value) => active.bundles.has(value) || state.providers[value]?.status === "pending");
+      .filter((value) => active.bundles.has(value) || state.providers[value]?.status === "pending")
+      .filter((value) => isProviderEnabled(value, selection));
 
     if (pendingValues.length === 0) {
       const now = nowIso();
@@ -769,9 +775,14 @@ export class Updater {
       stagingExists = false;
 
       unloadProviderModules(finalDir);
+      const selection = {
+        enabled: this.config.enabledProviders,
+        disabled: this.config.disabledProviders,
+      };
       const loaded = new Map<string, ProviderBundle>();
       const loadFailures = new Map<string, string>();
       for (const result of successes) {
+        if (!isProviderEnabled(result.entry.value, selection)) continue;
         try {
           const bundle = await loadProviderBundle(
             result.entry,
@@ -793,7 +804,7 @@ export class Updater {
           continue;
         }
         const old = previousBundles.get(entry.value);
-        if (old) bundles.set(entry.value, old);
+        if (old && isProviderEnabled(entry.value, selection)) bundles.set(entry.value, old);
       }
       const retired = uniqueSorted(
         Array.from(previousBundles.keys()).filter((value) => !enabledValues.has(value)),
@@ -1038,7 +1049,12 @@ export class Updater {
       if (entries.length === 0) return null;
 
       const bundles = new Map<string, ProviderBundle>();
-      for (const entry of entries) {
+      const enabledEntries = selectEnabledProviders(
+        entries,
+        { enabled: this.config.enabledProviders, disabled: this.config.disabledProviders },
+        (entry) => entry.value,
+      );
+      for (const entry of enabledEntries) {
         const bundle = await loadProviderBundle(
           entry,
           path.join(dir, entry.value),

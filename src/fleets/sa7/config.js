@@ -10,8 +10,8 @@ function resolvePath(candidate, fallback) {
   return fallback;
 }
 
-function envInt(name, fallback, min) {
-  const raw = process.env[name];
+function envInt(env, name, fallback, min) {
+  const raw = env[name];
   if (raw == null || raw === '') return fallback;
   const value = Number(raw);
   if (!Number.isFinite(value)) return fallback;
@@ -19,38 +19,53 @@ function envInt(name, fallback, min) {
   return floored >= min ? floored : fallback;
 }
 
-module.exports = {
-  host: process.env.HOST || '0.0.0.0',
-  port: Number(process.env.PORT || 7000),
-  addonName: process.env.ADDON_NAME || 'CB Providers',
-  providerManifest: resolvePath(
-    process.env.PROVIDER_MANIFEST,
-    path.join(bundledRoot, 'manifest.json')
-  ),
-  providerDir: resolvePath(
-    process.env.PROVIDER_DIR,
-    path.join(bundledRoot, 'providers')
-  ),
-  snapshotFile: process.env.SA7_SNAPSHOT_FILE || '',
-  providerTimeoutMs: Number(process.env.PROVIDER_TIMEOUT_MS || 20000),
-  deadlineMs: Number(process.env.ADDON_DEADLINE_MS || 25000),
-  breakerFailureThreshold: envInt('BREAKER_FAILURE_THRESHOLD', 3, 1),
-  breakerCooldownMs: envInt('BREAKER_COOLDOWN_MS', 300000, 0),
-  streamCacheTtlMs: envInt('STREAM_CACHE_TTL_MS', 180000, 0),
-  streamPartialCacheTtlMs: envInt('STREAM_PARTIAL_CACHE_TTL_MS', 30000, 0),
-  streamCacheMaxEntries: envInt('STREAM_CACHE_MAX_ENTRIES', 500, 0),
-  tmdbCacheMaxEntries: envInt('TMDB_CACHE_MAX_ENTRIES', 5000, 1),
-  maxPerProviderStreams: envInt('MAX_PER_PROVIDER_STREAMS', 100, 1),
-  maxTotalStreams: envInt('MAX_TOTAL_STREAMS', 1000, 1),
-  providerConcurrency: envInt('PROVIDER_CONCURRENCY', 30, 1),
-  enabledProviders: String(process.env.ENABLED_PROVIDERS || process.env.SA7_ENABLED_PROVIDERS || '')
+function envList(env, primary, secondary) {
+  return String(env[primary] || env[secondary] || '')
     .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean),
-  disabledProviders: String(process.env.DISABLED_PROVIDERS || process.env.SA7_DISABLED_PROVIDERS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean),
-  cinemetaUrl: (process.env.CINEMETA_URL || 'https://v3-cinemeta.strem.io').replace(/\/$/, ''),
-  tmdbApiKey: process.env.TMDB_API_KEY || '',
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function createConfig(env = process.env) {
+  return {
+    host: env.HOST || '0.0.0.0',
+    port: Number(env.PORT || 7000),
+    addonName: env.ADDON_NAME || 'CB Providers',
+    providerManifest: resolvePath(
+      env.PROVIDER_MANIFEST,
+      path.join(bundledRoot, 'manifest.json'),
+    ),
+    providerDir: resolvePath(
+      env.PROVIDER_DIR,
+      path.join(bundledRoot, 'providers'),
+    ),
+    snapshotFile: env.SA7_SNAPSHOT_FILE || '',
+    providerTimeoutMs: Number(env.PROVIDER_TIMEOUT_MS || 20000),
+    deadlineMs: Number(env.ADDON_DEADLINE_MS || 25000),
+    breakerFailureThreshold: envInt(env, 'BREAKER_FAILURE_THRESHOLD', 3, 1),
+    breakerCooldownMs: envInt(env, 'BREAKER_COOLDOWN_MS', 300000, 0),
+    streamCacheTtlMs: envInt(env, 'STREAM_CACHE_TTL_MS', 180000, 0),
+    streamPartialCacheTtlMs: envInt(env, 'STREAM_PARTIAL_CACHE_TTL_MS', 30000, 0),
+    streamCacheMaxEntries: envInt(env, 'STREAM_CACHE_MAX_ENTRIES', 500, 0),
+    tmdbCacheMaxEntries: envInt(env, 'TMDB_CACHE_MAX_ENTRIES', 5000, 1),
+    maxPerProviderStreams: envInt(env, 'MAX_PER_PROVIDER_STREAMS', 100, 1),
+    maxTotalStreams: envInt(env, 'MAX_TOTAL_STREAMS', 1000, 1),
+    providerConcurrency: envInt(env, 'PROVIDER_CONCURRENCY', 30, 1),
+    enabledProviders: envList(env, 'ENABLED_PROVIDERS', 'SA7_ENABLED_PROVIDERS'),
+    disabledProviders: envList(env, 'DISABLED_PROVIDERS', 'SA7_DISABLED_PROVIDERS'),
+    cinemetaUrl: (env.CINEMETA_URL || 'https://v3-cinemeta.strem.io').replace(/\/$/, ''),
+    tmdbApiKey: env.TMDB_API_KEY || '',
+  };
+}
+
+const config = createConfig();
+
+module.exports = config;
+module.exports.createConfig = createConfig;
+module.exports.apply = function apply(env) {
+  const next = createConfig(env);
+  for (const key of Object.keys(next)) {
+    config[key] = next[key];
+  }
+  return config;
 };

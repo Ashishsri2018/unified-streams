@@ -18,6 +18,7 @@ import type {
   StremioSubtitle,
 } from "../types.js";
 import { contentIdOf, requestLogFields } from "../addon/parseId.js";
+import { isProviderEnabled } from "../../../core/policy.js";
 import { ProviderTelemetry } from "../../../core/providerTelemetry.js";
 import { TtlCache } from "../util/cache.js";
 import {
@@ -303,9 +304,6 @@ export class StreamPipeline implements StreamHandlerApi {
   private readonly registry: PipelineDeps["registry"];
   private readonly cinemeta: PipelineDeps["cinemeta"];
   private readonly tmdb: PipelineDeps["tmdb"];
-  private readonly enabledProviders: Set<string>;
-  private readonly disabledProviders: Set<string>;
-  private readonly disableAllProviders: boolean;
 
   private readonly searchCache: TtlCache<string, Post[]>;
   private readonly mappingCache: TtlCache<string, Candidate>;
@@ -335,13 +333,6 @@ export class StreamPipeline implements StreamHandlerApi {
     this.registry = deps.registry;
     this.cinemeta = deps.cinemeta;
     this.tmdb = deps.tmdb ?? null;
-    this.enabledProviders = new Set(
-      deps.config.enabledProviders.map((value: string) => value.toLowerCase()),
-    );
-    this.disabledProviders = new Set(
-      deps.config.disabledProviders.map((value: string) => value.toLowerCase()),
-    );
-    this.disableAllProviders = this.disabledProviders.has('*');
     this.searchCache = new TtlCache<string, Post[]>(
       deps.config.providerCacheTtlMs,
     );
@@ -814,14 +805,14 @@ export class StreamPipeline implements StreamHandlerApi {
   }
 
   private async runRequest(ctx: InternalContext, snapshot: ProviderSnapshot): Promise<void> {
+    const selection = {
+      enabled: this.config.enabledProviders,
+      disabled: this.config.disabledProviders,
+    };
     const bundles = Array.from(snapshot.bundles.values()).filter((bundle) => {
       const value = bundle.entry.value.toLowerCase();
-      if (this.disableAllProviders || this.disabledProviders.has(value) || ctx.info.disabledProviders.has(value)) {
-        return false;
-      }
-      if (this.enabledProviders.size > 0 && !this.enabledProviders.has(value)) {
-        return false;
-      }
+      if (!isProviderEnabled(value, selection)) return false;
+      if (ctx.info.disabledProviders.has(value)) return false;
       if (ctx.info.providers && ctx.info.providers.size > 0) {
         return ctx.info.providers.has(value);
       }

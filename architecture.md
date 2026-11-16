@@ -11,46 +11,31 @@ Unified Streams is a production-grade Stremio stream addon combining three provi
                           GET/HEAD/OPTIONS    |  Public HTTP (Port 7000)
                                               v
 +------------------------------------------------------------------------------------+
-| Gateway Container                                                                  |
+| Single Node process (src/index.ts)                                                 |
 |                                                                                    |
 |  +------------------------------------------------------------------------------+  |
 |  | Gateway (src/addon/app.ts)                                                   |  |
-|  |                                                                              |  |
-|  |  - Public Routes:                                                            |  |
-|  |      /manifest.json, /:config/manifest.json                                  |  |
-|  |      /stream/:type/:id.json, /:config/stream/:type/:id.json                  |  |
-|  |      /configure, /:config/configure                                          |  |
-|  |      /health, /stats, /status, /                                             |  |
-|  |      /logo.png, /logo.svg, /favicon.ico                                      |  |
-|  |                                                                              |  |
-|  |  - Core Subsystems:                                                          |  |
-|  |      * Env & Policy Validation (Zod)                                         |  |
-|  |      * Gateway Cache: 180s full TTL, 30s partial TTL, non-empty only         |  |
-|  |      * Content ID Parser: tt, tmdb:, mal:                                    |  |
-|  |      * Metadata Resolver: Cinemeta, TMDB, Jikan (rate-limited)               |  |
-|  |      * Stream Merger & Deduplication: cross-fleet dedup, quality sort, safety net |  |
-|  |      * Stream Tagging: 🖥️ for externalUrl title, 🔲 for archive name          |  |
-|  |      * Filters: Resolution and File Size; inline subtitles pass through       |  |
-|  |      * Concurrency: Global deadline (12s), Timeout clamp, Request coalescing|  |
-|  |      * Telemetry: Canonical sliding-window health & stats                    |  |
-|  |      * Logger: Structured JSON lines, Redaction, Async queue, Stdout/CF Sink |  |
-|  |      * Updater Scheduler: 20-24h jittered jobs for SA7, Nuvio, Vega         |  |
+|  |  - Public routes, gateway cache, metadata resolution, stream merge/filter     |  |
+|  |  - Updater scheduler (20-24h jittered jobs)                                   |  |
 |  +------------------------------------------------------------------------------+  |
-|         |                                 |                                 |      |
-|         | HTTP 127.0.0.1:7001             | HTTP 127.0.0.1:7002             | HTTP |
-|         v                                 v                                 v      |
-|  +-------------------+          +-------------------+          +-----------------+ |
-|  | SA7 Worker        |          | Nuvio Worker      |          | Vega Worker     | |
-|  | (fleets/sa7)      |          | (fleets/nuvio)    |          | (fleets/vega)   | |
-|  |                   |          |                   |          |                 | |
-|  | - Port 7001       |          | - Port 7002       |          | - Port 7003     | |
-|  | - Loopback only   |          | - Loopback only   |          | - Loopback only | |
-|  | - /internal/*     |          | - /internal/*     |          | - /internal/*   | |
-|  | - Cap 100/provider|          | - Cap 100/provider|          | - Cap 100/prov  | |
-|  | - No stream cache |          | - No stream cache |          | - No stream cach| |
-|  +-------------------+          +-------------------+          +-----------------+ |
+|                                                                                    |
+|  +------------------------------------------------------------------------------+  |
+|  | In-process fleets (create*Handlers factories + core/internalServer.ts)       |  |
+|  |                                                                              |  |
+|  |  +-------------------+  +-------------------+  +-------------------+          |  |
+|  |  | SA7 127.0.0.1:7001|  | Nuvio 127.0.0.1:7002|  | Vega 127.0.0.1:7003|        |  |
+|  |  | /internal/*       |  | /internal/*       |  | /internal/*       |          |  |
+|  |  +-------------------+  +-------------------+  +-------------------+          |  |
+|  +------------------------------------------------------------------------------+  |
+|                                                                                    |
+|  Shared: env/policy derivation (core/env.ts, core/policy.ts), logger, telemetry     |
 +------------------------------------------------------------------------------------+
 ```
+
+All three fleet runtimes and the gateway share one Node heap. The loopback HTTP
+contract on ports 7001-7003 is unchanged, so `WorkerClient` and the gateway code
+are unaware of the in-process consolidation. Heap caps are applied at process
+start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
 
 ## 2. Directory Layout
 - `config/`: Default settings (`defaults.env`), per-instance profiles (`instances/beamup.env`, `instances/railway.env`), and canonical provider policy (`providers.json`). Loading order is defaults → selected profile → platform environment.

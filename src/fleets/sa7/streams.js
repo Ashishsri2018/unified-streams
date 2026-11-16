@@ -303,13 +303,18 @@ function createCollector({
   return { collectStreams, collectSubtitles, getRuntimeStats };
 }
 
-const defaultCollector = createCollector();
+let defaultCollector = null;
+
+function getDefaultCollector() {
+  if (!defaultCollector) defaultCollector = createCollector();
+  return defaultCollector;
+}
 
 module.exports = {
   createCollector,
-  collectStreams: defaultCollector.collectStreams,
-  collectSubtitles: defaultCollector.collectSubtitles,
-  getRuntimeStats: defaultCollector.getRuntimeStats,
+  collectStreams: (...args) => getDefaultCollector().collectStreams(...args),
+  collectSubtitles: (...args) => getDefaultCollector().collectSubtitles(...args),
+  getRuntimeStats: (...args) => getDefaultCollector().getRuntimeStats(...args),
   normalizeStreamKey,
   dedupe,
 };
