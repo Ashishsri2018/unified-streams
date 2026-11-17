@@ -114,6 +114,7 @@ export function isDirectMediaUrl(rawUrl: string): boolean {
 function isDirectHost(hostname: string, pathname: string): boolean {
   const host = hostname.toLowerCase();
   return (
+    host.startsWith('proxy.') ||
     host.endsWith('.r2.cloudflarestorage.com') ||
     host.endsWith('.googleusercontent.com') ||
     host.includes('direct-stream') ||

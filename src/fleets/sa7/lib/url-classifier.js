@@ -123,6 +123,7 @@ function isWebPage(url, stream = {}) {
   if (isDirectMediaUrl(url)) return false;
 
   if (
+    hostname.startsWith('proxy.') ||
     hostname.endsWith('.r2.cloudflarestorage.com') ||
     hostname === 'video-downloads.googleusercontent.com' ||
     (hostname === 'pixeldrain.com' && pathname.startsWith('/api/file/'))

@@ -50,6 +50,7 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
   - `urlClassifier.ts`: Single source of truth for URL & stream classification:
     * Direct playable media recognition across standard extensions (`mp4`, `mkv`, `m4v`, `webm`, `avi`, `mov`, `flv`, `m3u8`, `mpd`, `ts`, `3gp`, `3g2`, `ogv`, `ogg`, `mpg`, `mpeg`, `wmv`, `asf`, `vob`, `m2ts`, `mp3`, `aac`, `flac`, `wav`, `m4a`, `opus`) and streaming API endpoints like `/api/watch/m3u8`.
     * Extensionless links on media CDNs (e.g. `media.satella.buzz/e/...`, `/v/...`, `/stream/...`, `/play/...`) default to `url` for native in-app Stremio playback.
+    * Proxy hosts (`proxy.*` such as `proxy.vidbolt.xyz/f/...`) are direct stream endpoints, so extensionless proxy URLs stay in `url` even when the parent domain is in `KNOWN_EMBED_DOMAINS`.
     * Web embed and player page detection (HTML extensions `.html`/`.php`/etc., `/embed/`, `/player/`, `/watch/`, `/iframe/`, Telegram links, and `KNOWN_EMBED_DOMAINS` like Streamtape, Doodstream, Mixdrop, FileLions) route to `externalUrl` with `🖥️` prefix.
     * Compressed archive detection (`.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.tgz`, `.bz2`, `.tbz2`, `.iso`, `.xz`, `.zst`) routes to `externalUrl` with `🔲` name and `🖥️` title markers.
     * Blocker and anti-bot URL filtering (`/slowdown`, `/ratelimit`, `/antibot`).

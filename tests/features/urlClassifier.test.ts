@@ -132,6 +132,36 @@ describe('urlClassifier canonical rules', () => {
     expect(merged[1].title.startsWith('🖥️')).toBe(false);
   });
 
+  it('keeps direct proxy stream endpoints in url, even on known embed domains', () => {
+    const vidboltProxyUrl =
+      'https://proxy.vidbolt.xyz/f/x_D5ryyq2yiLY1bXEXfM07X9AoZkk_EwzIwtPvM5A5THNM-UjBSTa1z-RKTN7C3yfbfe4g2bKYjgeJQvAnmEFnATjrHySOmnu6hrWXJncxcKIH10vjzFq8xO1QxUr4nSq7k0q_Oa315fGF6qd8tskeSAadtg-EE6O0pLzAJCKsJg4fBVUfgQAk2MP0S-skSYjA';
+
+    expect(isDirectMediaUrl(vidboltProxyUrl)).toBe(false);
+    expect(isWebPage(vidboltProxyUrl)).toBe(false);
+    expect(isExternalUrl(vidboltProxyUrl)).toBe(false);
+
+    const inputs: FleetStreamsInput[] = [
+      {
+        fleet: 'nuvio',
+        streams: [
+          {
+            name: 'VidBolt',
+            title: '1080p Proxy',
+            quality: '1080p',
+            url: vidboltProxyUrl,
+          },
+        ],
+      },
+    ];
+
+    const merged = mergeAndFilterStreams(inputs, defaultFilters, 10);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].url).toBe(vidboltProxyUrl);
+    expect(merged[0].externalUrl).toBeUndefined();
+    expect(merged[0].title).toBe('1080p Proxy');
+    expect(merged[0].title.startsWith('🖥️')).toBe(false);
+  });
+
   it('recognizes 3gp and other media extensions as direct media in url', () => {
     const mediaUrls = [
       'https://example.com/video.3gp',
