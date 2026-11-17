@@ -1,0 +1,6 @@
+name = "unified-streams-proxy"
+main = "src/index.js"
+compatibility_date = "2024-11-12"
+
+[vars]
+ORIGIN = "http://unifiedstreams.duckdns.org:3057"
