@@ -134,8 +134,8 @@ describe('disabled providers derivation', () => {
 
   it('applies the Railway profile deny lists with 40-way concurrency', () => {
     const appEnv = loadAppEnv({ INSTANCE_PROFILE: 'railway' });
-    expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(27000);
-    expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(29000);
+    expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(34000);
+    expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(38000);
     expect(Number(appEnv.SEARCH_CONCURRENCY)).toBe(40);
     expect(Number(appEnv.SEARCH_TIMEOUT_MS)).toBe(15000);
 
