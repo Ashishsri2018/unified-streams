@@ -268,7 +268,7 @@ export function renderConfigurePageHtml(
         </div>
       </div>
       <div class="header-actions">
-        <a class="button" href="${baseUrl}/status">View status</a>
+        <a class="button" href="${baseUrl}/providers">Working providers</a>
       </div>
     </header>
 

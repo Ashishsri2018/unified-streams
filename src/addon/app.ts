@@ -3,6 +3,7 @@ import compression from 'compression';
 import { StreamHandlerContext, handleStreamRoute } from './stream.js';
 import { handleHealth, handleStats } from './health.js';
 import { handleStatusPage } from './status.js';
+import { handleProvidersPage } from './providers.js';
 import { handleConfigure, getPublicBaseUrl } from './configure.js';
 import { buildManifest } from './manifest.js';
 import { handleLogoPng, handleLogoSvg, handleFavicon } from './logo.js';
@@ -40,6 +41,7 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
       manifest: '/manifest.json',
       configure: '/configure',
       health: '/health',
+      providers: '/providers',
     });
   };
   app.get('/', handleRoot);
@@ -80,6 +82,9 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
 
   app.get('/status', (req, res) => handleStatusPage(req, res, ctx, startedAt, ctx.publicBaseUrl));
   app.head('/status', (req, res) => handleStatusPage(req, res, ctx, startedAt, ctx.publicBaseUrl));
+
+  app.get('/providers', (req, res) => handleProvidersPage(req, res, ctx.publicBaseUrl));
+  app.head('/providers', (req, res) => handleProvidersPage(req, res, ctx.publicBaseUrl));
 
   // Branding asset routes
   app.get('/logo.png', handleLogoPng);

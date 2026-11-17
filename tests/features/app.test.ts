@@ -144,6 +144,8 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.headers['content-type']).toContain('text/html');
     expect(res.headers['x-frame-options']).toBe('DENY');
     expect(res.text).toContain('Unified Streams');
+    expect(res.text).toContain('/providers');
+    expect(res.text).toContain('Working providers');
 
     const csp = res.headers['content-security-policy'];
     const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
@@ -302,6 +304,25 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(csp).not.toContain("'unsafe-inline'");
     expect(resGet.text).toContain(`<script nonce="${nonce}">`);
     expect(resGet.text).toContain(`<style nonce="${nonce}">`);
+  });
+
+  it('GET and HEAD /providers render the working providers page', async () => {
+    const resGet = await request(app).get('/providers');
+    expect(resGet.status).toBe(200);
+    expect(resGet.headers['content-type']).toContain('text/html');
+    expect(resGet.headers['x-frame-options']).toBe('DENY');
+    expect(resGet.text).toContain('Working providers');
+    expect(resGet.text).toContain('providers-list');
+    expect(resGet.text).not.toMatch(/nuvio|vega|sa7/i);
+
+    const resHead = await request(app).head('/providers');
+    expect(resHead.status).toBe(200);
+    expect(resHead.text).toBeFalsy();
+
+    const csp = resGet.headers['content-security-policy'];
+    const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
+    expect(nonce).toBeTruthy();
+    expect(resGet.text).toContain(`<script nonce="${nonce}">`);
   });
 
   it('GET /health aggregates providers and components across all fleets', async () => {
