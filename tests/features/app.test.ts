@@ -170,7 +170,8 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.text).toContain('"subtitleLangs":["en","es"]');
     expect(res.text).toContain('"includeUnknownSubtitleLang":false');
     expect(res.text).toContain('Stream filters');
-    expect(res.text).toContain('Provider fleets');
+    expect(res.text).not.toContain('Provider fleets');
+    expect(res.text).not.toContain('id="fleet-sa7"');
     expect(res.text).toContain('id="subtitleLangs"');
     expect(res.text).toContain('id="includeUnknownSubtitleLang"');
     expect(res.text).toContain('passed through unchanged');

@@ -147,26 +147,6 @@ export function renderConfigurePageHtml(
     }
     .check input { margin: 3px 0 0; accent-color: var(--accent); flex: none; }
     .check.disabled { opacity: 0.55; cursor: not-allowed; }
-    .fleets { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-    .fleet {
-      display: flex;
-      align-items: flex-start;
-      gap: 11px;
-      padding: 14px;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      background: var(--panel-deep);
-      cursor: pointer;
-      transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
-    }
-    .fleet:hover { border-color: #35507a; }
-    .fleet.selected {
-      border-color: var(--accent);
-      background: linear-gradient(180deg, #172554aa, #0a121fee);
-    }
-    .fleet input { margin: 3px 0 0; accent-color: var(--accent); flex: none; }
-    .fleet-name { display: block; font-weight: 700; color: var(--text); }
-    .fleet-desc { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
     .summary { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
     .summary li {
       display: flex;
@@ -253,7 +233,6 @@ export function renderConfigurePageHtml(
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .fleet { transition: none; }
     }
   </style>
 </head>
@@ -358,37 +337,13 @@ export function renderConfigurePageHtml(
       </fieldset>
     </section>
 
-    <section class="card" aria-labelledby="fleets-heading">
-      <div class="card-head">
-        <div>
-          <h2 id="fleets-heading">Provider fleets</h2>
-          <p class="card-sub">Choose which provider groups to query. At least one fleet is required.</p>
-        </div>
-        <span class="step" aria-hidden="true">02</span>
-      </div>
-      <div class="fleets">
-        <label class="fleet" id="fleetCard-sa7">
-          <input type="checkbox" id="fleet-sa7" checked>
-          <span><span class="fleet-name">SA7</span><span class="fleet-desc">SA7 provider set</span></span>
-        </label>
-        <label class="fleet" id="fleetCard-nuvio">
-          <input type="checkbox" id="fleet-nuvio" checked>
-          <span><span class="fleet-name">Nuvio</span><span class="fleet-desc">Nuvio provider set</span></span>
-        </label>
-        <label class="fleet" id="fleetCard-vega">
-          <input type="checkbox" id="fleet-vega" checked>
-          <span><span class="fleet-name">Vega</span><span class="fleet-desc">Vega provider set</span></span>
-        </label>
-      </div>
-    </section>
-
     <section class="card" aria-labelledby="install-heading">
       <div class="card-head">
         <div>
           <h2 id="install-heading">Install</h2>
           <p class="card-sub">Your choices are encoded in the link below. Nothing is saved on the server.</p>
         </div>
-        <span class="step" aria-hidden="true">03</span>
+        <span class="step" aria-hidden="true">02</span>
       </div>
 
       <ul class="summary" id="summary" aria-live="polite"></ul>
@@ -412,9 +367,7 @@ export function renderConfigurePageHtml(
     const BASE_URL = "${baseUrl}";
     const PREFILL_CONFIG = ${prefillConfigJson};
     const PREFILL = PREFILL_CONFIG && typeof PREFILL_CONFIG === 'object' ? PREFILL_CONFIG : {};
-    const FLEETS = ['sa7', 'nuvio', 'vega'];
-    const FLEET_NAMES = { sa7: 'SA7', nuvio: 'Nuvio', vega: 'Vega' };
-    const ALL_FLEETS = FLEETS.slice();
+    const BACKENDS = ['sa7', 'nuvio', 'vega'];
 
     function el(id) {
       return document.getElementById(id);
@@ -425,23 +378,6 @@ export function renderConfigurePageHtml(
       if (raw === '') return null;
       const value = Number(raw);
       return Number.isFinite(value) ? value : null;
-    }
-
-    function selectedBackends() {
-      return FLEETS.filter(function (fleet) {
-        return el('fleet-' + fleet).checked;
-      });
-    }
-
-    function setFleetChecked(fleet, checked) {
-      el('fleet-' + fleet).checked = checked;
-      el('fleetCard-' + fleet).classList.toggle('selected', checked);
-    }
-
-    function syncFleetStyles() {
-      FLEETS.forEach(function (fleet) {
-        el('fleetCard-' + fleet).classList.toggle('selected', el('fleet-' + fleet).checked);
-      });
     }
 
     function parsedSubtitleLangs() {
@@ -497,11 +433,6 @@ export function renderConfigurePageHtml(
       return resolutionLabel(maxRes) + ' and below';
     }
 
-    function fleetSummary(backends) {
-      if (backends.length === FLEETS.length) return 'All fleets (SA7, Nuvio, Vega)';
-      return backends.map(function (fleet) { return FLEET_NAMES[fleet]; }).join(', ');
-    }
-
     function addSummary(label, value) {
       const item = document.createElement('li');
       const strong = document.createElement('strong');
@@ -511,7 +442,7 @@ export function renderConfigurePageHtml(
       el('summary').appendChild(item);
     }
 
-    function renderSummary(minRes, maxRes, maxSizeGB, backends, subLangs, includeUnknownSub) {
+    function renderSummary(minRes, maxRes, maxSizeGB, subLangs, includeUnknownSub) {
       const summary = el('summary');
       summary.replaceChildren();
 
@@ -534,8 +465,6 @@ export function renderConfigurePageHtml(
         const unk = includeUnknownSub ? 'including unknown' : 'excluding unknown';
         addSummary('Subtitles', 'Only ' + subLangs.join(', ') + ' (' + unk + ')');
       }
-
-      addSummary('Fleets', fleetSummary(backends));
     }
 
     function validate(minRes, maxRes, maxSizeGB) {
@@ -568,13 +497,12 @@ export function renderConfigurePageHtml(
       const minRes = numberOrNull('minRes');
       const maxRes = numberOrNull('maxRes');
       const maxSizeGB = numberOrNull('maxSizeGB');
-      const backends = selectedBackends();
       const subLangs = parsedSubtitleLangs();
       const includeUnknownSub = el('includeUnknownSubtitleLang').checked;
       const subtitleMode = subLangs.length > 0 ? 'languages' : 'all';
       const errors = validate(minRes, maxRes, maxSizeGB);
 
-      renderSummary(minRes, maxRes, maxSizeGB, backends.length > 0 ? backends : ALL_FLEETS, subLangs, includeUnknownSub);
+      renderSummary(minRes, maxRes, maxSizeGB, subLangs, includeUnknownSub);
       setInvalid(errors);
       if (errors.length > 0) return { valid: false, manifestUrl: '' };
 
@@ -588,7 +516,7 @@ export function renderConfigurePageHtml(
         subtitleMode: subtitleMode,
         subtitleLangs: subLangs,
         includeUnknownSubtitleLang: includeUnknownSub,
-        backends: backends
+        backends: BACKENDS
       };
 
       const b64 = btoa(JSON.stringify(config))
@@ -629,20 +557,6 @@ export function renderConfigurePageHtml(
       } else {
         el('includeUnknownSubtitleLang').checked = true;
       }
-
-      const backends = Array.isArray(PREFILL.backends) && PREFILL.backends.length > 0
-        ? PREFILL.backends
-        : ALL_FLEETS;
-      FLEETS.forEach(function (fleet) {
-        setFleetChecked(fleet, backends.indexOf(fleet) !== -1);
-      });
-    }
-
-    function ensureSelectedFleet(changedFleet) {
-      if (selectedBackends().length === 0) {
-        setFleetChecked(changedFleet, true);
-      }
-      syncFleetStyles();
     }
 
     async function copyText(text) {
@@ -667,12 +581,6 @@ export function renderConfigurePageHtml(
     });
     ['includeUnknownRes', 'includeUnknownSize', 'includeUnknownSubtitleLang'].forEach(function (id) {
       el(id).addEventListener('change', updateUrl);
-    });
-    FLEETS.forEach(function (fleet) {
-      el('fleet-' + fleet).addEventListener('change', function () {
-        ensureSelectedFleet(fleet);
-        updateUrl();
-      });
     });
 
     const chips = document.querySelectorAll('.chip');
@@ -720,15 +628,11 @@ export function renderConfigurePageHtml(
       el('includeUnknownSize').checked = true;
       el('subtitleLangs').value = '';
       el('includeUnknownSubtitleLang').checked = true;
-      FLEETS.forEach(function (fleet) {
-        setFleetChecked(fleet, true);
-      });
       el('copyStatus').textContent = '';
       updateUrl();
     });
 
     applyPrefill();
-    syncFleetStyles();
     updateUrl();
   </script>
 </body>
