@@ -1,6 +1,6 @@
 # Unified Streams — Condensed Project History
 
-Chronological summary of sessions and outcomes. Full technical detail lives in the code, `CHANGELOG.md`, `architecture.md`, `docs/provider-compatibility.md`, and `docs/nuvio-provider-mapping.md`. Live domains, IDs, and secrets are intentionally redacted.
+Chronological summary of sessions and outcomes. Full technical detail lives in the code, `CHANGELOG.md`, and `architecture.md`; provider audit notes are kept local-only. Live domains, IDs, and secrets are intentionally redacted.
 
 ## Build-out (Phases 1–9)
 - Scaffolded Node 22 / ESM / strict TypeScript package, Zod env schema, ESLint (zero `any`), Vitest, Docker, and CI/CD.
@@ -26,14 +26,14 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - Fixed CI lint/typecheck failures (`no-explicit-any` in tests, `updater` fallback typing in `health.ts`).
 
 ## Benchmarks, allocation & security
-- Benchmarked 6 titles across Railway and Beamup (653 vs 407 streams). Railway wins where clean egress matters; Beamup wins for a few anime scrapers. Full tier tables are in `docs/provider-compatibility.md`.
+- Benchmarked 6 titles across Railway and Beamup (653 vs 407 streams). Railway wins where clean egress matters; Beamup wins for a few anime scrapers. Full tier tables are kept in local-only audit notes.
 - Beamup runs its exclusive/duplicate scrapers; Railway is the primary instance. Configured FebBox cookie, GramCinema, and Kartoons credential pipelines, with CI secret sync.
 - Redacted live domains, infra IDs, and hardcoded keys from all tracked files and workflows; rotated the TMDB key; purged Git history and force-pushed a clean repository.
 - Added `paths-ignore: ['**.md']` to CI and the `[skip ci]` convention for doc commits.
 
 ## Recent sessions (Nov 15 2026)
 - **Render deploy:** pushed `e8657fc` (classifier fixes); Render auto-deploy went live and `/`, `/manifest.json`, `/health` were probed successfully (all three fleets active). Local verify/build/lint skipped by request.
-- **Provider mapping:** inspected Nuvio (51), Vega (66), and SA7 (28) provider sources, deobfuscated their media hosts/APIs, and built the 25-cluster tri-fleet duplicate matrix in `docs/nuvio-provider-mapping.md`.
+- **Provider mapping:** inspected Nuvio, Vega, and SA7 provider sources, deobfuscated their media hosts/APIs, and built a tri-fleet duplicate matrix in local-only audit notes.
 - **Railway CLI logs:** `railway status` showed the service online; HTTP and error logs showed healthy Nuvio/Vega extraction. Expected warnings: Turnstile requirement for Vega `everything` (no headless solver) and high log throughput during scraper bursts.
 - **Live series checks:** *Breaking Bad* S01E01 returned 234 streams on Railway vs 6 on Beamup; *Stranger Things* S01E01 returned 114 on Railway. Gateway cache hits returned in <7s.
 
