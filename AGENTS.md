@@ -22,7 +22,7 @@ npm run verify       # CI only: policy -> icon -> lint -> typecheck -> all tests
 ## Configuration and provider policy
 - Env load order: `config/defaults.env` -> `config/instances/$INSTANCE_PROFILE.env` -> process env. `INSTANCE_PROFILE=generic` locally; `beamup` and `railway` intentionally use different provider sets and timeout budgets.
 - Provider availability is canonical in `config/providers.json` (fleet allow/deny plus `instances.<profile>`). `src/core/env.ts` derives worker-scoped env from it. Runtime `*_ENABLED_*` / `*_DISABLED_*` env vars are per-run overrides, not the source of truth.
-- `torrentio`, `internetarchive`, `youtube`, `brellor`, `durbinlive`, and `livetgtv` are hard-disabled in both `src/core/env.ts` and `scripts/check-provider-policy.mjs`; keep both lists in sync.
+- `torrentio`, `internetarchive`, `youtube`, `brellor`, `durbinlive`, `livetgtv`, `bdix-cf`, `bdix-df`, and `bdix-fh` are hard-disabled in both `src/core/env.ts` and `scripts/check-provider-policy.mjs`; keep both lists in sync.
 - Keep `config/provider-audit.csv` aligned when replacing providers. `npm run policy:check` warns about IDs absent from the audit.
 - Local `DATA_DIR` defaults to `/data`; use `DATA_DIR=./data` if it is not writable. Startup creates the per-fleet subdirectories.
 

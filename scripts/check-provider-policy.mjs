@@ -10,12 +10,15 @@ const POLICY_PATH = path.join(rootDir, 'config', 'providers.json');
 const AUDIT_PATH = path.join(rootDir, 'config', 'provider-audit.csv');
 const FLEETS = ['sa7', 'nuvio', 'vega'];
 const HARD_DISABLED = [
-  'youtube',
   'torrentio',
   'internetarchive',
+  'youtube',
   'brellor',
   'durbinlive',
   'livetgtv',
+  'bdix-cf',
+  'bdix-df',
+  'bdix-fh',
 ];
 
 function parseCsv(content) {

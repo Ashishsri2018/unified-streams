@@ -141,3 +141,4 @@ vega,vega,VMovies,global,,vegamovies,vega:vega,enabled,yes,yes,keep,,,,,,keep_pr
 vega,world4u,World4uFree,global,"mediafire.com,photolinx.space",,,failing,no,yes,keep_disabled,,,,,,keep_disabled,Upstream world4ufree.vu search endpoint returns HTTP 404.
 vega,youtube,YouTube,global,youtube.com,,,env_disabled,no,yes,keep_disabled,,,,,,disable_requested,YouTube; disabled by user request.
 vega,zeefliz,Zeefliz,global,,,,enabled,yes,yes,keep,,,,,,,hosts resolved via urls.json/getBaseUrl; not literal in provider folder
+vega,rareanimes,Rareanimes,india,rareanimes.fans,,,,no,no,keep,,,,,,,Baseline-only provider; not present in current upstream manifest.

@@ -4,7 +4,7 @@ Canonical reference for duplicate providers across **Nuvio**, **Vega**, and **SA
 
 - Provider counts: SA7 28, Nuvio 51, Vega 66.
 - 25 duplicate clusters: 10 three-fleet, 5 Nuvio↔SA7, 4 Vega↔SA7, 6 Nuvio↔Vega.
-- Hard-disabled by policy: `torrentio`, `internetArchive`/`brellor`, YouTube, live TV; see `config/providers.json`.
+- Hard-disabled by policy: `torrentio`, `internetArchive`/`brellor`, YouTube, BDIX (`bdix-cf`, `bdix-df`, `bdix-fh`), live TV; see `config/providers.json`.
 
 ## 1. Duplicate clusters (canonical)
 
@@ -79,9 +79,9 @@ Source: `eclipsia/nuvio-plugin` (`pages`).
 
 | ID / file | Service | Upstream | Notes |
 |---|---|---|---|
-| `bdix-cf` | Circle FTP | new.circleftp.net | BDIX regional, :5000 |
-| `bdix-df` | DhakaFlix FTP | 172.16.50.12/.14 | BDIX internal |
-| `bdix-fh` | FlixHub FTP | flixhub.net | BDIX regional |
+| `bdix-cf` | Circle FTP | new.circleftp.net | hard-disabled (BDIX) |
+| `bdix-df` | DhakaFlix FTP | 172.16.50.12/.14 | hard-disabled (BDIX) |
+| `bdix-fh` | FlixHub FTP | flixhub.net | hard-disabled (BDIX) |
 | `brellor` | Internet Archive | archive.org | hard-disabled |
 | `durnel` | CTGMovies | ctgmovies.com | nip.io API |
 | `esvyl` | VidBolt | vidbolt.xyz | /api/resolve |

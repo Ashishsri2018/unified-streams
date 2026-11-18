@@ -99,7 +99,7 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
 - **Platform-Differentiated Timeout Strategy**:
   - `INSTANCE_PROFILE` selects `config/instances/<profile>.env`; values are overlaid on `config/defaults.env` and then platform env wins. CI sets only `INSTANCE_PROFILE` plus credentials, so later runtime overrides persist across deploys.
   - **Beamup Deployment**: `config/instances/beamup.env` sets `BACKEND_TIMEOUT_MS=12000` (12s), `GLOBAL_DEADLINE_MS=13000` (13s), and derived worker deadline `11000` (11s) to fit strictly within Beamup's ~14s reverse proxy cut-off.
-  - **Railway Deployment**: `config/instances/railway.env` sets `BACKEND_TIMEOUT_MS=27000` (27s), `GLOBAL_DEADLINE_MS=29000` (29s), and derived worker deadline `26000` (26s), taking advantage of Railway's support for extended connection durations to yield streams from slower scrapers (e.g. `4khdHub`, `Maelith`).
+  - **Railway Deployment**: `config/instances/railway.env` sets `BACKEND_TIMEOUT_MS=34000` (34s), `GLOBAL_DEADLINE_MS=38000` (38s), and derived worker deadline `33000` (33s), taking advantage of Railway's support for extended connection durations to yield streams from slower scrapers (e.g. `4khdHub`, `Maelith`).
   - Both profiles set 40-way concurrency (`SEARCH_CONCURRENCY`, `SCRAPER_CONCURRENCY`, `SA7_CONCURRENCY`).
   - Metadata resolution is bounded by `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (MAL clamped to 500–2000ms: 1s Beamup, 2s Railway; other lookups 250–5000ms). This uses only the existing gap before the worker fetch, so the worker budget is untouched. AnimeAPI is capped at 40% of the MAL budget, the Jikan/TMDB fallback consumes the remainder, and `themoviedb_type` chooses the TMDB endpoint. Budget expiries and transient failures are not negatively cached; only 404s keep the 60s TTL. On failure the gateway returns `{ "streams": [] }` without fan-out.
 - **Dual CI/CD Deployment Pipeline (`.github/workflows/ci.yml`)**:
@@ -113,18 +113,18 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
   - `Cleanup Legacy Environment` (`workflow_dispatch`) is a one-time task that unsets legacy Beamup provider env vars (`SA7_*`, `NUVIO_*`, `VEGA_*`). Run it once after the profile-based Beamup deploy finishes; the restart makes the current release use the profile and `instances.beamup` policy. Subsequent deploys keep the minimal CI env sync.
 - **Active Fleets & Per-Instance Provider Policy**:
   - `config/providers.json` holds a default policy per fleet plus optional `instances.<profile>` overrides. A fleet can use `allow` or `deny` mode; `*` disables a whole fleet.
-  - Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`, `durbinlive`, `livetgtv`) are enforced in the gateway derivation and cannot be re-enabled by a profile or environment allow list.
-  - **Railway Instance Routing (Primary)**:
-    - SA7 (14 active): 14 duplicate scrapers disabled (`moviesdrive, 4khdhub, hdhub4u, vegamovies, castle, anizone, moviebox, moviesmod, torrentio, reanime, animeworld, animesalt, anizen, anikage`), leaving 14 active scrapers (`dahmermovies, dahmermovies-tv, desiflix, einthusan, kurage, movix-vf, multimovies, netmirror, playimdb, puretoons, redflix, toonstream, topcartoons, vidrock`).
-    - Nuvio (30 active): Baseline 20 duplicates/BDIX/dead scrapers + `sylphera` disabled (21 disabled), leaving 30 active scrapers.
-    - Vega (24 active): Baseline scrapers + Railway deny items (`1cinevood`, `disneyMirror`, `netflixMirror`, `primeMirror`, `luxMovies`, `mxplayer`, `animeworld`, `movies4u`) and hard-disabled live TV / torrent scrapers disabled, leaving active scrapers.
-    - Total active providers on Railway = **68 providers**.
+  - All profiles use `deny` mode so new providers are enabled automatically as upstream fleets add them. The default policy and both instance profiles therefore list only what to disable, not a frozen allowlist.
+  - Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`, `durbinlive`, `livetgtv`, `bdix-cf`, `bdix-df`, `bdix-fh`) are enforced in the gateway derivation and cannot be re-enabled by a profile or environment allow list.
+  - **Railway Instance Routing (Nuvio Primary)**:
+    - Nuvio is the primary fleet: all scrapers are enabled except the hard-disabled `brellor` and BDIX scrapers. The Railway Nuvio deny list is intentionally empty.
+    - SA7 disables providers duplicated in Nuvio or Vega: `4khdhub`, `anikage`, `animesalt`, `animeworld`, `anizen`, `anizone`, `castle`, `hdhub4u`, `moviebox`, `moviesdrive`, `moviesmod`, `playimdb`, `reanime`, `torrentio`, `vegamovies`, `vidrock`. The remaining 12 SA7 scrapers stay active.
+    - Vega disables Nuvio duplicates (`4khdhub`, `anikoto`, `animeworld`, `castle`, `drive`, `hdhub4u`, `katmovies`, `kissKh`, `movieBoxWeb`, `movielinkdb`, `showbox`) and the failing NetMirror/MultiMovies family replaced by SA7 (`disneyMirror`, `netflixMirror`, `primeMirror`, `multi`). All other Vega providers are enabled.
   - **Beamup Instance Routing (Duplicate & Exclusive Scrapers)**:
-    - Beamup runs the duplicate scrapers disabled in Railway along with its exclusive scrapers:
-      - `sa7` (13 active): `moviesdrive`, `4khdhub`, `hdhub4u`, `vegamovies`, `castle`, `anizone`, `moviebox`, `moviesmod`, `reanime`, `animeworld`, `animesalt`, `anizen`, `anikage` (the 13 redundant duplicate scrapers disabled on Railway).
-      - `nuvio` (1 active): `sylphera` (Beamup-exclusive).
+    - Beamup keeps its existing active set via deny lists rather than allowlists:
+      - `sa7` (13 active): `moviesdrive`, `4khdhub`, `hdhub4u`, `vegamovies`, `castle`, `anizone`, `moviebox`, `moviesmod`, `reanime`, `animeworld`, `animesalt`, `anizen`, `anikage`.
+      - `nuvio` (1 active): `sylphera`.
       - `vega` (9 active): `animeworld`, `movies4u`, `luxMovies` (RogMovies), `mod` (MoviesMod), `1cinevood`, `disneyMirror`, `netflixMirror`, `primeMirror`, `mxplayer`.
-    - Enforced by `instances.beamup` in `config/providers.json` (SA7 allowlist mode for the 13 duplicates, Nuvio `sylphera` allow, Vega 9 allow). Runtime `*_ENABLED_*` and `*_DISABLED_*` env vars can override this per instance without a code change.
+    - This preserves Beamup's current routing while allowing any provider later added upstream to be enabled without another policy change. Runtime `*_ENABLED_*` and `*_DISABLED_*` env vars can still override this per instance.
   - **Search Timeout per Instance**:
     - `SEARCH_TIMEOUT_MS` defaults to 10s (`config/defaults.env`), and `src/core/env.ts` clamps it to the worker deadline. `config/instances/railway.env` raises it to 15s to accommodate slower scrapers within the 27s backend budget.
   - **Instance-Level Environment Overrides & Alias Mapping**:

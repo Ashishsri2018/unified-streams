@@ -87,7 +87,7 @@ describe('disabled providers derivation', () => {
     expect(disabled).toContain('luxMovies');
   });
 
-  it('applies the Beamup profile with duplicate scrapers enabled in SA7 and 40-way concurrency', () => {
+  it('applies the Beamup profile while enabling new providers by default', () => {
     const appEnv = loadAppEnv({ INSTANCE_PROFILE: 'beamup' });
     expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(12000);
     expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(13000);
@@ -96,39 +96,53 @@ describe('disabled providers derivation', () => {
     expect(Number(appEnv.SA7_CONCURRENCY)).toBe(40);
 
     const sa7Env = deriveFleetEnv(appEnv, 'sa7', 7001);
-    const sa7Enabled = sa7Env.ENABLED_PROVIDERS.split(',');
-    expect(sa7Enabled).toContain('moviesdrive');
-    expect(sa7Enabled).toContain('4khdhub');
-    expect(sa7Enabled).toContain('hdhub4u');
-    expect(sa7Enabled).toContain('vegamovies');
-    expect(sa7Enabled).toContain('castle');
-    expect(sa7Enabled).toContain('anizone');
-    expect(sa7Enabled).toContain('moviebox');
-    expect(sa7Enabled).toContain('moviesmod');
-    expect(sa7Enabled).toContain('reanime');
-    expect(sa7Enabled).toContain('animeworld');
-    expect(sa7Enabled).toContain('animesalt');
-    expect(sa7Enabled).toContain('anizen');
-    expect(sa7Enabled).toContain('anikage');
-    expect(sa7Env.DISABLED_PROVIDERS.split(',')).not.toContain('*');
+    const sa7Disabled = sa7Env.DISABLED_PROVIDERS.split(',');
+    expect(sa7Env.ENABLED_PROVIDERS).toBeUndefined();
+    expect(sa7Disabled).not.toContain('*');
+    expect(sa7Disabled).not.toContain('moviesdrive');
+    expect(sa7Disabled).not.toContain('4khdhub');
+    expect(sa7Disabled).not.toContain('hdhub4u');
+    expect(sa7Disabled).not.toContain('vegamovies');
+    expect(sa7Disabled).not.toContain('castle');
+    expect(sa7Disabled).not.toContain('anizone');
+    expect(sa7Disabled).not.toContain('moviebox');
+    expect(sa7Disabled).not.toContain('moviesmod');
+    expect(sa7Disabled).not.toContain('reanime');
+    expect(sa7Disabled).not.toContain('animeworld');
+    expect(sa7Disabled).not.toContain('animesalt');
+    expect(sa7Disabled).not.toContain('anizen');
+    expect(sa7Disabled).not.toContain('anikage');
+    expect(sa7Disabled).toContain('redflix');
+    expect(sa7Disabled).toContain('kurage');
     expect(Number(sa7Env.PROVIDER_CONCURRENCY)).toBe(40);
 
     const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
-    expect(nuvioEnv.ENABLED_SCRAPERS).toBe('sylphera');
-    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).not.toContain('sylphera');
+    const nuvioDisabled = nuvioEnv.DISABLED_SCRAPERS.split(',');
+    expect(nuvioEnv.ENABLED_SCRAPERS).toBeUndefined();
+    expect(nuvioDisabled).not.toContain('sylphera');
+    expect(nuvioDisabled).toContain('bdix-cf');
+    expect(nuvioDisabled).toContain('bdix-df');
+    expect(nuvioDisabled).toContain('bdix-fh');
+    expect(nuvioDisabled).toContain('brellor');
     expect(nuvioEnv.SCRAPER_CONCURRENCY).toBe('40');
 
     const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
-    const enabled = vegaEnv.ENABLED_PROVIDERS.split(',');
-    expect(enabled).toContain('animeworld');
-    expect(enabled).toContain('movies4u');
-    expect(enabled).toContain('luxMovies');
-    expect(enabled).toContain('mod');
-    expect(enabled).toContain('1cinevood');
-    expect(enabled).toContain('disneyMirror');
-    expect(enabled).toContain('netflixMirror');
-    expect(enabled).toContain('primeMirror');
-    expect(enabled).toContain('mxplayer');
+    const vegaDisabled = vegaEnv.DISABLED_PROVIDERS.split(',');
+    expect(vegaEnv.ENABLED_PROVIDERS).toBeUndefined();
+    expect(vegaDisabled).not.toContain('animeworld');
+    expect(vegaDisabled).not.toContain('movies4u');
+    expect(vegaDisabled).not.toContain('luxMovies');
+    expect(vegaDisabled).not.toContain('mod');
+    expect(vegaDisabled).not.toContain('1cinevood');
+    expect(vegaDisabled).not.toContain('disneyMirror');
+    expect(vegaDisabled).not.toContain('netflixMirror');
+    expect(vegaDisabled).not.toContain('primeMirror');
+    expect(vegaDisabled).not.toContain('mxplayer');
+    expect(vegaDisabled).toContain('drive');
+    expect(vegaDisabled).toContain('hdhub4u');
+    expect(vegaDisabled).toContain('showbox');
+    expect(vegaDisabled).not.toContain('extraflix');
+    expect(vegaDisabled).not.toContain('aniDream');
     expect(vegaEnv.SEARCH_CONCURRENCY).toBe('40');
   });
 
@@ -155,10 +169,10 @@ describe('disabled providers derivation', () => {
     const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
     const nuvioDisabled = nuvioEnv.DISABLED_SCRAPERS.split(',');
     expect(nuvioDisabled).toContain('brellor');
+    expect(nuvioDisabled).toContain('bdix-cf');
+    expect(nuvioDisabled).toContain('bdix-df');
+    expect(nuvioDisabled).toContain('bdix-fh');
     expect(nuvioDisabled).not.toContain('sylphera');
-    expect(nuvioDisabled).not.toContain('bdix-cf');
-    expect(nuvioDisabled).not.toContain('bdix-df');
-    expect(nuvioDisabled).not.toContain('bdix-fh');
     expect(nuvioEnv.ENABLED_SCRAPERS).toBeUndefined();
 
     const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
@@ -194,8 +208,8 @@ describe('disabled providers derivation', () => {
     });
 
     const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
-    expect(vegaEnv.ENABLED_PROVIDERS.split(',')).not.toContain('animeworld');
-    expect(vegaEnv.ENABLED_PROVIDERS.split(',')).toContain('movies4u');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('animeworld');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).not.toContain('movies4u');
 
     const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('*');

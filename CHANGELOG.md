@@ -13,7 +13,9 @@ All notable changes to this project will be documented in this file.
 - HTML pages now apply their CSP nonce to inline `<style>` as well as `<script>`, and `'unsafe-inline'` was removed from `style-src`.
 - Closed the remaining `todo.md` items: dropped the three operational entries, and verified configure prefill and SA7 `server.js`/`run.js` removal were already resolved.
 - Removed the unused Vega client rate limiter (`RateLimiter`) and its six dead `STREAM_*`/`PROXY_*` rate-limit configuration fields. No requests were ever rate-limited; this deletes unused code only.
-- Redesigned `/configure` with grouped stream filters, provider fleet cards, a live human-readable filter summary, inline validation, and a clearer install flow.
+- Redesigned `/configure` with grouped stream filters, a live human-readable filter summary, inline validation, and a clearer install flow. Provider fleet selection was removed; install links always enable all three fleets.
+- Provider policy now uses deny lists on every profile so new providers added upstream are enabled automatically. Railway treats Nuvio as the primary fleet, disabling Vega providers duplicated in Nuvio and SA7 providers duplicated in Nuvio or Vega; Beamup preserves its existing active set without freezing out future providers.
+- Hard-disabled BDIX scrapers (`bdix-cf`, `bdix-df`, `bdix-fh`) on every instance alongside torrent, Internet Archive, YouTube, and live-TV providers.
 - Inline `stream.subtitles` tracks are no longer filtered or rewritten by the gateway; provider subtitle tracks pass through unchanged.
 
 ### Fixed

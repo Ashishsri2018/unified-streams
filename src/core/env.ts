@@ -138,6 +138,9 @@ const HARD_DISABLED_PROVIDERS = [
   'brellor',
   'durbinlive',
   'livetgtv',
+  'bdix-cf',
+  'bdix-df',
+  'bdix-fh',
 ];
 
 export interface FleetPolicy {
