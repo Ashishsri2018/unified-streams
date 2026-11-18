@@ -13,5 +13,5 @@
 5. Deploys production using the exact same verified commit SHA.
 
 ## Incident Management
-- If an upstream provider consistently fails (>30% timeouts or >50% errors over 7 days), check `config/providers.json` and replace it with a reserve duplicate from `config/provider-audit.csv`.
+- If an upstream provider consistently fails (>30% timeouts or >50% errors over 7 days), check `config/providers.json` and replace it with a reserve duplicate from `config/provider-audit.csv`. Use the `duplicates` and `*_active` columns to find a same-site provider that is already enabled.
 - Never re-enable default-disabled scraper classes (YouTube, torrent scraper, Internet Archive).

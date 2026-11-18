@@ -87,9 +87,22 @@ function verifyPolicy() {
   const auditByFleet = { sa7: new Set(), nuvio: new Set(), vega: new Set() };
   if (fs.existsSync(AUDIT_PATH)) {
     const auditRows = parseCsv(fs.readFileSync(AUDIT_PATH, 'utf-8'));
+    if (auditRows.length === 0) {
+      throw new Error('provider-audit.csv is empty');
+    }
+    for (const fleet of FLEETS) {
+      if (!(fleet in auditRows[0])) {
+        throw new Error(`provider-audit.csv is missing the '${fleet}' column`);
+      }
+    }
     for (const row of auditRows) {
-      if (auditByFleet[row.component]) {
-        auditByFleet[row.component].add(row.id.toLowerCase());
+      for (const fleet of FLEETS) {
+        for (const id of (row[fleet] || '').split('|')) {
+          const trimmed = id.trim();
+          if (trimmed) {
+            auditByFleet[fleet].add(trimmed.toLowerCase());
+          }
+        }
       }
     }
   }

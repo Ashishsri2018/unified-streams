@@ -24,6 +24,7 @@ npm run verify       # CI only: policy -> icon -> lint -> typecheck -> all tests
 - Provider availability is canonical in `config/providers.json` (fleet allow/deny plus `instances.<profile>`). `src/core/env.ts` derives worker-scoped env from it. Runtime `*_ENABLED_*` / `*_DISABLED_*` env vars are per-run overrides, not the source of truth.
 - `torrentio`, `internetarchive`, `youtube`, `brellor`, `durbinlive`, `livetgtv`, `bdix-cf`, `bdix-df`, and `bdix-fh` are hard-disabled in both `src/core/env.ts` and `scripts/check-provider-policy.mjs`; keep both lists in sync.
 - Keep `config/provider-audit.csv` aligned when replacing providers. `npm run policy:check` warns about IDs absent from the audit.
+- The audit is one row per website: fleet columns hold `|`-separated provider IDs, `*_active` flags reflect default policy, and `disable_reason` uses fleet-prefixed tokens.
 - Local `DATA_DIR` defaults to `/data`; use `DATA_DIR=./data` if it is not writable. Startup creates the per-fleet subdirectories.
 
 ## Non-obvious invariants
