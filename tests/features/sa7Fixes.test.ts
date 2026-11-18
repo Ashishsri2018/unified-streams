@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const { parseContentId } = require('../../src/fleets/sa7/content-id.js');
@@ -27,5 +30,25 @@ describe('SA7 content id parser', () => {
       season: 1,
       episode: 2,
     });
+  });
+});
+
+describe('SA7 provider module resolution', () => {
+  it('resolves cheerio from snapshot directories outside the app root', () => {
+    require('../../src/fleets/sa7/lib/cheerio-hook.js');
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sa7-cheerio-'));
+    try {
+      const providerPath = path.join(dir, 'provider.js');
+      fs.writeFileSync(providerPath, "module.exports = require('cheerio-without-node-native');\n");
+      const providerRequire = createRequire(providerPath);
+      const wrapper = providerRequire('./provider.js');
+      const direct = providerRequire('cheerio');
+
+      expect(wrapper).toBe(direct);
+      expect(typeof wrapper.load).toBe('function');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
