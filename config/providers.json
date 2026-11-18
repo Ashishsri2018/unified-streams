@@ -84,6 +84,54 @@
           "mxplayer"
         ]
       }
+    },
+    "railway": {
+      "sa7": {
+        "mode": "deny",
+        "ids": [
+          "4khdhub",
+          "anikage",
+          "animesalt",
+          "animeworld",
+          "anizen",
+          "anizone",
+          "castle",
+          "hdhub4u",
+          "moviebox",
+          "moviesdrive",
+          "moviesmod",
+          "playimdb",
+          "reanime",
+          "torrentio",
+          "vegamovies",
+          "vidrock"
+        ]
+      },
+      "nuvio": {
+        "mode": "deny",
+        "ids": []
+      },
+      "vega": {
+        "mode": "deny",
+        "ids": [
+          "4khdhub",
+          "anikoto",
+          "animeworld",
+          "castle",
+          "disneyMirror",
+          "drive",
+          "hdhub4u",
+          "internetArchive",
+          "katmovies",
+          "kissKh",
+          "movieBoxWeb",
+          "movielinkdb",
+          "multi",
+          "netflixMirror",
+          "primeMirror",
+          "showbox"
+        ]
+      }
     }
   }
 }
