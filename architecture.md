@@ -115,10 +115,10 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
 - **Active Fleets & Per-Instance Provider Policy**:
   - `config/providers.json` holds a default policy per fleet plus optional `instances.<profile>` overrides. A fleet can use `allow` or `deny` mode; `*` disables a whole fleet.
   - All profiles use `deny` mode so new providers are enabled automatically as upstream fleets add them. The default policy and both instance profiles therefore list only what to disable, not a frozen allowlist.
-  - Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`, `durbinlive`, `livetgtv`, `bdix-cf`, `bdix-df`, `bdix-fh`) are enforced in the gateway derivation and cannot be re-enabled by a profile or environment allow list.
+  - Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`, `durbinlive`, `livetgtv`, `bdix-cf`, `bdix-df`, `bdix-fh`, `jyniq`/Wikimedia) are enforced in the gateway derivation and cannot be re-enabled by a profile or environment allow list.
   - **Railway Instance Routing (Nuvio Primary)**:
-    - Nuvio is the primary fleet: all scrapers are enabled except the hard-disabled `brellor` and BDIX scrapers. The Railway Nuvio deny list is intentionally empty.
-    - SA7 disables providers duplicated in Nuvio or Vega: `4khdhub`, `anikage`, `animesalt`, `animeworld`, `anizen`, `anizone`, `castle`, `hdhub4u`, `moviebox`, `moviesdrive`, `moviesmod`, `playimdb`, `reanime`, `torrentio`, `vegamovies`, `vidrock`. The remaining 12 SA7 scrapers stay active.
+    - Nuvio is the primary fleet: all scrapers are enabled except the hard-disabled `brellor` and BDIX scrapers, plus `soryn` (NetMirror) and `fastrion` (MultiMovies), which are left to SA7. The Railway Nuvio deny list contains only those two.
+    - SA7 disables providers duplicated in Nuvio or Vega: `4khdhub`, `anikage`, `animesalt`, `animeworld`, `anizen`, `anizone`, `castle`, `hdhub4u`, `moviebox`, `moviesdrive`, `moviesmod`, `playimdb`, `reanime`, `torrentio`, `vegamovies`, `vidrock`. The remaining 12 SA7 scrapers stay active, and SA7 is the sole source for `netmirror` and `multimovies` on Railway.
     - Vega disables Nuvio duplicates (`4khdhub`, `anikoto`, `animeworld`, `castle`, `drive`, `hdhub4u`, `katmovies`, `kissKh`, `movieBoxWeb`, `movielinkdb`, `showbox`) and the failing NetMirror/MultiMovies family replaced by SA7 (`disneyMirror`, `netflixMirror`, `primeMirror`, `multi`). All other Vega providers are enabled.
   - **Beamup Instance Routing (Duplicate & Exclusive Scrapers)**:
     - Beamup keeps its existing active set via deny lists rather than allowlists:

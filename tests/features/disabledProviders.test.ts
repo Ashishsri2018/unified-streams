@@ -172,6 +172,9 @@ describe('disabled providers derivation', () => {
     expect(nuvioDisabled).toContain('bdix-cf');
     expect(nuvioDisabled).toContain('bdix-df');
     expect(nuvioDisabled).toContain('bdix-fh');
+    expect(nuvioDisabled).toContain('fastrion');
+    expect(nuvioDisabled).toContain('soryn');
+    expect(nuvioDisabled).toContain('jyniq');
     expect(nuvioDisabled).not.toContain('sylphera');
     expect(nuvioEnv.ENABLED_SCRAPERS).toBeUndefined();
 
@@ -219,10 +222,14 @@ describe('disabled providers derivation', () => {
     const appEnv = loadAppEnv({
       INSTANCE_PROFILE: 'beamup',
       VEGA_ENABLED_PROVIDERS: 'torrentio,animeworld',
+      NUVIO_ENABLED_SCRAPERS: 'jyniq',
     });
     const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
     expect(vegaEnv.ENABLED_PROVIDERS).toBe('animeworld');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('torrentio');
+
+    const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('jyniq');
   });
 
   it('verifies baseline policy has sylphera, animeworld, movies4u, and luxMovies disabled by default', () => {
@@ -231,8 +238,18 @@ describe('disabled providers derivation', () => {
     const vegaEnv = deriveFleetEnv(defaultEnv, 'vega', 7003);
 
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('sylphera');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('fastrion');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('soryn');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('jyniq');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('animeworld');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('movies4u');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('luxMovies');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('4khdhub');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('katmovies');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('showbox');
+    const sa7Env = deriveFleetEnv(defaultEnv, 'sa7', 7001);
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).toContain('vidrock');
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).not.toContain('netmirror');
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).not.toContain('multimovies');
   });
 });

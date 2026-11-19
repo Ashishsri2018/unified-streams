@@ -15,7 +15,8 @@
       "animeworld",
       "animesalt",
       "anizen",
-      "anikage"
+      "anikage",
+      "vidrock"
     ]
   },
   "nuvio": {
@@ -25,6 +26,8 @@
       "bdix-df",
       "bdix-fh",
       "brellor",
+      "fastrion",
+      "soryn",
       "sylphera"
     ]
   },
@@ -43,7 +46,18 @@
       "luxMovies",
       "mxplayer",
       "durbinLive",
-      "liveTgTv"
+      "liveTgTv",
+      "4khdhub",
+      "anikoto",
+      "castle",
+      "hdhub4u",
+      "katmovies",
+      "kissKh",
+      "drive",
+      "movieBoxWeb",
+      "movieBox",
+      "showbox",
+      "multi"
     ]
   },
   "instances": {
@@ -198,7 +212,10 @@
       },
       "nuvio": {
         "mode": "deny",
-        "ids": []
+        "ids": [
+          "fastrion",
+          "soryn"
+        ]
       },
       "vega": {
         "mode": "deny",

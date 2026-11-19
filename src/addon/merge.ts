@@ -8,8 +8,8 @@ export interface FleetStreamsInput {
 }
 
 // When the same stream is returned by more than one fleet, keep the copy from
-// the highest-priority fleet. Vega is primary, then Nuvio, then SA7.
-const FLEET_PRIORITY: Record<string, number> = { vega: 0, nuvio: 1, sa7: 2 };
+// the highest-priority fleet. Nuvio is primary, then Vega, then SA7.
+const FLEET_PRIORITY: Record<string, number> = { nuvio: 0, vega: 1, sa7: 2 };
 
 function fleetPriority(fleet: string): number {
   return FLEET_PRIORITY[fleet] ?? 3;
@@ -100,7 +100,7 @@ export function mergeAndFilterStreams(
   }
 
   // Sort: direct before external, then by resolution descending, then container,
-  // then fleet priority so duplicate URLs resolve to Vega before Nuvio/SA7.
+  // then fleet priority so duplicate URLs resolve to Nuvio before Vega/SA7.
   normalizedList.sort((a, b) => {
     const aExt = a.stream.externalUrl ? 1 : 0;
     const bExt = b.stream.externalUrl ? 1 : 0;

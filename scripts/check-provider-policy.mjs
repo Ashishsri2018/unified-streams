@@ -19,6 +19,7 @@ const HARD_DISABLED = [
   'bdix-cf',
   'bdix-df',
   'bdix-fh',
+  'jyniq',
 ];
 
 function parseCsv(content) {

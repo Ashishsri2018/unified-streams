@@ -141,6 +141,7 @@ const HARD_DISABLED_PROVIDERS = [
   'bdix-cf',
   'bdix-df',
   'bdix-fh',
+  'jyniq',
 ];
 
 export interface FleetPolicy {

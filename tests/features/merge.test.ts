@@ -236,7 +236,7 @@ describe('classifier and merger', () => {
     expect(merged[0].title).toBe('Hash MP4');
   });
 
-  it('keeps duplicate URLs from the highest-priority fleet (vega > nuvio > sa7)', () => {
+  it('keeps duplicate URLs from the highest-priority fleet (nuvio > vega > sa7)', () => {
     const defaultFilters: StreamFilterConfig = {
       minRes: null,
       maxRes: null,
@@ -271,6 +271,6 @@ describe('classifier and merger', () => {
 
     const merged = mergeAndFilterStreams(inputs, defaultFilters, 100);
     expect(merged).toHaveLength(1);
-    expect(merged[0].title).toBe('Vega copy');
+    expect(merged[0].title).toBe('Nuvio copy');
   });
 });
