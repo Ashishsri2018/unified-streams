@@ -14,6 +14,8 @@ export const BLOCKER_URL_PATTERN = /\/(slowdown|ratelimit|antibot)\b/i;
 // Direct media extensions or path segments (e.g. .m3u8, /m3u8, .mp4, /mp4, .mpd, /mpd, .3gp, etc.)
 export const DIRECT_MEDIA_PATTERN =
   /(?:\.|\/)(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])/i;
+const DIRECT_ENDPOINT_HOST_PATTERN = /streamtape\./i;
+const DIRECT_ENDPOINT_PATH_PATTERN = /\/(?:get_video)(?:$|[?&#/])/i;
 export const HTML_EXTENSIONS = /\.(html?|php|aspx?|jsp|cgi)($|\?|&|#)/i;
 
 export const EMBED_OR_WEB_PATTERNS = [
@@ -96,6 +98,12 @@ export function isDirectMediaUrl(rawUrl: string): boolean {
     const parsed = new URL(rawUrl);
     const pathname = parsed.pathname;
     if (DIRECT_MEDIA_PATTERN.test(pathname)) {
+      return true;
+    }
+    if (
+      DIRECT_ENDPOINT_HOST_PATTERN.test(parsed.hostname) &&
+      DIRECT_ENDPOINT_PATH_PATTERN.test(pathname)
+    ) {
       return true;
     }
     // Check direct media in query parameters (e.g. ?url=...master.m3u8)

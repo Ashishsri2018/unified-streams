@@ -41,6 +41,10 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Final todo sweep:** removed the three operational entries from `todo.md`; verified configure prefill and SA7 `server.js`/`run.js` removal were already resolved. Switched the Docker healthcheck to a `HEAD /health` liveness probe, made `/status` render 503 health payloads, nonced inline `<style>` and dropped `'unsafe-inline'` from `style-src`, and normalized SA7 object-shaped `lastError` values in gateway health aggregation. Local lint/typecheck/feature tests only; no deploy.
 - **Rate-limit cleanup:** removed the dead Vega token-bucket `RateLimiter` (`src/fleets/vega/addon/rateLimit.ts`) and its six unused `STREAM_*`/`PROXY_*` config fields from `src/fleets/vega/config.ts`; closed the matching `todo.md` item. It was never wired into any handler, so no live behavior changed. Local lint/typecheck/feature tests only; build/verify skipped by request.
 
+## Recent sessions (Nov 19 2026)
+- **Header/notWebReady parity:** Confirmed Nuvio and Vega were advertising provider `Referer`/`Origin`/`User-Agent`/`Cookie` via `behaviorHints.proxyHeaders.request` but omitted `notWebReady`. Added `behaviorHints.notWebReady: true` wherever headers are emitted, matching SA7's existing rule; verified a header-gated stream returned 403 without advertised headers and 206 with them.
+- **Streamtape classification:** A Katmovie `/get_video` link was routed to `externalUrl` because `streamtape.com` is in `KNOWN_EMBED_DOMAINS`. Added a host-scoped direct-endpoint rule for Streamtape `/get_video`, with a regression test. Live check: 302 to `*.tapecontent.net` returning `Content-Type: video/mp4`, `Accept-Ranges: bytes`.
+
 ## Key Decisions & Conventions
 - TypeScript strict mode, zero `any`; all stream failures return `{ "streams": [] }` with HTTP 200.
 - Explicit `GET`/`HEAD`/`OPTIONS`; `HEAD` never triggers provider fan-out; `/subtitles*` is always 404.

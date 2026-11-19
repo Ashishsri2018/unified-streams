@@ -69,6 +69,13 @@ describe('urlClassifier canonical rules', () => {
     // Known embed domains with /e/ or /v/ paths are externalUrl
     expect(isWebPage('https://streamtape.com/e/6879879')).toBe(true);
     expect(isExternalUrl('https://streamtape.com/e/6879879')).toBe(true);
+
+    // Streamtape /get_video is a direct download endpoint (redirects to video)
+    const streamtapeDirect =
+      'https://streamtape.com/get_video?id=A3L8K9MYvptX8Ve&expires=1795087142&ip=FHEsDRWnDS9X&token=c360AKsODOGJ';
+    expect(isDirectMediaUrl(streamtapeDirect)).toBe(true);
+    expect(isWebPage(streamtapeDirect)).toBe(false);
+    expect(isExternalUrl(streamtapeDirect)).toBe(false);
     expect(isWebPage('https://doodstream.com/e/12345')).toBe(true);
     expect(isExternalUrl('https://doodstream.com/e/12345')).toBe(true);
     expect(isWebPage('https://mixdrop.co/e/abcdef')).toBe(true);
