@@ -121,6 +121,41 @@ describe('classifier and merger', () => {
     expect(merged[2].title).toBe('🖥️ External Link');
   });
 
+  it('drops playback-only behavior hints from externalUrl streams', () => {
+    const defaultFilters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: null,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+
+    const inputs: FleetStreamsInput[] = [
+      {
+        fleet: 'sa7',
+        streams: [
+          {
+            title: 'Embed player',
+            externalUrl: 'https://example.com/embed/123',
+            behaviorHints: {
+              bingeGroup: 'provider-1080p',
+              proxyHeaders: { request: { Referer: 'https://example.com/' } },
+              notWebReady: true,
+            },
+          },
+        ],
+      },
+    ];
+
+    const merged = mergeAndFilterStreams(inputs, defaultFilters, 10);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].externalUrl).toBe('https://example.com/embed/123');
+    expect(merged[0].behaviorHints).toEqual({ bingeGroup: 'sa7:provider-1080p' });
+  });
+
   it('routes zip/archive files to externalUrl with 🔲 and 🖥️ markers', () => {
     const defaultFilters: StreamFilterConfig = {
       minRes: null,

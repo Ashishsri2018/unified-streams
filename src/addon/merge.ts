@@ -49,6 +49,7 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     }
     const restHints = { ...behaviorHints };
     delete restHints.proxyHeaders;
+    delete restHints.notWebReady;
     return {
       name,
       title,
