@@ -146,7 +146,7 @@ describe('disabled providers derivation', () => {
     expect(vegaEnv.SEARCH_CONCURRENCY).toBe('40');
   });
 
-  it('applies the Railway profile with Nuvio primary and duplicate fleets disabled', () => {
+  it('applies the Railway profile with replacement duplicates enabled', () => {
     const appEnv = loadAppEnv({ INSTANCE_PROFILE: 'railway' });
     expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(34000);
     expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(38000);
@@ -164,6 +164,11 @@ describe('disabled providers derivation', () => {
     expect(sa7Disabled).not.toContain('redflix');
     expect(sa7Disabled).not.toContain('desiflix');
     expect(sa7Disabled).not.toContain('kurage');
+    expect(sa7Disabled).not.toContain('castle');
+    expect(sa7Disabled).not.toContain('anizone');
+    expect(sa7Disabled).not.toContain('hdhub4u');
+    expect(sa7Disabled).not.toContain('anizen');
+    expect(sa7Disabled).not.toContain('animesalt');
     expect(Number(sa7Env.PROVIDER_CONCURRENCY)).toBe(40);
 
     const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
@@ -175,6 +180,14 @@ describe('disabled providers derivation', () => {
     expect(nuvioDisabled).toContain('fastrion');
     expect(nuvioDisabled).toContain('soryn');
     expect(nuvioDisabled).toContain('jyniq');
+    expect(nuvioDisabled).toContain('fyron');
+    expect(nuvioDisabled).toContain('gravix');
+    expect(nuvioDisabled).toContain('karnis');
+    expect(nuvioDisabled).toContain('lenyr');
+    expect(nuvioDisabled).toContain('mavonyx');
+    expect(nuvioDisabled).toContain('pynvix');
+    expect(nuvioDisabled).toContain('qyrvaen');
+    expect(nuvioDisabled).toContain('zyrvael');
     expect(nuvioDisabled).not.toContain('sylphera');
     expect(nuvioEnv.ENABLED_SCRAPERS).toBeUndefined();
 
@@ -182,16 +195,17 @@ describe('disabled providers derivation', () => {
     const vegaDisabled = vegaEnv.DISABLED_PROVIDERS.split(',');
     expect(vegaDisabled).toContain('4khdhub');
     expect(vegaDisabled).toContain('anikoto');
-    expect(vegaDisabled).toContain('animeworld');
+    expect(vegaDisabled).toContain('animesalt');
     expect(vegaDisabled).toContain('castle');
     expect(vegaDisabled).toContain('drive');
     expect(vegaDisabled).toContain('hdhub4u');
     expect(vegaDisabled).toContain('katmovies');
-    expect(vegaDisabled).toContain('kissKh');
-    expect(vegaDisabled).toContain('movieBoxWeb');
     expect(vegaDisabled).toContain('movielinkdb');
-    expect(vegaDisabled).toContain('showbox');
     expect(vegaDisabled).toContain('disneyMirror');
+    expect(vegaDisabled).not.toContain('animeworld');
+    expect(vegaDisabled).not.toContain('kissKh');
+    expect(vegaDisabled).not.toContain('movieBoxWeb');
+    expect(vegaDisabled).not.toContain('showbox');
     expect(vegaDisabled).toContain('netflixMirror');
     expect(vegaDisabled).toContain('primeMirror');
     expect(vegaDisabled).toContain('multi');
@@ -232,7 +246,7 @@ describe('disabled providers derivation', () => {
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('jyniq');
   });
 
-  it('verifies baseline policy has sylphera, animeworld, movies4u, and luxMovies disabled by default', () => {
+  it('verifies baseline policy has sylphera, movies4u, and luxMovies disabled by default', () => {
     const defaultEnv = loadAppEnv({});
     const nuvioEnv = deriveFleetEnv(defaultEnv, 'nuvio', 7002);
     const vegaEnv = deriveFleetEnv(defaultEnv, 'vega', 7003);
@@ -241,15 +255,21 @@ describe('disabled providers derivation', () => {
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('fastrion');
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('soryn');
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('jyniq');
-    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('animeworld');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('fyron');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('gravix');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('pynvix');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('movies4u');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('luxMovies');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('animesalt');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('4khdhub');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('katmovies');
-    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('showbox');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).not.toContain('animeworld');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).not.toContain('showbox');
     const sa7Env = deriveFleetEnv(defaultEnv, 'sa7', 7001);
     expect(sa7Env.DISABLED_PROVIDERS.split(',')).toContain('vidrock');
     expect(sa7Env.DISABLED_PROVIDERS.split(',')).not.toContain('netmirror');
     expect(sa7Env.DISABLED_PROVIDERS.split(',')).not.toContain('multimovies');
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).not.toContain('castle');
+    expect(sa7Env.DISABLED_PROVIDERS.split(',')).not.toContain('anizone');
   });
 });

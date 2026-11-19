@@ -4,17 +4,12 @@
     "ids": [
       "moviesdrive",
       "4khdhub",
-      "hdhub4u",
       "vegamovies",
-      "castle",
-      "anizone",
       "moviebox",
       "moviesmod",
       "torrentio",
       "reanime",
       "animeworld",
-      "animesalt",
-      "anizen",
       "anikage",
       "vidrock"
     ]
@@ -27,8 +22,16 @@
       "bdix-fh",
       "brellor",
       "fastrion",
+      "fyron",
+      "gravix",
+      "karnis",
+      "lenyr",
+      "mavonyx",
+      "pynvix",
+      "qyrvaen",
       "soryn",
-      "sylphera"
+      "sylphera",
+      "zyrvael"
     ]
   },
   "vega": {
@@ -37,7 +40,6 @@
       "torrentio",
       "internetArchive",
       "youtube",
-      "animeworld",
       "movies4u",
       "1cinevood",
       "disneyMirror",
@@ -52,11 +54,9 @@
       "castle",
       "hdhub4u",
       "katmovies",
-      "kissKh",
       "drive",
-      "movieBoxWeb",
       "movieBox",
-      "showbox",
+      "animesalt",
       "multi"
     ]
   },
@@ -194,12 +194,7 @@
         "ids": [
           "4khdhub",
           "anikage",
-          "animesalt",
           "animeworld",
-          "anizen",
-          "anizone",
-          "castle",
-          "hdhub4u",
           "moviebox",
           "moviesdrive",
           "moviesmod",
@@ -214,7 +209,15 @@
         "mode": "deny",
         "ids": [
           "fastrion",
-          "soryn"
+          "fyron",
+          "gravix",
+          "karnis",
+          "lenyr",
+          "mavonyx",
+          "pynvix",
+          "qyrvaen",
+          "soryn",
+          "zyrvael"
         ]
       },
       "vega": {
@@ -222,20 +225,17 @@
         "ids": [
           "4khdhub",
           "anikoto",
-          "animeworld",
+          "animesalt",
           "castle",
           "disneyMirror",
           "drive",
           "hdhub4u",
           "internetArchive",
           "katmovies",
-          "kissKh",
-          "movieBoxWeb",
           "movielinkdb",
           "multi",
           "netflixMirror",
-          "primeMirror",
-          "showbox"
+          "primeMirror"
         ]
       }
     }
