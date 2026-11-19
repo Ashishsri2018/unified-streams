@@ -157,6 +157,7 @@ export function mapProviderStreams(
       };
       if (Object.keys(requestHeaders).length > 0) {
         behaviorHints.proxyHeaders = { request: requestHeaders };
+        behaviorHints.notWebReady = true;
       }
 
       mapped.push({

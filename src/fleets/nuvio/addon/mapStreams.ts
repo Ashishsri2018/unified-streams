@@ -116,6 +116,7 @@ export function mapScraperStreams(
     };
     if (!isExternal && options.proxyEnabled && Object.keys(requestHeaders).length > 0) {
       behaviorHints.proxyHeaders = { request: requestHeaders };
+      behaviorHints.notWebReady = true;
     }
 
     mapped.push({
