@@ -38,13 +38,15 @@ async function getStreams(tmdbId, mediaType, season, episode) {
         const data = await res.json();
         if (!data || data.status_code === "error" || !data.data) return [];
 
+        const payload = data.data;
+        const source = payload.stream_urls ?? payload.stream_url ?? payload.cast_urls ?? payload.urls ?? payload.sources;
         let rawItems = [];
-        if (Array.isArray(data.data.stream_urls)) {
-            rawItems = data.data.stream_urls;
-        } else if (typeof data.data.stream_urls === "object" && data.data.stream_urls !== null) {
-            rawItems = Object.values(data.data.stream_urls);
-        } else if (data.data.stream_url) {
-            rawItems = [data.data.stream_url];
+        if (Array.isArray(source)) {
+            rawItems = source;
+        } else if (typeof source === "string") {
+            rawItems = [source];
+        } else if (source && typeof source === "object") {
+            rawItems = Object.values(source);
         }
 
         const streamMap = new Map();
@@ -70,7 +72,17 @@ async function getStreams(tmdbId, mediaType, season, episode) {
 
         if (streamMap.size === 0) return [];
 
-        const subs = data.data.default_subs || data.default_subs || [];
+        const qualityFrom = (value) => {
+            const text = String(value || "");
+            const match = text.match(/\b(2160|1440|1080|720|480|360)\s*p\b/i);
+            if (match) return `${match[1]}p`;
+            return /\b(4k|uhd)\b/i.test(text) ? "2160p" : "Auto";
+        };
+        const quality = qualityFrom(payload.file_name) !== "Auto"
+            ? qualityFrom(payload.file_name)
+            : qualityFrom(payload.title);
+
+        const subs = payload.default_subs || data.default_subs || [];
         const subtitles = (Array.isArray(subs) ? subs : [])
             .filter(s => s.url)
             .map(s => ({
@@ -81,9 +93,9 @@ async function getStreams(tmdbId, mediaType, season, episode) {
 
         return [...streamMap.values()].map(url => ({
             name: "VAplayer",
-            title: "VAplayer",
+            title: quality === "Auto" ? "VAplayer" : `VAplayer • ${quality}`,
             url,
-            quality: "1080p",
+            quality,
             headers: HEADERS,
             subtitles,
         }));

@@ -266,7 +266,12 @@ function hiParseEpisodes(seasonText) {
 async function getHicineStreams(title, year, mediaType, season, episode) {
     const match = await hiFindId(title, year, mediaType);
     if (!match) return [];
-    const det = await hiFetchJson(`${API_BASE}/api/${hiCollection(match.categories, mediaType)}/${match.id}`);
+    const detResponse = await hiFetchJson(`${API_BASE}/api/${hiCollection(match.categories, mediaType)}/${match.id}`);
+    const det = Array.isArray(detResponse)
+        ? detResponse[0]
+        : (detResponse && detResponse.data !== undefined && detResponse.links === undefined)
+            ? (Array.isArray(detResponse.data) ? detResponse.data[0] : detResponse.data)
+            : detResponse;
     if (!det || det.error) return [];
 
     const targets = [];
