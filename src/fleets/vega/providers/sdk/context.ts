@@ -47,20 +47,30 @@ interface TransportResponseInit {
   statusText: string;
   url: string;
   headers: Record<string, string>;
+  setCookies?: string[];
   body: Buffer;
 }
 
 class ResponseHeaders {
   private readonly map = new Map<string, string>();
+  private readonly setCookies: string[];
 
-  constructor(headers: Record<string, string>) {
+  constructor(headers: Record<string, string>, setCookies: string[] = []) {
     for (const [key, value] of Object.entries(headers)) {
       this.map.set(key.toLowerCase(), value);
     }
+    this.setCookies = setCookies;
   }
 
   get(name: string): string | null {
+    if (name.toLowerCase() === "set-cookie" && this.setCookies.length > 0) {
+      return this.setCookies.join(", ");
+    }
     return this.map.get(name.toLowerCase()) ?? null;
+  }
+
+  getSetCookie(): string[] {
+    return [...this.setCookies];
   }
 
   has(name: string): boolean {
@@ -98,7 +108,7 @@ class TransportResponse {
     this.status = init.status;
     this.statusText = init.statusText;
     this.url = init.url;
-    this.headers = new ResponseHeaders(init.headers);
+    this.headers = new ResponseHeaders(init.headers, init.setCookies);
     this.rawBody = init.body;
     this.ok = init.status >= 200 && init.status < 300;
   }
@@ -122,6 +132,7 @@ class TransportResponse {
       statusText: this.statusText,
       url: this.url,
       headers: Object.fromEntries(this.headers.entries()),
+      setCookies: this.headers.getSetCookie(),
       body: Buffer.from(this.rawBody),
     });
   }
@@ -405,11 +416,16 @@ function createAxiosAdapter(transport: HttpTransportApi): AxiosAdapter {
       }
     }
 
+    const responseHeaders: Record<string, string | string[]> = { ...response.headers };
+    if (response.setCookies && response.setCookies.length > 0) {
+      responseHeaders["set-cookie"] = response.setCookies;
+    }
+
     const axiosResponse: AxiosResponse = {
       data: responseData,
       status: response.status,
       statusText: response.statusText,
-      headers: AxiosHeaders.from(response.headers),
+      headers: AxiosHeaders.from(responseHeaders),
       config,
       request: {},
     };

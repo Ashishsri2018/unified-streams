@@ -5,7 +5,7 @@ set -e
 export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-1}"
 
 if [ -z "${NODE_OPTIONS:-}" ]; then
-  export NODE_OPTIONS="--max-old-space-size=${HEAP_MAX_MB:-160} --max-semi-space-size=${SEMI_SPACE_MB:-8}"
+  export NODE_OPTIONS="--max-old-space-size=${HEAP_MAX_MB:-700} --max-semi-space-size=${SEMI_SPACE_MB:-8}"
 fi
 
 # Ensure data directories exist

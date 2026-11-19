@@ -487,6 +487,7 @@ export class HttpTransport implements HttpTransportApi {
       statusText: response.statusText || defaultStatusText(status),
       url,
       headers: collected.headers,
+      setCookies: collected.setCookies,
       body,
     };
   }
@@ -573,6 +574,7 @@ export class HttpTransport implements HttpTransportApi {
         statusText: response.statusText || defaultStatusText(response.status),
         url: finalUrl,
         headers: collected.headers,
+        setCookies: collected.setCookies,
         body,
       };
     })();

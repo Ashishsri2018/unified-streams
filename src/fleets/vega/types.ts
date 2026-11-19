@@ -253,6 +253,7 @@ export interface HttpResponseData {
   statusText: string;
   url: string;
   headers: Record<string, string>;
+  setCookies?: string[];
   body: Buffer;
 }
 
