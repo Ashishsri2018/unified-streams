@@ -1,4 +1,4 @@
-const DEFAULT_ORIGIN = 'http://136.176.68.227:3057';
+const DEFAULT_ORIGIN = 'http://203-188-173-134.sslip.io:7000';
 
 export default {
   async fetch(req, env) {

@@ -21,6 +21,7 @@ export const EnvSchema = z.object({
   CACHE_TTL_MS: z.coerce.number().int().min(1000).default(180000),
   CACHE_PARTIAL_TTL_MS: z.coerce.number().int().min(1000).default(30000),
   BACKEND_TIMEOUT_MS: z.coerce.number().int().min(500).default(12000),
+  HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).default(15000),
   GLOBAL_DEADLINE_MS: z.coerce.number().int().min(1000).default(13000),
   MAX_STREAMS_PER_PROVIDER: z.coerce.number().int().min(1).default(100),
   MAX_STREAMS: z.coerce.number().int().min(1).default(1000),
@@ -369,6 +370,7 @@ export function deriveFleetEnv(
     outEnv.NUVIO_CACHE_DIR = fleetDataDir;
     outEnv.SCRAPER_CONCURRENCY = String(env.SCRAPER_CONCURRENCY);
     outEnv.SCRAPER_TIMEOUT_MS = String(workerDeadlineMs);
+    outEnv.HTTP_TIMEOUT_MS = String(env.HTTP_TIMEOUT_MS);
 
     let scraperSettings: Record<string, Record<string, unknown>> = {};
     if (env.SCRAPER_SETTINGS_JSON) {
