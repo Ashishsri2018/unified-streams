@@ -11,7 +11,7 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 
 ## Observability & provider policy
 - Added aggregated per-provider health/stats and a dark `/status` dashboard with WORKING/DEGRADED/OFFLINE badges, latency, updater banners, search, and 15s refresh.
-- Migrated SA7 from allow-list to deny-list; consolidated provider policy into `config/providers.json` with `instances.<profile>` overrides and `config/instances/{beamup,railway}.env` timeouts; CI sets only `INSTANCE_PROFILE` + credentials. Added allow/wildcard support, hard-disabled classes, and Vega > Nuvio > SA7 duplicate priority in merge.
+- Migrated SA7 from allow-list to deny-list; consolidated provider policy into `config/providers.json` with `instances.<profile>` overrides and `config/instances/{beamup,railway}.env` timeouts; CI sets only `INSTANCE_PROFILE` + credentials. Added allow/wildcard support, hard-disabled classes, and Nuvio > Vega > SA7 duplicate priority in merge.
 - Hard-disabled YouTube, torrentio, Internet Archive, live TV (`durbinLive`, `liveTgTv`); `mxplayer` denied on Railway, allowed on Beamup.
 - Diagnosed 100%-empty status rows: mostly genre/catalog mismatch and silent `catch → []` on dead upstreams. Fixed observability with `src/core/networkClassifier.ts` (AsyncLocalStorage request tracking across all fleets), real `lastError`, and Vega/Nuvio call counters; SA7 `ok` now counts clean empties.
 
@@ -44,6 +44,10 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 ## Recent sessions (Nov 19 2026)
 - **Header/notWebReady parity:** Confirmed Nuvio and Vega were advertising provider `Referer`/`Origin`/`User-Agent`/`Cookie` via `behaviorHints.proxyHeaders.request` but omitted `notWebReady`. Added `behaviorHints.notWebReady: true` wherever headers are emitted, matching SA7's existing rule; verified a header-gated stream returned 403 without advertised headers and 206 with them.
 - **Streamtape classification:** A Katmovie `/get_video` link was routed to `externalUrl` because `streamtape.com` is in `KNOWN_EMBED_DOMAINS`. Added a host-scoped direct-endpoint rule for Streamtape `/get_video`, with a regression test. Live check: 302 to `*.tapecontent.net` returning `Content-Type: video/mp4`, `Accept-Ranges: bytes`.
+
+## Recent sessions (Nov 20 2026)
+- **Gateway dedupe/filter ordering:** Fixed `mergeAndFilterStreams` adding a stream key to `seenKeys` before `filterStream`, which let a filtered-out higher-ranked duplicate suppress a valid lower-ranked copy of the same URL (e.g. a Nuvio 2160p copy dropped by `maxRes=1080` also hid the Vega 1080p duplicate). The key is now recorded only after the stream survives filtering, with a regression test. Local lint/typecheck/feature tests (204) pass; no deploy.
+- **VPS memory (ops):** Set THP to `madvise`, fixed the systemd `NODE_OPTIONS` quoting so `--max-semi-space-size=8` applies, and added an `LD_PRELOAD` `malloc_trim` helper that only trims after a CPU-idle burst (`MALLOC_TRIM_POLL_SEC=60`, 2 idle samples). Idle RSS returns to ~110–125 MB after load.
 
 ## Key Decisions & Conventions
 - TypeScript strict mode, zero `any`; all stream failures return `{ "streams": [] }` with HTTP 200.

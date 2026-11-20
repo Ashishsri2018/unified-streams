@@ -7,8 +7,9 @@ export interface FleetStreamsInput {
   streams: StremioStream[];
 }
 
-// When the same stream is returned by more than one fleet, keep the copy from
-// the highest-priority fleet. Nuvio is primary, then Vega, then SA7.
+// When the same stream URL is returned by more than one fleet, dedupe keeps the
+// first survivor after sorting (best resolution/container first, then fleet
+// priority: Nuvio > Vega > SA7).
 const FLEET_PRIORITY: Record<string, number> = { nuvio: 0, vega: 1, sa7: 2 };
 
 function fleetPriority(fleet: string): number {
@@ -124,10 +125,13 @@ export function mergeAndFilterStreams(
   for (const { stream } of normalizedList) {
     const key = getStreamDedupeKey(stream);
     if (key && seenKeys.has(key)) continue;
-    if (key) seenKeys.add(key);
 
+    // Only mark the key as seen once the copy survives filtering. Otherwise a
+    // filtered-out higher-ranked duplicate would suppress a valid lower-ranked
+    // duplicate of the same URL.
     const filtered = filterStream(stream, filterConfig);
     if (filtered) {
+      if (key) seenKeys.add(key);
       finalStreams.push(filtered);
       if (finalStreams.length >= maxStreams) break;
     }

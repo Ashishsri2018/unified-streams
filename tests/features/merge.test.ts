@@ -273,4 +273,32 @@ describe('classifier and merger', () => {
     expect(merged).toHaveLength(1);
     expect(merged[0].title).toBe('Nuvio copy');
   });
+
+  it('keeps a valid lower-ranked duplicate when the higher-ranked copy is filtered out', () => {
+    const filters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: 1080,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+
+    const inputs: FleetStreamsInput[] = [
+      {
+        fleet: 'nuvio',
+        streams: [{ title: 'Nuvio 4K', quality: '2160p', url: 'https://cdn.test/shared.mp4' }],
+      },
+      {
+        fleet: 'vega',
+        streams: [{ title: 'Vega 1080p', quality: '1080p', url: 'https://cdn.test/shared.mp4' }],
+      },
+    ];
+
+    const merged = mergeAndFilterStreams(inputs, filters, 100);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].title).toBe('Vega 1080p');
+  });
 });
