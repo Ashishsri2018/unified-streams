@@ -40,9 +40,6 @@ function extractTextCorpus(input: unknown): string {
   if (typeof s.name === 'string') parts.push(s.name);
   if (typeof s.title === 'string') parts.push(s.title);
   if (typeof s.description === 'string') parts.push(s.description);
-  if (typeof s.behaviorHints?.bingeGroup === 'string') parts.push(s.behaviorHints.bingeGroup);
-  if (typeof s.url === 'string') parts.push(s.url);
-  if (typeof s.externalUrl === 'string') parts.push(s.externalUrl);
   return parts.join(' ');
 }
 

@@ -17,13 +17,25 @@ describe('streamQuality core module', () => {
       expect(inferResolution({ title: 'Show S01E01 1440p QHD' })).toBe(1440);
       expect(inferResolution({ description: 'FHD 1080p stream' })).toBe(1080);
       expect(inferResolution({ name: 'Fast 720p HD' })).toBe(720);
-      expect(inferResolution({ behaviorHints: { bingeGroup: '576p' } })).toBe(576);
-      expect(inferResolution({ url: 'https://stream.test/video-480p.mp4' })).toBe(480);
       expect(inferResolution({ title: '360p mobile' })).toBe(360);
       expect(inferResolution({ quality: '8k' })).toBe(4320);
       expect(inferResolution('Random title with no resolution')).toBeNull();
       expect(inferQuality('Random title with no resolution')).toBe(0);
       expect(inferQuality('Movie 1080p')).toBe(1080);
+    });
+
+    it('does not infer resolution from URLs or binge groups', () => {
+      expect(inferResolution({ url: 'https://stream.test/video-480p.mp4' })).toBeNull();
+      expect(inferResolution({ url: 'https://cdn.test/4k/token.mp4' })).toBeNull();
+      expect(inferResolution({ externalUrl: 'https://hd.example.com/embed/1080p' })).toBeNull();
+      expect(inferResolution({ behaviorHints: { bingeGroup: '576p' } })).toBeNull();
+      expect(
+        inferResolution({
+          quality: '1080p',
+          url: 'https://cdn.test/4k/token.mp4',
+          behaviorHints: { bingeGroup: 'provider-2160p' },
+        }),
+      ).toBe(1080);
     });
   });
 

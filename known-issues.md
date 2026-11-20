@@ -70,6 +70,54 @@ Those headers are not enough: Cloudflare requires a `cf_clearance` cookie from a
 solved challenge. Playback needs a WebView/resolver that produces and reuses
 those cookies, or a different source. Status: unresolved.
 
+## Gateway filtering and deduplication
+
+### Torrent dedupe does not unify infoHash and magnet forms (2026-11-20)
+
+`getStreamDedupeKey` in `src/addon/merge.ts` prefers the stream URL when one is
+present and only falls back to `infoHash` + `fileIdx` when no URL exists. As a
+result, the same torrent returned by one fleet as a bare `infoHash` stream and
+by another as a `magnet:` URL produces different keys and is not deduplicated.
+
+Current fleet mappers do not appear to emit both forms for the same stream, so
+this is a latent issue. Status: unresolved.
+
+Possible fix: when `infoHash` is present, use it as the primary key (including
+`fileIdx`) and only use the URL key for non-torrent streams.
+
+### Query-token-rotated URLs are not deduplicated (2026-11-20)
+
+`normalizeStreamKey` in `src/core/urlClassifier.ts` lowercases the host and
+removes fragments and trailing slashes, but intentionally preserves
+`parsed.search`. Signed CDN URLs that differ only by rotated query tokens are
+therefore treated as distinct streams and can duplicate across fleets.
+
+Status: unresolved by design; stripping query strings would collapse legitimate
+distinct URLs that use query parameters for resource selection.
+
+### One invalid filter field resets the entire user config (2026-11-20)
+
+`decodeUserConfig` in `src/addon/userConfig.ts` parses the whole config with
+`UserConfigSchema.safeParse`; if any field is invalid the function returns
+`DEFAULT_USER_CONFIG`, discarding valid fields from the same config payload.
+This can silently re-enable streams or resolution/size limits the user set.
+
+Status: unresolved. Possible fix: validate fields individually and fall back per
+field, or return a partially-applied config with warnings.
+
+### External streams lose quality and size metadata (2026-11-20)
+
+`normalizeStreamItem` in `src/addon/merge.ts` rebuilds external streams as
+`{name, title, description, externalUrl, behaviorHints}`, dropping `quality`,
+`size`, and other fields. Because filtering runs after normalization, size and
+resolution filters see external/archive entries as having unknown metadata,
+which can change which entries pass (especially when `includeUnknownSize` or
+`includeUnknownRes` is disabled).
+
+Status: unresolved. Possible fix: carry `quality` and `size` onto external
+streams so filters can evaluate them consistently, or explicitly exempt
+external streams from size/resolution filtering.
+
 ## Provider patches (context)
 
 ### Zevran and Solunix parsing repaired (2026-11-19)
