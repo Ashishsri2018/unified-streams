@@ -203,7 +203,7 @@ export class MetadataResolver {
     const ctx = this.abortable(timeoutMs ?? this.metadataBudgetMs, signal);
     try {
       const endpoint = type === 'movie' ? 'movie' : 'tv';
-      const url = `${this.tmdbUrl}/${endpoint}/${tmdbNumericId}?api_key=${this.tmdbApiKey}&external_source=imdb_id`;
+      const url = `${this.tmdbUrl}/${endpoint}/${tmdbNumericId}?api_key=${this.tmdbApiKey}&append_to_response=external_ids`;
       const res = await fetch(url, { signal: ctx.signal });
       if (!res.ok) {
         this.cacheError(cacheKey, ctx, res.status);
@@ -215,13 +215,19 @@ export class MetadataResolver {
         release_date?: string;
         first_air_date?: string;
         imdb_id?: string;
+        external_ids?: { imdb_id?: string };
       };
       const dateStr = d.release_date || d.first_air_date || '';
+      const rawImdbId =
+        typeof d.imdb_id === 'string' ? d.imdb_id : d.external_ids?.imdb_id;
       const meta: CanonicalMetadata = {
         title: d.title || d.name || '',
         year: dateStr ? parseCanonicalYear(dateStr) : undefined,
         type,
-        imdbId: typeof d.imdb_id === 'string' && IMDB_ID_PATTERN.test(d.imdb_id) ? d.imdb_id : undefined,
+        imdbId:
+          typeof rawImdbId === 'string' && IMDB_ID_PATTERN.test(rawImdbId)
+            ? rawImdbId
+            : undefined,
         tmdbId: tmdbNumericId,
       };
       this.setCache(cacheKey, meta);

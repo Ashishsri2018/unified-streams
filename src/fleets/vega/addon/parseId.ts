@@ -1,5 +1,5 @@
 import type { StreamRequest } from "../types.js";
-import { parseContentId } from "../../../core/contentId.js";
+import { IMDB_ID_PATTERN, parseContentId } from "../../../core/contentId.js";
 
 const MAX_SEASON = 1000;
 const MAX_EPISODE = 10000;
@@ -40,6 +40,14 @@ export function parseStreamId(type: string, rawId: string): StreamRequest | null
   }
 
   return null;
+}
+
+export function applyForwardedImdb(
+  request: StreamRequest,
+  imdbId: string | null | undefined,
+): StreamRequest {
+  if (!imdbId || !IMDB_ID_PATTERN.test(imdbId) || "imdbId" in request) return request;
+  return { ...request, imdbId };
 }
 
 export function contentIdOf(request: StreamRequest): string {

@@ -1,7 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import request from 'supertest';
+import { createGatewayApp } from '../../src/addon/app.js';
+import type { StreamHandlerContext } from '../../src/addon/stream.js';
+import { GatewayStreamCache } from '../../src/core/cache.js';
 import { WorkerClient } from '../../src/core/workerClient.js';
 import { INTERNAL_HEADERS } from '../../src/core/contract.js';
-import { parseCanonicalYear } from '../../src/core/metadata.js';
+import { MetadataResolver, parseCanonicalYear } from '../../src/core/metadata.js';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('Metadata Forwarding between Gateway and Loopback Workers', () => {
   it('attaches metadata headers in WorkerClient.fetchStream', async () => {
@@ -94,5 +103,59 @@ describe('Metadata Forwarding between Gateway and Loopback Workers', () => {
     expect(parseCanonicalYear('invalid')).toBeUndefined();
     expect(parseCanonicalYear(null)).toBeUndefined();
     expect(parseCanonicalYear(undefined)).toBeUndefined();
+  });
+
+  it('forwards resolved IMDb metadata for TMDB series stream requests', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tv/1399')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            name: 'Game of Thrones',
+            first_air_date: '2011-04-17',
+            external_ids: { imdb_id: 'tt0944947' },
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 404,
+        json: async () => ({}),
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const fetchStream = vi.fn().mockResolvedValue({ streams: [], outcome: 'ok' });
+    const worker = { fetchStream } as unknown as WorkerClient;
+    const ctx: StreamHandlerContext = {
+      cache: new GatewayStreamCache(),
+      workers: { sa7: worker, nuvio: worker, vega: worker },
+      addonVersion: '1.0.0',
+      policyVersion: '1.0.0',
+      maxStreams: 100,
+      globalDeadlineMs: 13000,
+      workerTimeoutMs: 12000,
+      metadataResolver: new MetadataResolver(
+        'https://cinemeta.test',
+        'tmdb-key',
+        undefined,
+        { tmdbUrl: 'https://tmdb.test/3' },
+      ),
+    };
+    const app = createGatewayApp(ctx, Date.now());
+
+    const res = await request(app).get('/stream/series/tmdb:1399:1:1.json');
+
+    expect(res.status).toBe(200);
+    expect(fetchStream).toHaveBeenCalled();
+    const call = fetchStream.mock.calls[0];
+    expect(call?.[0]).toBe('series');
+    expect(call?.[1]).toBe('tmdb:1399:1:1');
+    expect(call?.[5]).toMatchObject({
+      title: 'Game of Thrones',
+      year: 2011,
+      tmdbId: 1399,
+      imdbId: 'tt0944947',
+    });
   });
 });

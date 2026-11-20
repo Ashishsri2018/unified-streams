@@ -6,7 +6,7 @@ import { StreamPipeline } from './pipeline/streamHandler.js';
 import { nativeFetch } from './util/nativeFetch.js';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
-import { parseStreamId } from './addon/parseId.js';
+import { applyForwardedImdb, parseStreamId } from './addon/parseId.js';
 import { isProviderEnabled } from '../../core/policy.js';
 import { sendJson, type FleetInstance } from '../../core/internalServer.js';
 import type { StremioStream } from './types.js';
@@ -75,6 +75,11 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
     const metaTitle = typeof rawTitle === 'string' && rawTitle ? decodeURIComponent(rawTitle) : undefined;
     const metaYear = req.headers['x-meta-year'] ? Number(req.headers['x-meta-year']) : undefined;
     const metaTmdb = Number(req.headers['x-meta-tmdb-id']);
+    const rawImdb = req.headers['x-meta-imdb-id'];
+    streamRequest = applyForwardedImdb(
+      streamRequest,
+      typeof rawImdb === 'string' ? rawImdb : undefined,
+    );
     if (cinemeta && metaTitle && 'imdbId' in streamRequest) {
       cinemeta.prime(streamRequest.type, streamRequest.imdbId, {
         id: streamRequest.imdbId,

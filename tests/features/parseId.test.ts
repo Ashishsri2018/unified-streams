@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseStreamId as parseNuvioId, contentIdOf as nuvioContentIdOf } from '../../src/fleets/nuvio/addon/parseId.js';
-import { parseStreamId as parseVegaId, contentIdOf as vegaContentIdOf } from '../../src/fleets/vega/addon/parseId.js';
+import { applyForwardedImdb, parseStreamId as parseVegaId, contentIdOf as vegaContentIdOf } from '../../src/fleets/vega/addon/parseId.js';
 
 describe.each([
   ['nuvio', parseNuvioId, nuvioContentIdOf],
@@ -57,5 +57,29 @@ describe.each([
     expect(parseStreamId('anime', 'tt1234567')).toBeNull();
     expect(parseStreamId('movie', 'invalid-id')).toBeNull();
     expect(parseStreamId('series', 'tt1234567:bad:ep')).toBeNull();
+  });
+});
+
+describe('vega forwarded IMDb metadata', () => {
+  it('merges a valid forwarded IMDb id into a TMDB request', () => {
+    const request = parseVegaId('series', 'tmdb:1399:1:2');
+    expect(request).not.toBeNull();
+    expect(applyForwardedImdb(request!, 'tt0944947')).toEqual({
+      type: 'series',
+      tmdbId: 1399,
+      season: 1,
+      episode: 2,
+      imdbId: 'tt0944947',
+    });
+  });
+
+  it('keeps an existing IMDb id and ignores invalid forwarded ids', () => {
+    const request = parseVegaId('movie', 'tmdb:550');
+    expect(request).not.toBeNull();
+    expect(applyForwardedImdb(request!, 'invalid')).toEqual(request);
+
+    const imdbRequest = parseVegaId('movie', 'tt1234567');
+    expect(imdbRequest).not.toBeNull();
+    expect(applyForwardedImdb(imdbRequest!, 'tt7654321')).toEqual(imdbRequest);
   });
 });

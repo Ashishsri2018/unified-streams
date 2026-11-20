@@ -107,7 +107,35 @@ describe('review fixes', () => {
     );
     const meta = await resolver.resolveTmdb('movie', 123);
     expect(fetchMock.mock.calls[0]?.[0]).toContain('https://tmdb.local/3/movie/123');
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('append_to_response=external_ids');
     expect(meta?.year).toBe(2020);
+    expect(meta?.imdbId).toBe('tt1234567');
+  });
+
+  it('resolves IMDb ids for TMDB series via external_ids', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        name: 'Game of Thrones',
+        first_air_date: '2011-04-17',
+        external_ids: { imdb_id: 'tt0944947' },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resolver = new MetadataResolver(
+      'https://cinemeta.example',
+      'key',
+      undefined,
+      { tmdbUrl: 'https://tmdb.local/3' },
+    );
+    const meta = await resolver.resolveTmdb('series', 1399);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('https://tmdb.local/3/tv/1399');
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('append_to_response=external_ids');
+    expect(meta?.title).toBe('Game of Thrones');
+    expect(meta?.year).toBe(2011);
+    expect(meta?.imdbId).toBe('tt0944947');
   });
 
   it('stops the 5-minute retry loop after three failures', async () => {
