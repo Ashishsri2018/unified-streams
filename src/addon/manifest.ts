@@ -22,7 +22,7 @@ export interface StremioManifest {
 export const MANIFEST_ID = 'org.unifiedstreams.addon';
 
 export function buildManifest(options: ManifestOptions): StremioManifest {
-  const prefixes = ['tt', 'tmdb:', 'mal:', 'kitsu:'];
+  const prefixes = ['tt', 'tmdb:', 'mal:', 'kitsu:', 'tvdb:'];
 
   const cleanBase = options.baseUrl.replace(/\/+$/, '');
   const logo = `${cleanBase}/logo.png?v=${options.addonVersion}`;

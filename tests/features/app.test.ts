@@ -74,7 +74,7 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(resGet.status).toBe(200);
     expect(resGet.body.id).toBe('org.unifiedstreams.addon');
     expect(resGet.body.resources).toEqual(['stream']);
-    expect(resGet.body.idPrefixes).toEqual(['tt', 'tmdb:', 'mal:', 'kitsu:']);
+    expect(resGet.body.idPrefixes).toEqual(['tt', 'tmdb:', 'mal:', 'kitsu:', 'tvdb:']);
     expect(resGet.headers['cache-control']).toBe('public, max-age=300');
     expect(resGet.headers['access-control-allow-origin']).toBe('*');
 

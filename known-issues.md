@@ -72,6 +72,22 @@ those cookies, or a different source. Status: unresolved.
 
 ## Gateway filtering and deduplication
 
+### AniChan (Xandril) returns incorrect streams and false-matches non-anime (2026-11-21)
+
+AniChan (`xandril` in Nuvio, scraping `https://anichan.to`) frequently returns streams for the wrong title, season, or episode.
+
+Specific symptoms:
+1. **False-positive matches on non-anime**: Live-action movies and Western TV series return anime streams. For example, *Moonlight* (TMDB 376867) returns *Sumikkogurashi: The Little Wizard in the Blue Moonlight*; *Invincible* (TMDB 95557) returns *I'm invincible* (Chinese donghua). Any title containing common words (*Monster*, *Drive*, *Alone*, *Hero*, *Kingdom*, *Solo*) risks falsely locking onto an anime title.
+2. **Season and arc mismatches**: Western databases (TMDB / IMDb) number seasons sequentially (Season 1, Season 2, Season 3), whereas AniList / AniChan indexes each story arc as an independent anime entry. For multi-season anime like *Demon Slayer*, requesting Season 3 (*Swordsmith Village Arc*) matches Season 2 (*Entertainment District Arc*) because both share identical episode counts (11 episodes) and generic season keywords.
+3. **Out-of-bounds episode fallbacks**: When specific season matching fails, the provider falls back to Season 1 and computes an absolute episode number (`abs = sum(prev_seasons) + ep`). If the Season 1 entry on AniChan only has 24 episodes, requesting episode 26+ produces out-of-bounds errors or plays unrelated specials/OVAs.
+
+Root causes in `src/fleets/nuvio/snapshot/providers/xandril.js` & manifest:
+- **No anime gating**: Registered with `supportedTypes: ["movie", "tv"]` in `src/fleets/nuvio/snapshot/manifest.json`. Without anime genre/origin detection, Nuvio fans out every single movie and series request to AniChan.
+- **Overly permissive scoring**: `scoreCandidate` awards 60 points for any substring match (`a.includes(b) || b.includes(a)`). Added to same-year (+30) or movie format (+20) against a low 70-point threshold, common words match easily.
+- **Loose season regex**: `SEASON_MARK` awards +10 to any candidate containing keywords (`season`, `2nd`, `3rd`, `part`, `final`) regardless of whether the season number matches.
+
+Status: Unresolved; provider code unedited. Recommended non-provider mitigations include disabling `xandril` in `config/providers.json` (relying on other dedicated anime providers like `anizen`, `anizone`, `animesalt`, `kurage`, `animeworld`, `kickAssAnime`) or gating `xandril` at the fleet/gateway layer so it only runs when metadata confirms anime content.
+
 ### Torrent dedupe does not unify infoHash and magnet forms (2026-11-20)
 
 `getStreamDedupeKey` in `src/addon/merge.ts` prefers the stream URL when one is

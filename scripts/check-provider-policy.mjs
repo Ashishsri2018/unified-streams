@@ -20,6 +20,7 @@ const HARD_DISABLED = [
   'bdix-df',
   'bdix-fh',
   'jyniq',
+  'mxplayer',
 ];
 
 function parseCsv(content) {

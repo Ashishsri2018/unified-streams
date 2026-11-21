@@ -137,7 +137,7 @@ describe('disabled providers derivation', () => {
     expect(vegaDisabled).not.toContain('disneyMirror');
     expect(vegaDisabled).not.toContain('netflixMirror');
     expect(vegaDisabled).not.toContain('primeMirror');
-    expect(vegaDisabled).not.toContain('mxplayer');
+    expect(vegaDisabled).toContain('mxplayer');
     expect(vegaDisabled).toContain('drive');
     expect(vegaDisabled).toContain('hdhub4u');
     expect(vegaDisabled).toContain('showbox');
@@ -151,7 +151,7 @@ describe('disabled providers derivation', () => {
     expect(Number(appEnv.BACKEND_TIMEOUT_MS)).toBe(34000);
     expect(Number(appEnv.GLOBAL_DEADLINE_MS)).toBe(38000);
     expect(Number(appEnv.SEARCH_CONCURRENCY)).toBe(40);
-    expect(Number(appEnv.SEARCH_TIMEOUT_MS)).toBe(15000);
+    expect(Number(appEnv.SEARCH_TIMEOUT_MS)).toBe(20000);
 
     const sa7Env = deriveFleetEnv(appEnv, 'sa7', 7001);
     const sa7Disabled = sa7Env.DISABLED_PROVIDERS.split(',');
@@ -214,7 +214,7 @@ describe('disabled providers derivation', () => {
     expect(vegaDisabled).not.toContain('movies4u');
     expect(vegaDisabled).not.toContain('luxMovies');
     expect(vegaDisabled).not.toContain('1cinevood');
-    expect(vegaDisabled).not.toContain('mxplayer');
+    expect(vegaDisabled).toContain('mxplayer');
   });
 
   it('lets runtime env override profile provider selection without code changes', () => {
@@ -235,12 +235,13 @@ describe('disabled providers derivation', () => {
   it('never re-enables hard-disabled providers through an allowlist', () => {
     const appEnv = loadAppEnv({
       INSTANCE_PROFILE: 'beamup',
-      VEGA_ENABLED_PROVIDERS: 'torrentio,animeworld',
+      VEGA_ENABLED_PROVIDERS: 'torrentio,mxplayer,animeworld',
       NUVIO_ENABLED_SCRAPERS: 'jyniq',
     });
     const vegaEnv = deriveFleetEnv(appEnv, 'vega', 7003);
     expect(vegaEnv.ENABLED_PROVIDERS).toBe('animeworld');
     expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('torrentio');
+    expect(vegaEnv.DISABLED_PROVIDERS.split(',')).toContain('mxplayer');
 
     const nuvioEnv = deriveFleetEnv(appEnv, 'nuvio', 7002);
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('jyniq');
@@ -252,6 +253,7 @@ describe('disabled providers derivation', () => {
     const vegaEnv = deriveFleetEnv(defaultEnv, 'vega', 7003);
 
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('sylphera');
+    expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('kethrax');
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('fastrion');
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('soryn');
     expect(nuvioEnv.DISABLED_SCRAPERS.split(',')).toContain('jyniq');

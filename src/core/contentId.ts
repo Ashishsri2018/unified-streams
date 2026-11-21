@@ -1,9 +1,9 @@
 /**
  * Content ID parser for Stremio stream requests.
- * Supports IMDb (`tt`), TMDB (`tmdb:`), MyAnimeList (`mal:`), and Kitsu (`kitsu:`).
+ * Supports IMDb (`tt`), TMDB (`tmdb:`), MyAnimeList (`mal:`), Kitsu (`kitsu:`), and TheTVDB (`tvdb:`).
  */
 
-export type ContentIdFamily = 'tt' | 'tmdb' | 'mal' | 'kitsu';
+export type ContentIdFamily = 'tt' | 'tmdb' | 'mal' | 'kitsu' | 'tvdb';
 
 export function canonicalIdSuffix(parsed: ParsedContentId): string {
   if (parsed.season === undefined) return '';
@@ -24,6 +24,7 @@ export const IMDB_ID_PATTERN = /^tt(\d{7,12})$/;
 const TMDB_PATTERN = /^tmdb:(\d{1,10})$/;
 const MAL_PATTERN = /^mal:(\d{1,10})$/;
 const KITSU_PATTERN = /^kitsu:(\d{1,10})$/;
+const TVDB_PATTERN = /^tvdb:(\d{1,10})$/;
 
 function parseNumericPart(part: string | undefined): number | undefined {
   if (part === undefined) return undefined;
@@ -56,6 +57,8 @@ export function parseContentId(
     return parseMalId(type, decoded, parts);
   } else if (prefix === 'kitsu') {
     return parseKitsuId(type, decoded, parts);
+  } else if (prefix === 'tvdb') {
+    return parseTvdbId(type, decoded, parts);
   } else if (prefix === 'tmdb') {
     return parseTmdbId(type, decoded, parts);
   } else {
@@ -132,6 +135,18 @@ function parseKitsuId(
   return { family: 'kitsu', rawId: raw, cleanId: baseId, season: s, episode: ep };
 }
 
+function parseTvdbId(
+  type: 'movie' | 'series',
+  raw: string,
+  parts: string[],
+): ParsedContentId | null {
+  if (parts.length < 2 || parts.length > 4) return null;
+  const baseId = `tvdb:${parts[1]}`;
+  if (!TVDB_PATTERN.test(baseId)) return null;
+
+  return parseStandardSuffixes(type, raw, baseId, 'tvdb', parts.slice(2));
+}
+
 function parseTmdbId(
   type: 'movie' | 'series',
   raw: string,
@@ -159,7 +174,7 @@ function parseStandardSuffixes(
   type: 'movie' | 'series',
   raw: string,
   cleanId: string,
-  family: 'tt' | 'tmdb',
+  family: 'tt' | 'tmdb' | 'tvdb',
   suffixes: string[],
 ): ParsedContentId | null {
   if (type === 'movie') {

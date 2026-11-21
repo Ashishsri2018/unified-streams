@@ -4,6 +4,7 @@ import { DEFAULT_ANIMEAPI_URL, RESOLVE_MIN_MS } from './env.js';
 import { JikanClient } from './jikan.js';
 import { KitsuClient } from './kitsu.js';
 import { scoreTitleCandidate } from './titleMatch.js';
+import { TvmazeClient } from './tvmaze.js';
 
 export interface CanonicalMetadata {
   title: string;
@@ -52,6 +53,7 @@ export class MetadataResolver {
   private readonly jikan: JikanClient;
   private readonly animeApi: AnimeApiClient;
   private readonly kitsu: KitsuClient;
+  private readonly tvmaze: TvmazeClient;
   private readonly metadataBudgetMs: number;
   private readonly malResolveBudgetMs: number;
   private readonly posTtlMs = 86400000;
@@ -80,6 +82,7 @@ export class MetadataResolver {
       jikanMaxRpm?: number;
       animeApiUrl?: string;
       kitsuUrl?: string;
+      tvmazeUrl?: string;
       metadataBudgetMs?: number;
       malResolveBudgetMs?: number;
     },
@@ -95,6 +98,7 @@ export class MetadataResolver {
       this.malResolveBudgetMs,
     );
     this.kitsu = new KitsuClient(options?.kitsuUrl, this.malResolveBudgetMs);
+    this.tvmaze = new TvmazeClient(options?.tvmazeUrl, this.metadataBudgetMs);
   }
 
   private abortable(timeoutMs: number, external?: AbortSignal): AbortContext {

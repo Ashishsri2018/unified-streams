@@ -6,6 +6,7 @@ type Fleet = 'sa7' | 'nuvio' | 'vega';
 
 export const DEFAULT_ANIMEAPI_URL = 'https://animeapi.my.id';
 export const DEFAULT_KITSU_URL = 'https://kitsu.io/api/edge';
+export const DEFAULT_TVMAZE_URL = 'https://api.tvmaze.com';
 
 export const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(7000),
@@ -39,6 +40,7 @@ export const EnvSchema = z.object({
   TMDB_URL: z.string().url().default('https://api.themoviedb.org/3'),
   ANIMEAPI_URL: z.string().url().default(DEFAULT_ANIMEAPI_URL),
   KITSU_URL: z.string().url().default(DEFAULT_KITSU_URL),
+  TVMAZE_URL: z.string().url().default(DEFAULT_TVMAZE_URL),
   JIKAN_URL: z.string().url().default('https://api.jikan.moe/v4'),
   JIKAN_MAX_RPS: z.coerce.number().int().min(1).default(3),
   JIKAN_MAX_RPM: z.coerce.number().int().min(1).default(60),
@@ -145,6 +147,7 @@ const HARD_DISABLED_PROVIDERS = [
   'bdix-df',
   'bdix-fh',
   'jyniq',
+  'mxplayer',
 ];
 
 export interface FleetPolicy {
