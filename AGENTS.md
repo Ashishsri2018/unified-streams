@@ -44,3 +44,9 @@ npm run verify       # CI only: policy -> icon -> lint -> typecheck -> all tests
 - Do not deploy to Beamup, Railway, or Cloudflare unless explicitly asked. A push to `main` triggers the production deploy workflow, so do not push unless explicitly allowed.
 - `deploy-cloudflare.yml` is manual and only deploys the optional log ingest Worker.
 - Docker runtime needs `config/`, `assets/`, `scripts/`, plus vendored `sa7`, `nuvio/snapshot`, and `vega/providers-baseline` copied into `dist` by `scripts/copy-fleet-assets.mjs`.
+
+## Documentation and guidelines
+- All caveats should be stored in `known-issues.md`.
+- Add comments where necessary.
+- Docs-only changes should be committed with `[skip ci]`.
+- `memory.md` acts as a running log. Update it to note what was changed/achieved in the session.
