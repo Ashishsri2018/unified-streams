@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 ### Added
 - `mal:` stream IDs now resolve end-to-end: AnimeAPI supplies the canonical IMDb/TMDB mapping, with Jikan title/year plus TMDB search as fallback, and the gateway fan-out uses the rewritten ID with season/episode suffixes preserved. The manifest always advertises `mal:`.
+- `kitsu:` stream IDs are now supported and advertised in the manifest. The gateway maps Kitsu to MAL through the Kitsu mappings API (`KITSU_URL`), then reuses the MAL resolution pipeline; when no MAL mapping exists it falls back to the Kitsu title/year plus TMDB search. This makes AIOMetadata anime catalogs (such as MAL Top Series, whose episode IDs are `kitsu:...`) work end-to-end.
 
 ### Changed
 - MAL metadata resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped to 500–2000ms: 1s on Beamup, 2s on Railway), with AnimeAPI capped at 40% of that budget so the Jikan/TMDB fallback can still complete. The same headroom now bounds all metadata lookups, not just MAL.

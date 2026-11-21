@@ -5,6 +5,7 @@ import { z } from 'zod';
 type Fleet = 'sa7' | 'nuvio' | 'vega';
 
 export const DEFAULT_ANIMEAPI_URL = 'https://animeapi.my.id';
+export const DEFAULT_KITSU_URL = 'https://kitsu.io/api/edge';
 
 export const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(7000),
@@ -37,6 +38,7 @@ export const EnvSchema = z.object({
   CINEMETA_URL: z.string().url().default('https://v3-cinemeta.strem.io'),
   TMDB_URL: z.string().url().default('https://api.themoviedb.org/3'),
   ANIMEAPI_URL: z.string().url().default(DEFAULT_ANIMEAPI_URL),
+  KITSU_URL: z.string().url().default(DEFAULT_KITSU_URL),
   JIKAN_URL: z.string().url().default('https://api.jikan.moe/v4'),
   JIKAN_MAX_RPS: z.coerce.number().int().min(1).default(3),
   JIKAN_MAX_RPM: z.coerce.number().int().min(1).default(60),

@@ -1,9 +1,9 @@
 /**
  * Content ID parser for Stremio stream requests.
- * Supports IMDb (`tt`), TMDB (`tmdb:`), and MyAnimeList (`mal:`).
+ * Supports IMDb (`tt`), TMDB (`tmdb:`), MyAnimeList (`mal:`), and Kitsu (`kitsu:`).
  */
 
-export type ContentIdFamily = 'tt' | 'tmdb' | 'mal';
+export type ContentIdFamily = 'tt' | 'tmdb' | 'mal' | 'kitsu';
 
 export function canonicalIdSuffix(parsed: ParsedContentId): string {
   if (parsed.season === undefined) return '';
@@ -23,6 +23,7 @@ const FORBIDDEN_CHARS = /[/?#]|\.\./;
 export const IMDB_ID_PATTERN = /^tt(\d{7,12})$/;
 const TMDB_PATTERN = /^tmdb:(\d{1,10})$/;
 const MAL_PATTERN = /^mal:(\d{1,10})$/;
+const KITSU_PATTERN = /^kitsu:(\d{1,10})$/;
 
 function parseNumericPart(part: string | undefined): number | undefined {
   if (part === undefined) return undefined;
@@ -49,12 +50,13 @@ export function parseContentId(
   }
 
   const parts = decoded.split(':');
-  const isMal = parts[0] === 'mal';
-  const isTmdb = parts[0] === 'tmdb';
+  const prefix = parts[0];
 
-  if (isMal) {
+  if (prefix === 'mal') {
     return parseMalId(type, decoded, parts);
-  } else if (isTmdb) {
+  } else if (prefix === 'kitsu') {
+    return parseKitsuId(type, decoded, parts);
+  } else if (prefix === 'tmdb') {
     return parseTmdbId(type, decoded, parts);
   } else {
     return parseImdbId(type, decoded, parts);
@@ -94,6 +96,40 @@ function parseMalId(
   const ep = parseNumericPart(parts[3]);
   if (s === undefined || ep === undefined) return null;
   return { family: 'mal', rawId: raw, cleanId: baseId, season: s, episode: ep };
+}
+
+function parseKitsuId(
+  type: 'movie' | 'series',
+  raw: string,
+  parts: string[],
+): ParsedContentId | null {
+  // Kitsu format: kitsu:id, kitsu:id:ep, or kitsu:id:season:ep
+  if (parts.length < 2 || parts.length > 4) return null;
+  const baseId = `kitsu:${parts[1]}`;
+  if (!KITSU_PATTERN.test(baseId)) return null;
+
+  if (type === 'movie') {
+    if (parts.length > 2) return null; // Movie must not have episode
+    return { family: 'kitsu', rawId: raw, cleanId: baseId };
+  }
+
+  // Series
+  if (parts.length === 2) {
+    return null;
+  }
+
+  if (parts.length === 3) {
+    // kitsu:id:episode -> season 1, episode N
+    const ep = parseNumericPart(parts[2]);
+    if (ep === undefined) return null;
+    return { family: 'kitsu', rawId: raw, cleanId: baseId, season: 1, episode: ep };
+  }
+
+  // parts.length === 4: kitsu:id:season:episode
+  const s = parseNumericPart(parts[2]);
+  const ep = parseNumericPart(parts[3]);
+  if (s === undefined || ep === undefined) return null;
+  return { family: 'kitsu', rawId: raw, cleanId: baseId, season: s, episode: ep };
 }
 
 function parseTmdbId(

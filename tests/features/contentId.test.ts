@@ -77,6 +77,32 @@ describe('contentId parser', () => {
     expect(parseContentId('series', 'mal:20')).toBeNull();
   });
 
+  it('parses Kitsu IDs according to spec', () => {
+    const animeMovie = parseContentId('movie', 'kitsu:46474');
+    expect(animeMovie).toEqual({ family: 'kitsu', rawId: 'kitsu:46474', cleanId: 'kitsu:46474' });
+
+    const animeEp = parseContentId('series', 'kitsu:46474:5');
+    expect(animeEp).toEqual({
+      family: 'kitsu',
+      rawId: 'kitsu:46474:5',
+      cleanId: 'kitsu:46474',
+      season: 1,
+      episode: 5,
+    });
+
+    const animeSeasonEp = parseContentId('series', 'kitsu:46474:2:5');
+    expect(animeSeasonEp).toEqual({
+      family: 'kitsu',
+      rawId: 'kitsu:46474:2:5',
+      cleanId: 'kitsu:46474',
+      season: 2,
+      episode: 5,
+    });
+
+    expect(parseContentId('series', 'kitsu:46474')).toBeNull();
+    expect(parseContentId('movie', 'kitsu:46474:1')).toBeNull();
+  });
+
   it('handles URL-encoded IDs', () => {
     const encoded = parseContentId('series', 'tt0944947%3A1%3A2');
     expect(encoded).toEqual({

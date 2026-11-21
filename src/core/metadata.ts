@@ -2,6 +2,7 @@ import { AnimeApiClient } from './animeapi.js';
 import { IMDB_ID_PATTERN } from './contentId.js';
 import { DEFAULT_ANIMEAPI_URL, RESOLVE_MIN_MS } from './env.js';
 import { JikanClient } from './jikan.js';
+import { KitsuClient } from './kitsu.js';
 import { scoreTitleCandidate } from './titleMatch.js';
 
 export interface CanonicalMetadata {
@@ -50,6 +51,7 @@ export class MetadataResolver {
   private readonly tmdbApiKey?: string;
   private readonly jikan: JikanClient;
   private readonly animeApi: AnimeApiClient;
+  private readonly kitsu: KitsuClient;
   private readonly metadataBudgetMs: number;
   private readonly malResolveBudgetMs: number;
   private readonly posTtlMs = 86400000;
@@ -77,6 +79,7 @@ export class MetadataResolver {
       jikanMaxRps?: number;
       jikanMaxRpm?: number;
       animeApiUrl?: string;
+      kitsuUrl?: string;
       metadataBudgetMs?: number;
       malResolveBudgetMs?: number;
     },
@@ -91,6 +94,7 @@ export class MetadataResolver {
       options?.animeApiUrl ?? DEFAULT_ANIMEAPI_URL,
       this.malResolveBudgetMs,
     );
+    this.kitsu = new KitsuClient(options?.kitsuUrl, this.malResolveBudgetMs);
   }
 
   private abortable(timeoutMs: number, external?: AbortSignal): AbortContext {
@@ -304,18 +308,23 @@ export class MetadataResolver {
     type: 'movie' | 'series',
     malNumericId: number,
     signal?: AbortSignal,
+    timeoutMs?: number,
   ): Promise<CanonicalMetadata | null> {
     const cacheKey = `mal:${type}:${malNumericId}`;
     const cached = this.getCached(cacheKey);
     if (cached !== undefined) return cached;
 
-    const deadlineAt = Date.now() + this.malResolveBudgetMs;
+    const budgetMs = Math.max(
+      RESOLVE_MIN_MS,
+      Math.min(this.malResolveBudgetMs, timeoutMs ?? this.malResolveBudgetMs),
+    );
+    const deadlineAt = Date.now() + budgetMs;
     const remaining = () =>
-      Math.max(RESOLVE_MIN_MS, Math.min(this.malResolveBudgetMs, deadlineAt - Date.now()));
-    const ctx = this.abortable(this.malResolveBudgetMs, signal);
+      Math.max(RESOLVE_MIN_MS, Math.min(budgetMs, deadlineAt - Date.now()));
+    const ctx = this.abortable(budgetMs, signal);
 
     try {
-      const animeApiBudget = Math.max(RESOLVE_MIN_MS, Math.floor(this.malResolveBudgetMs * 0.4));
+      const animeApiBudget = Math.max(RESOLVE_MIN_MS, Math.floor(budgetMs * 0.4));
       const lookup = await this.animeApi.lookup(malNumericId, ctx.signal, animeApiBudget);
       if (lookup.status === 'ok') this.resolutionStats.animeApiOk += 1;
       else if (lookup.status === 'not_found') this.resolutionStats.animeApiNotFound += 1;
@@ -380,6 +389,64 @@ export class MetadataResolver {
     }
   }
 
+  async resolveKitsu(
+    type: 'movie' | 'series',
+    kitsuNumericId: number,
+    signal?: AbortSignal,
+  ): Promise<CanonicalMetadata | null> {
+    const cacheKey = `kitsu:${type}:${kitsuNumericId}`;
+    const cached = this.getCached(cacheKey);
+    if (cached !== undefined) return cached;
+
+    const budgetMs = this.malResolveBudgetMs;
+    const deadlineAt = Date.now() + budgetMs;
+    const remaining = () =>
+      Math.max(RESOLVE_MIN_MS, Math.min(budgetMs, deadlineAt - Date.now()));
+    const ctx = this.abortable(budgetMs, signal);
+
+    try {
+      const mappingBudget = Math.max(RESOLVE_MIN_MS, Math.floor(budgetMs * 0.35));
+      const lookup = await this.kitsu.lookup(kitsuNumericId, ctx.signal, mappingBudget);
+      if (lookup.status === 'ok' && lookup.mapping.malId) {
+        const mal = await this.resolveMal(type, lookup.mapping.malId, ctx.signal, remaining());
+        if (mal) {
+          this.setCache(cacheKey, mal);
+          return mal;
+        }
+      }
+
+      const anime = await this.kitsu.getAnime(kitsuNumericId, remaining(), ctx.signal);
+      if (!anime) {
+        if (!ctx.aborted()) this.setCache(cacheKey, null, this.transientTtlMs);
+        return null;
+      }
+
+      const animeType: 'movie' | 'series' = anime.subtype === 'movie' ? 'movie' : 'series';
+      let tmdbId = await this.searchTmdbByTitle(
+        animeType,
+        anime.title,
+        anime.year,
+        ctx.signal,
+        remaining(),
+      );
+      let imdbId: string | undefined;
+      if (tmdbId && remaining() >= 300) {
+        const detail = await this.resolveTmdb(animeType, tmdbId, ctx.signal, remaining());
+        imdbId = detail?.imdbId;
+        tmdbId = detail?.tmdbId ?? tmdbId;
+      }
+
+      const meta: CanonicalMetadata = { title: anime.title, year: anime.year, type, imdbId, tmdbId };
+      this.setCache(cacheKey, meta);
+      return meta;
+    } catch {
+      if (!ctx.aborted()) this.setCache(cacheKey, null, this.transientTtlMs);
+      return null;
+    } finally {
+      ctx.cleanup();
+    }
+  }
+
   async resolveContent(
     type: 'movie' | 'series',
     parsed: { family: string; cleanId: string },
@@ -395,6 +462,10 @@ export class MetadataResolver {
     if (parsed.family === 'mal') {
       const id = Number(parsed.cleanId.slice('mal:'.length));
       return this.resolveMal(type, id, signal);
+    }
+    if (parsed.family === 'kitsu') {
+      const id = Number(parsed.cleanId.slice('kitsu:'.length));
+      return this.resolveKitsu(type, id, signal);
     }
     return null;
   }

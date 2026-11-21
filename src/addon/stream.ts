@@ -77,6 +77,8 @@ export async function handleStreamRoute(
 
   const requestController = new AbortController();
 
+  const requiresCanonicalRewrite = parsedId.family === 'mal' || parsedId.family === 'kitsu';
+
   try {
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {
       // Resolve canonical metadata once in the gateway to eliminate redundant upstream calls
@@ -105,7 +107,7 @@ export async function handleStreamRoute(
               tmdbId: resolved.tmdbId ?? forwardedMeta?.tmdbId,
               imdbId: resolved.imdbId ?? forwardedMeta?.imdbId,
             };
-            if (parsedId.family === 'mal') {
+            if (requiresCanonicalRewrite) {
               const suffix = canonicalIdSuffix(parsedId);
               if (resolved.imdbId) {
                 forwardId = `${resolved.imdbId}${suffix}`;
@@ -119,7 +121,7 @@ export async function handleStreamRoute(
         }
       }
 
-      if (parsedId.family === 'mal' && forwardId === rawId) {
+      if (requiresCanonicalRewrite && forwardId === rawId) {
         return { value: { streams: [] }, isPartial: false };
       }
 
