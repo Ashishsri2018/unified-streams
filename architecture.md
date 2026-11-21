@@ -69,7 +69,7 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
   - `configure.ts`: Accessible, responsive configuration UI.
   - `stream.ts`: Stream resolution orchestrator.
   - `filters.ts`: Canonical stream filtering (resolution, size); inline `stream.subtitles` and `stream.drm` pass through unchanged.
-  - `merge.ts`: URL classification, deduplication, and sorting. Direct streams keep their full `drm` object; external pages/archives drop it, and a DRM-bearing copy wins when the same URL is duplicated.
+  - `merge.ts`: URL classification, deduplication, and sorting. Every stream keeps its full `drm` object, and a DRM-bearing copy wins when the same URL is duplicated.
   - `health.ts` & `stats.ts`: Observability endpoints with aggregated provider metrics across fleets, real worker roundtrip latency measurements, updater error propagation, and accurate fleet working state (`ok`, `degraded`, `error`).
   - `status.ts` & `statusHtml.ts`: Dark-mode real-time status dashboard with per-provider metrics table, filter search, prominent fleet working badges (`WORKING`, `DEGRADED`, `OFFLINE`), updater failure banners, and 15s auto-refresh.
 - `src/fleets/`: Worker implementations:

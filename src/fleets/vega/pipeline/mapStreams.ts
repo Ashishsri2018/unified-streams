@@ -140,6 +140,8 @@ export function mapProviderStreams(
         name: streamName,
         ...(streamTitle ? { title: streamTitle } : {}),
         externalUrl: link,
+        // Keep the full DRM object; the gateway validates it later.
+        ...(stream.drm != null ? { drm: stream.drm } : {}),
         behaviorHints: {
           bingeGroup: `${options.providerValue}-${quality || "auto"}`,
         },
@@ -164,7 +166,7 @@ export function mapProviderStreams(
         name: providerName,
         ...(title ? { title } : {}),
         url: link,
-        // Keep the full DRM object for direct media; the gateway validates it later.
+        // Keep the full DRM object; the gateway validates it later.
         ...(stream.drm != null ? { drm: stream.drm } : {}),
         behaviorHints,
         ...(subtitles.length > 0 ? { subtitles } : {}),

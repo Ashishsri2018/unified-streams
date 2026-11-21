@@ -123,8 +123,8 @@ export function mapScraperStreams(
       name: streamName,
       ...(streamTitle ? { title: streamTitle } : {}),
       ...(isExternal ? { externalUrl: rawUrl } : { url: rawUrl }),
-      // Keep the full DRM object for direct media; the gateway validates it later.
-      ...(!isExternal && stream.drm != null ? { drm: stream.drm } : {}),
+      // Keep the full DRM object; the gateway validates it later.
+      ...(stream.drm != null ? { drm: stream.drm } : {}),
       behaviorHints,
       ...(!isExternal && subtitles.length > 0 ? { subtitles } : {}),
     });

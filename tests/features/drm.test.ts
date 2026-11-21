@@ -60,7 +60,7 @@ describe('DRM passthrough', () => {
     expect(redactObject({ clearKeys: drm.clearKeys })).toEqual({ clearKeys: '[REDACTED]' });
   });
 
-  it('keeps DRM on direct streams and drops it for external links', () => {
+  it('keeps DRM on both direct and external streams', () => {
     const direct = mergeAndFilterStreams(
       [{ fleet: 'vega', streams: [{ name: 'V', title: 'T', url: 'https://cdn.test/movie.mpd', drm }] }],
       baseConfig,
@@ -72,12 +72,12 @@ describe('DRM passthrough', () => {
       [
         {
           fleet: 'vega',
-          streams: [{ name: 'V', title: 'T', externalUrl: 'https://example.com/embed/1', drm }],
+          streams: [{ name: 'V', title: 'T', externalUrl: 'https://cdn.test/embed/1', drm }],
         },
       ],
       baseConfig,
     );
-    expect(external[0].drm).toBeUndefined();
+    expect(external[0].drm).toEqual(drm);
   });
 
   it('prefers the DRM-bearing copy when the same URL is duplicated', () => {
@@ -111,6 +111,26 @@ describe('DRM passthrough', () => {
     expect(vega[0].drm).toEqual(drm);
 
     const sa7 = toStremioStream({ url: 'https://cdn.test/sa7.mpd', drm }, { name: 'SA7' });
+    expect(sa7.drm).toEqual(drm);
+  });
+
+  it('passes DRM through external links in every fleet mapper', () => {
+    const nuvio = mapScraperStreams(
+      [{ name: 'N', externalUrl: 'https://cdn.test/embed/1', drm }],
+      { scraperId: 's', scraperName: 'S', proxyEnabled: false },
+    );
+    expect(nuvio[0].drm).toEqual(drm);
+
+    const vega = mapProviderStreams(
+      [{ server: 'V', link: 'https://cdn.test/embed/1', drm }],
+      { providerValue: 'v', providerName: 'V', includeMagnets: false },
+    );
+    expect(vega[0].drm).toEqual(drm);
+
+    const sa7 = toStremioStream(
+      { externalUrl: 'https://cdn.test/embed/1', drm },
+      { name: 'SA7' },
+    );
     expect(sa7.drm).toEqual(drm);
   });
 });

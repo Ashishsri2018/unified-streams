@@ -43,6 +43,9 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     }
   }
 
+  // Keep the full DRM object on every stream type; clients decide whether it applies.
+  const drm = normalizeDrm(stream.drm);
+
   let title = stream.title;
   if (isExternal) {
     if (!title || !title.startsWith('🖥️')) {
@@ -52,13 +55,13 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     const restHints = { ...behaviorHints };
     delete restHints.proxyHeaders;
     delete restHints.notWebReady;
-    // External pages/archives are not playable media, so DRM metadata does not apply.
     return {
       name,
       title,
       description: stream.description,
       externalUrl: primaryUrl,
       behaviorHints: restHints,
+      ...(drm ? { drm } : {}),
     };
   }
 
@@ -66,7 +69,6 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     title = title.slice(3).trim();
   }
 
-  const drm = normalizeDrm(stream.drm);
   const cleanStream: StremioStream = {
     ...stream,
     name,
