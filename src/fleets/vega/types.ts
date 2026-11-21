@@ -74,6 +74,8 @@ export interface ProviderStream {
   subtitles?: SubtitleTrack[];
   headers?: Record<string, string>;
   skip?: SkipInterval[];
+  /** Raw provider DRM object; the gateway normalizes it before returning to clients. */
+  drm?: unknown;
   [key: string]: unknown;
 }
 
@@ -430,6 +432,8 @@ export interface StremioStream {
     notWebReady?: boolean;
   };
   subtitles?: StremioSubtitle[];
+  /** Raw provider DRM object; the gateway normalizes it before returning to clients. */
+  drm?: unknown;
 }
 
 export interface PipelineMetrics {

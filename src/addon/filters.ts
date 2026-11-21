@@ -1,4 +1,5 @@
 import { SubtitleTrack, filterSubtitleTracks } from './subtitles.js';
+import { DrmInfo } from '../core/drm.js';
 import { inferResolution, inferSizeBytes } from '../core/streamQuality.js';
 
 export { inferResolution, inferSizeBytes };
@@ -20,6 +21,8 @@ export interface StremioStream {
   subtitles?: SubtitleTrack[];
   size?: number;
   quality?: string;
+  /** Full provider DRM object; passed through unchanged for DRM-capable clients. */
+  drm?: DrmInfo;
   [key: string]: unknown;
 }
 

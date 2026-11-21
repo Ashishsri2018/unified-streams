@@ -73,6 +73,10 @@ export function redactObject<T>(obj: T): T {
     'internal_token',
     'github_token',
     'tmdb_api_key',
+    // DRM metadata carries decryption keys; never let it reach logs.
+    'drm',
+    'clearkeys',
+    'keyid',
   ]);
 
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {

@@ -38,6 +38,8 @@ export interface StremioStream {
     videoSize?: number;
     notWebReady?: boolean;
   };
+  /** Raw provider DRM object; the gateway normalizes it before returning to clients. */
+  drm?: unknown;
 }
 
 export interface ImdbStreamRequest {
@@ -87,6 +89,7 @@ export interface NuvioRawStream {
   subtitles?: unknown;
   type?: unknown;
   server?: unknown;
+  drm?: unknown;
 }
 
 export interface LoadedScraper {

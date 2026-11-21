@@ -106,6 +106,44 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.headers['cloudflare-cdn-cache-control']).toBeUndefined();
   });
 
+  it('GET /stream passes DRM metadata through to the client', async () => {
+    const drm = {
+      type: 'clearkey',
+      clearKeys: {
+        '00112233445566778899aabbccddeeff': 'ffeeddccbbaa99887766554433221100',
+      },
+      extra: 'kept',
+    };
+    const drmWorker = {
+      ...mockWorker,
+      fetchStream: vi.fn().mockResolvedValue({
+        streams: [{ title: 'DRM', url: 'https://cdn.test/drm.mpd', drm }],
+        outcome: 'ok',
+      }),
+    };
+    const emptyWorker = {
+      ...mockWorker,
+      fetchStream: vi.fn().mockResolvedValue({ streams: [], outcome: 'empty' }),
+    };
+    const drmApp = createGatewayApp(
+      {
+        ...ctx,
+        cache: new GatewayStreamCache(),
+        workers: {
+          sa7: drmWorker,
+          nuvio: emptyWorker,
+          vega: emptyWorker,
+        } as unknown as StreamHandlerContext['workers'],
+      },
+      Date.now(),
+    );
+
+    const res = await request(drmApp).get('/stream/movie/tt0111161.json');
+    expect(res.status).toBe(200);
+    expect(res.body.streams).toHaveLength(1);
+    expect(res.body.streams[0].drm).toEqual(drm);
+  });
+
   it('GET /stream merges results when a worker times out', async () => {
     const okWorker = {
       ...mockWorker,

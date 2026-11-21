@@ -34,6 +34,10 @@ function toStremioStream(stream, provider) {
       out.externalUrl = targetUrl;
     } else {
       out.url = targetUrl;
+      // Keep the full DRM object for direct media; the gateway validates it later.
+      if (stream.drm && typeof stream.drm === 'object' && !Array.isArray(stream.drm)) {
+        out.drm = stream.drm;
+      }
       const hints = {};
       const videoSize = sizeBytesOf(stream);
       if (videoSize != null) hints.videoSize = videoSize;

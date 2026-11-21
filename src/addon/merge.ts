@@ -1,5 +1,6 @@
 import { StremioStream, StreamFilterConfig, filterStream, inferResolution } from './filters.js';
 import { isBlockerUrl, isArchiveUrl, isExternalUrl, canonicalizeStreamKey } from './classifier.js';
+import { normalizeDrm } from '../core/drm.js';
 import { getContainerRank } from '../core/streamQuality.js';
 
 export interface FleetStreamsInput {
@@ -51,6 +52,7 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     const restHints = { ...behaviorHints };
     delete restHints.proxyHeaders;
     delete restHints.notWebReady;
+    // External pages/archives are not playable media, so DRM metadata does not apply.
     return {
       name,
       title,
@@ -64,6 +66,7 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     title = title.slice(3).trim();
   }
 
+  const drm = normalizeDrm(stream.drm);
   const cleanStream: StremioStream = {
     ...stream,
     name,
@@ -71,6 +74,8 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     url: primaryUrl,
     behaviorHints,
   };
+  if (drm) cleanStream.drm = drm;
+  else delete cleanStream.drm;
   delete cleanStream.externalUrl;
   return cleanStream;
 }
@@ -114,6 +119,11 @@ export function mergeAndFilterStreams(
     const aRank = getContainerRank(a.stream.url || a.stream.externalUrl);
     const bRank = getContainerRank(b.stream.url || b.stream.externalUrl);
     if (aRank !== bRank) return aRank - bRank;
+
+    // If the same URL arrives with and without DRM metadata, keep the DRM-bearing copy.
+    const aDrm = a.stream.drm ? 0 : 1;
+    const bDrm = b.stream.drm ? 0 : 1;
+    if (aDrm !== bDrm) return aDrm - bDrm;
 
     return fleetPriority(a.fleet) - fleetPriority(b.fleet);
   });

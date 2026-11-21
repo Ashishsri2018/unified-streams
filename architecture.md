@@ -57,6 +57,7 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
     * Blocker and anti-bot URL filtering (`/slowdown`, `/ratelimit`, `/antibot`).
     * Stream key canonicalization and normalization for cross-fleet deduplication.
   - `streamQuality.ts`: Single canonical implementation of resolution inference (8K down to 240p), quality sorting rank, container format ranking (`mp4`/`mkv` > other > `m3u8`/`mpd`), and file size parsing (`parseSizeBytes`, `inferSizeBytes`).
+  - `drm.ts`: DRM metadata passthrough. Validates that a provider's `drm` value is a recognizable object (ClearKey, Widevine, PlayReady, or a `clearKeys` map) and returns a shallow copy preserving every field, so DRM-capable clients receive information the gateway itself does not interpret.
   - `streamHeaders.ts`: Upstream proxy header sanitization (stripping hop-by-hop and `Proxy-*` headers, CRLF injection protection), placeholder host identification (`example.com`, `localhost`, etc.), and safe HTTP URL parsing. Fleets advertise provider playback headers via `behaviorHints.proxyHeaders.request` and set `behaviorHints.notWebReady: true` whenever headers are required (SA7, Nuvio, and Vega all follow this contract).
   - `subtitles.ts`: Centralized subtitle track formatting, ISO base code mapping for global and Indic languages, and user preference filtering.
   - `networkClassifier.ts`: Single source of truth for transport attempt tracking and silent error classification heuristics across all three fleets (SA7, Nuvio, Vega), accurately distinguishing genuine catalog misses (`empty`) from swallowed upstream network/API failures (`error` / `timeout`) without touching vendor provider files.
@@ -67,8 +68,8 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
   - `manifest.ts`: Stremio manifest generator.
   - `configure.ts`: Accessible, responsive configuration UI.
   - `stream.ts`: Stream resolution orchestrator.
-  - `filters.ts`: Canonical stream filtering (resolution, size); inline `stream.subtitles` pass through unchanged.
-  - `merge.ts`: URL classification, deduplication, and sorting.
+  - `filters.ts`: Canonical stream filtering (resolution, size); inline `stream.subtitles` and `stream.drm` pass through unchanged.
+  - `merge.ts`: URL classification, deduplication, and sorting. Direct streams keep their full `drm` object; external pages/archives drop it, and a DRM-bearing copy wins when the same URL is duplicated.
   - `health.ts` & `stats.ts`: Observability endpoints with aggregated provider metrics across fleets, real worker roundtrip latency measurements, updater error propagation, and accurate fleet working state (`ok`, `degraded`, `error`).
   - `status.ts` & `statusHtml.ts`: Dark-mode real-time status dashboard with per-provider metrics table, filter search, prominent fleet working badges (`WORKING`, `DEGRADED`, `OFFLINE`), updater failure banners, and 15s auto-refresh.
 - `src/fleets/`: Worker implementations:
