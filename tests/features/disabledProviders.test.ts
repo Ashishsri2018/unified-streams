@@ -107,8 +107,29 @@ describe('disabled providers derivation', () => {
     expect(sa7Env.ENABLED_PROVIDERS).toBeUndefined();
     expect(sa7Disabled).not.toContain('*');
     expectFleetPolicy(sa7Disabled, {
-      disabled: ['redflix', 'castle', 'hdhub4u', 'netmirror'],
-      enabled: ['anizone', 'kurage', 'puretoons', 'toonstream', 'moviesdrive', '4khdhub'],
+      disabled: [
+        'redflix',
+        'castle',
+        'hdhub4u',
+        'netmirror',
+        'moviebox',
+        'moviesdrive',
+        '4khdhub',
+        'animesalt',
+        'anizen',
+        'animeworld',
+      ],
+      enabled: [
+        'anizone',
+        'kurage',
+        'puretoons',
+        'toonstream',
+        'anikage',
+        'moviesmod',
+        'reanime',
+        'vegamovies',
+        'vidrock',
+      ],
     });
     expect(Number(sa7Env.PROVIDER_CONCURRENCY)).toBe(40);
 
@@ -116,8 +137,23 @@ describe('disabled providers derivation', () => {
     const nuvioDisabled = nuvioEnv.DISABLED_SCRAPERS.split(',');
     expect(nuvioEnv.ENABLED_SCRAPERS).toBeUndefined();
     expectFleetPolicy(nuvioDisabled, {
-      disabled: ['bdix-cf', 'bdix-df', 'bdix-fh', 'brellor'],
-      enabled: ['sylphera', 'lyrin', 'novus', 'vyranel', 'zevran'],
+      disabled: ['bdix-cf', 'bdix-df', 'bdix-fh', 'brellor', 'xylos', 'hexion', 'qorva'],
+      enabled: [
+        'sylphera',
+        'lyrin',
+        'novus',
+        'vyranel',
+        'zevran',
+        'zyrvael',
+        'karnis',
+        'qyrvaen',
+        'fyron',
+        'fastrion',
+        'soryn',
+        'mavonyx',
+        'pynvix',
+        'gravix',
+      ],
     });
     expect(nuvioEnv.SCRAPER_CONCURRENCY).toBe('40');
 
@@ -125,9 +161,21 @@ describe('disabled providers derivation', () => {
     const vegaDisabled = vegaEnv.DISABLED_PROVIDERS.split(',');
     expect(vegaEnv.ENABLED_PROVIDERS).toBeUndefined();
     expectFleetPolicy(vegaDisabled, {
-      disabled: ['mxplayer', 'drive', 'hdhub4u', 'showbox'],
-      enabled: [
+      disabled: [
+        'mxplayer',
+        'hdhub4u',
+        'showbox',
         'animeworld',
+        'netflixMirror',
+        'primeMirror',
+        'disneyMirror',
+        'mod',
+        'castle',
+        'anikoto',
+        'multi',
+        'kissKh',
+      ],
+      enabled: [
         'movies4u',
         'luxMovies',
         'dramacool',
@@ -135,6 +183,11 @@ describe('disabled providers derivation', () => {
         'gokuHD',
         'kickAssAnime',
         'rareanimes',
+        'drive',
+        '4khdhub',
+        'animesalt',
+        'katmovies',
+        'movielinkdb',
       ],
     });
     expect(vegaEnv.SEARCH_CONCURRENCY).toBe('40');
@@ -152,7 +205,6 @@ describe('disabled providers derivation', () => {
     expectFleetPolicy(sa7Disabled, {
       disabled: [
         'moviesdrive',
-        'playimdb',
         'vidrock',
         'torrentio',
         'kurage',
@@ -160,7 +212,15 @@ describe('disabled providers derivation', () => {
         'toonstream',
         'anizone',
       ],
-      enabled: ['castle', 'hdhub4u', 'netmirror', 'multimovies', 'redflix', 'desiflix'],
+      enabled: [
+        'castle',
+        'hdhub4u',
+        'netmirror',
+        'multimovies',
+        'redflix',
+        'desiflix',
+        'playimdb',
+      ],
     });
     expect(Number(sa7Env.PROVIDER_CONCURRENCY)).toBe(40);
 

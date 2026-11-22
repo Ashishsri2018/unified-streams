@@ -117,16 +117,17 @@ start via `NODE_OPTIONS` (see `docker-entrypoint.sh`).
   - `config/providers.json` holds a default policy per fleet plus optional `instances.<profile>` overrides. A fleet can use `allow` or `deny` mode; `*` disables a whole fleet.
   - All profiles use `deny` mode so new providers are enabled automatically as upstream fleets add them. The default policy and both instance profiles therefore list only what to disable, not a frozen allowlist.
   - Hard-disabled classes (`youtube`, `torrentio`, `internetArchive`, `brellor`, `durbinlive`, `livetgtv`, `bdix-cf`, `bdix-df`, `bdix-fh`, `jyniq`/Wikimedia) are enforced in the gateway derivation and cannot be re-enabled by a profile or environment allow list.
-  - **Railway Instance Routing (Nuvio Primary)**:
-    - Nuvio is the primary fleet: all scrapers are enabled except the hard-disabled `brellor` and BDIX scrapers, plus `soryn` (NetMirror) and `fastrion` (MultiMovies), which are left to SA7. The Railway Nuvio deny list contains only those two.
-    - SA7 disables providers duplicated in Nuvio or Vega: `4khdhub`, `anikage`, `animesalt`, `animeworld`, `anizen`, `anizone`, `castle`, `hdhub4u`, `moviebox`, `moviesdrive`, `moviesmod`, `playimdb`, `reanime`, `torrentio`, `vegamovies`, `vidrock`. The remaining 12 SA7 scrapers stay active, and SA7 is the sole source for `netmirror` and `multimovies` on Railway.
-    - Vega disables Nuvio duplicates (`4khdhub`, `anikoto`, `animeworld`, `castle`, `drive`, `hdhub4u`, `katmovies`, `kissKh`, `movieBoxWeb`, `movielinkdb`, `showbox`) and the failing NetMirror/MultiMovies family replaced by SA7 (`disneyMirror`, `netflixMirror`, `primeMirror`, `multi`). All other Vega providers are enabled.
-  - **Beamup Instance Routing (Duplicate & Exclusive Scrapers)**:
-    - Beamup keeps its existing active set via deny lists rather than allowlists:
-      - `sa7` (13 active): `moviesdrive`, `4khdhub`, `hdhub4u`, `vegamovies`, `castle`, `anizone`, `moviebox`, `moviesmod`, `reanime`, `animeworld`, `animesalt`, `anizen`, `anikage`.
-      - `nuvio` (1 active): `sylphera`.
-      - `vega` (9 active): `animeworld`, `movies4u`, `luxMovies` (RogMovies), `mod` (MoviesMod), `1cinevood`, `disneyMirror`, `netflixMirror`, `primeMirror`, `mxplayer`.
-    - This preserves Beamup's current routing while allowing any provider later added upstream to be enabled without another policy change. Runtime `*_ENABLED_*` and `*_DISABLED_*` env vars can still override this per instance.
+  - **Railway Instance Routing (Nuvio Primary, One Copy Per Provider)**:
+    - Railway runs at most one fleet copy of every duplicated provider; the remaining copies are reserved for Beamup. Nuvio is the primary fleet, denying only the hard-disabled `brellor`/BDIX scrapers, the nuvio copies whose working copy lives in another fleet (`fastrion`, `fyron`, `gravix`, `karnis`, `mavonyx`, `pynvix`, `qyrvaen`, `soryn`, `zyrvael`), and the zero-yield/policy-denied `kethrax`, `lyrin`, `novus`, `vyranel`, `zevran`.
+    - SA7 disables the duplicate copies owned by Nuvio/Vega plus the zero-yield `kurage`, `puretoons`, `toonstream` and hard-disabled `torrentio` (`4khdhub`, `anikage`, `animeworld`, `anizone`, `moviebox`, `moviesdrive`, `moviesmod`, `reanime`, `vegamovies`, `vidrock`). SA7 is the sole Railway source for `netmirror`, `multimovies`, `animesalt`, `anizen`, `castle`, and `playimdb` (re-enabled on Railway after its manifest entry was restored; Beamup keeps the Nuvio `zevran` copy as the backup).
+    - Vega disables the duplicate copies owned by Nuvio/SA7 (`4khdhub`, `anikoto`, `animesalt`, `castle`, `drive`, `hdhub4u`, `katmovies`, `movielinkdb`), the failing NetMirror/MultiMovies family replaced by SA7 (`disneyMirror`, `netflixMirror`, `primeMirror`, `multi`), the zero-yield `dramacool`, `eonMovies`, `gokuHD`, `kickAssAnime`, `rareanimes`, and hard-disabled `internetArchive`. All other Vega providers are enabled.
+  - **Beamup Instance Routing (Duplicate Backup Copies)**:
+    - Beamup runs the duplicate copy that Railway does not run, so a fleet failure cannot take out both instances. For providers with three copies the backup is chosen by priority `nuvio > vega > sa7`.
+    - Duplicate backups enabled on Beamup:
+      - `sa7`: `anikage` (AniKage), `anizone` (AniZone), `moviesmod` (MoviesMod), `reanime` (Reanime), `vegamovies` (VegaMovies), `vidrock` (VidRock).
+      - `nuvio`: `zyrvael` (Anikoto), `karnis` (Castle), `qyrvaen` (HDHub4u), `fyron` (KissKh), `fastrion` (MultiMovies), `soryn` (NetMirror), `mavonyx` (MovieBox), `pynvix` (ShowBox), `gravix` (AnimeWorld).
+      - `vega`: `4khdhub` (4KHDHub), `animesalt` (AnimeSalt), `drive` (MoviesDrive), `katmovies` (KatMoviesHd), `movielinkdb` (MovieLinkBD).
+    - The Railway-active copies stay denied on Beamup (for example `hexion`, `xylos`, `qorva`, `jhaeros`, `vornix`, `praxiel`, `evyrith`, and the `vega`/`sa7` copies used on Railway). Beamup keeps deny-mode lists so newly added upstream providers are enabled automatically; runtime `*_ENABLED_*` and `*_DISABLED_*` env vars can still override this per instance.
   - **Search Timeout per Instance**:
     - `SEARCH_TIMEOUT_MS` defaults to 10s (`config/defaults.env`), and `src/core/env.ts` clamps it to the worker deadline. `config/instances/railway.env` raises it to 15s to accommodate slower scrapers within the 27s backend budget.
   - **Instance-Level Environment Overrides & Alias Mapping**:
