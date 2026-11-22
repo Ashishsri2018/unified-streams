@@ -16,6 +16,7 @@ const {
   createTracker,
   classifyEmptyResult,
 } = require('./lib/tracker');
+const { streamMatchesEpisode } = require('./lib/episode-match');
 
 const BLOCKER_URL_PATTERN = /\/slowdown\b/i;
 
@@ -170,8 +171,13 @@ function createCollector({
               signal
             )
           );
+          const seriesEpisode =
+            mediaType === 'tv' && Number.isInteger(season) && Number.isInteger(episode) && episode > 0;
           const list = (Array.isArray(streams) ? streams : [])
             .filter(validStream)
+            .filter((stream) =>
+              seriesEpisode ? streamMatchesEpisode(stream, season, episode) : true
+            )
             .slice(0, maxPerProviderStreams)
             .map((stream) => ({ stream, provider }));
           const latencyMs = now() - started;

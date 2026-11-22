@@ -29,7 +29,7 @@ import {
   withTimeout,
 } from "../util/concurrency.js";
 import { extractYear, normalizeTitle, rankCandidates } from "./match.js";
-import { isSeasonPack, matchesEpisode } from "./episodes.js";
+import { extractSeasons, isSeasonPack, matchesEpisode } from "./episodes.js";
 import { mapProviderStreams, sortStreams } from "./mapStreams.js";
 import { vegaNetworkStorage } from "../providers/sdk/context.js";
 import {
@@ -1140,7 +1140,7 @@ export class StreamPipeline implements StreamHandlerApi {
     if (ctx.info.request.type === "movie") {
       return this.resolveMovieLinks(candidate.meta);
     }
-    return this.resolveSeriesLinks(bundle, candidate.meta, ctx);
+    return this.resolveSeriesLinks(bundle, candidate, ctx);
   }
 
   private resolveMovieLinks(meta: ProviderMeta): LinkResolution {
@@ -1173,10 +1173,20 @@ export class StreamPipeline implements StreamHandlerApi {
 
   private async resolveSeriesLinks(
     bundle: ProviderBundle,
-    meta: ProviderMeta,
+    candidate: Candidate,
     ctx: InternalContext,
   ): Promise<LinkResolution> {
     const { season, episode, episodeName, absoluteEpisode } = ctx.info;
+    const meta = candidate.meta;
+
+    // The provider meta title is usually replaced with the canonical series
+    // name, so use the original search post title to reject posts for a
+    // different season before any episode matching runs.
+    const postSeasons = extractSeasons(trimString(candidate.post?.title));
+    if (postSeasons.size > 0 && !postSeasons.has(season)) {
+      return { links: [], failed: false };
+    }
+
     const entries = Array.isArray(meta.linkList) ? meta.linkList : [];
     const specific: ResolvedLink[] = [];
     const pack: ResolvedLink[] = [];
@@ -1212,7 +1222,9 @@ export class StreamPipeline implements StreamHandlerApi {
       const specificMatch = unknownTitle
         ? episode === undefined
         : matchesEpisode(title, season, episode, episodeName, absoluteEpisode);
-      const packMatch = unknownTitle || isSeasonPack(title, season);
+      // An untitled entry cannot be verified as a season pack for an episode
+      // request, so only keep genuine season packs for the fallback path.
+      const packMatch = !unknownTitle && isSeasonPack(title, season);
 
       if (specificMatch) pushDirect(specific, seenSpecific, entry);
       else if (packMatch) pushDirect(pack, seenPack, entry);
@@ -1223,7 +1235,7 @@ export class StreamPipeline implements StreamHandlerApi {
         bundle.modules.episodes &&
         !ctx.stopped &&
         !jobUrls.has(episodesLink) &&
-        (specificMatch || packMatch || episode === undefined)
+        (specificMatch || packMatch || unknownTitle || episode === undefined)
       ) {
         jobUrls.add(episodesLink);
         jobs.push({ url: episodesLink });

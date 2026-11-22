@@ -60,6 +60,38 @@ function collectMatches(
   }
 }
 
+// Handles comma/ampersand/and-separated episode lists such as
+// "Episode 5 & 6", "Episodes 1, 2 and 3". These must be collected before the
+// single-episode pattern so the list span is not swallowed by its first number.
+function collectEpisodeList(text: string, output: IndexedRange[], used: Span[]): void {
+  const pattern =
+    /(?<![\p{L}\p{N}])(?:episodes?|eps?|ep|e)\s*\.?\s*(\d{1,4})(?![\p{L}\p{N}])((?:\s*(?:,|&|\/|\band\b)\s*(?:and\b\s*)?(?:episodes?|eps?|ep|e)?\s*\.?\s*\d{1,4}(?![\p{L}\p{N}]))+)/giu;
+  for (const match of text.matchAll(pattern)) {
+    const index = match.index ?? 0;
+    const span = { start: index, end: index + match[0].length };
+    if (used.some((existing) => span.start < existing.end && span.end > existing.start)) {
+      continue;
+    }
+    const numbers = [Number(match[1])];
+    for (const extra of match[2].matchAll(/\d{1,4}/g)) numbers.push(Number(extra[0]));
+    const episodes = [...new Set(numbers)].filter(
+      (episode) => Number.isInteger(episode) && episode >= 0,
+    );
+    if (episodes.length === 0) continue;
+    used.push(span);
+    episodes.forEach((episode, offset) => {
+      if (
+        output.some(
+          (range) => range.season === undefined && range.from === episode && range.to === episode,
+        )
+      ) {
+        return;
+      }
+      output.push({ from: episode, to: episode, index: index + offset });
+    });
+  }
+}
+
 export function parseEpisodeRanges(title: string): EpisodeRange[] {
   if (typeof title !== "string" || title.length === 0) return [];
   const text = title.replace(/[–—~]/g, "-");
@@ -68,7 +100,7 @@ export function parseEpisodeRanges(title: string): EpisodeRange[] {
 
   collectMatches(
     text,
-    /\bs\s*(\d{1,2})\s*e\s*(\d{1,3})(?![\p{L}\p{N}])(?:\s*-\s*(?:e|ep|episode)?\s*\.?\s*(\d{1,3})(?![\p{L}\p{N}]))?/giu,
+    /\bs\s*(\d{1,2})[\s.\-_]*(?:episodes?|eps?|ep|e)\s*\.?\s*(\d{1,4})(?![\p{L}\p{N}])(?:\s*-\s*(?:episodes?|eps?|ep|e)?\s*\.?\s*(\d{1,4})(?![\p{L}\p{N}]))?/giu,
     found,
     used,
     (match) => ({
@@ -80,7 +112,7 @@ export function parseEpisodeRanges(title: string): EpisodeRange[] {
 
   collectMatches(
     text,
-    /\bseason\s*(\d{1,2})\s*[,:-]?\s*(?:episodes?|eps?|ep)\s*\.?\s*(\d{1,3})(?![\p{L}\p{N}])(?:\s*-\s*(?:episodes?|eps?|ep)?\s*\.?\s*(\d{1,3})(?![\p{L}\p{N}]))?/giu,
+    /\bseason\s*(\d{1,2})\s*[•·|,:;-]?\s*(?:episodes?|eps?|ep|e)\s*\.?\s*(\d{1,4})(?![\p{L}\p{N}])(?:\s*-\s*(?:episodes?|eps?|ep|e)?\s*\.?\s*(\d{1,4})(?![\p{L}\p{N}]))?/giu,
     found,
     used,
     (match) => ({
@@ -92,7 +124,7 @@ export function parseEpisodeRanges(title: string): EpisodeRange[] {
 
   collectMatches(
     text,
-    /(?<![\p{L}\p{N}])(\d{1,2})\s*x\s*(\d{1,3})(?![\p{L}\p{N}])(?:\s*-\s*(?:e|ep|episode)?\s*\.?\s*(\d{1,3})(?![\p{L}\p{N}]))?/giu,
+    /(?<![\p{L}\p{N}])(\d{1,2})\s*x\s*(\d{1,4})(?![\p{L}\p{N}])(?:\s*-\s*(?:e|ep|episode)?\s*\.?\s*(\d{1,4})(?![\p{L}\p{N}]))?/giu,
     found,
     used,
     (match) => ({
@@ -102,9 +134,11 @@ export function parseEpisodeRanges(title: string): EpisodeRange[] {
     }),
   );
 
+  collectEpisodeList(text, found, used);
+
   collectMatches(
     text,
-    /(?<![\p{L}\p{N}])(?:episodes?|eps?|ep|e)\s*\.?\s*(\d{1,3})(?![\p{L}\p{N}])(?:\s*-\s*(?:episodes?|eps?|ep|e)?\s*\.?\s*(\d{1,3})(?![\p{L}\p{N}]))?/giu,
+    /(?<![\p{L}\p{N}])(?:episodes?|eps?|ep|e)\s*\.?\s*(\d{1,4})(?![\p{L}\p{N}])(?:\s*-\s*(?:episodes?|eps?|ep|e)?\s*\.?\s*(\d{1,4})(?![\p{L}\p{N}]))?/giu,
     found,
     used,
     (match) => ({
@@ -121,18 +155,31 @@ export function parseEpisodeRanges(title: string): EpisodeRange[] {
     );
 }
 
-function extractSeasons(title: string): Set<number> {
+function addSeasonRange(target: Set<number>, from: string, to?: string): void {
+  const start = Number(from);
+  const end = to === undefined ? start : Number(to);
+  if (!Number.isInteger(start) || !Number.isInteger(end)) return;
+  const low = Math.min(start, end);
+  const high = Math.max(start, end);
+  for (let season = low; season <= high; season += 1) target.add(season);
+}
+
+export function extractSeasons(title: string): Set<number> {
   const seasons = new Set<number>();
   for (const range of parseEpisodeRanges(title)) {
     if (range.season !== undefined) seasons.add(range.season);
   }
-  for (const match of title.matchAll(/\bseason\s*(\d{1,2})(?!\d)/gi)) {
-    seasons.add(Number(match[1]));
+  for (const match of title.matchAll(
+    /\bseason\s*(\d{1,2})(?:\s*[-–—]\s*(?:season\s*)?(\d{1,2}))?(?!\d)/gi,
+  )) {
+    addSeasonRange(seasons, match[1], match[2]);
   }
-  for (const match of title.matchAll(/\bs(\d{1,2})(?!\d)/gi)) {
-    seasons.add(Number(match[1]));
+  for (const match of title.matchAll(
+    /\bs(\d{1,2})(?:\s*[-–—]\s*s?(\d{1,2}))?(?!\d)/gi,
+  )) {
+    addSeasonRange(seasons, match[1], match[2]);
   }
-  for (const match of title.matchAll(/(?<![\p{L}\p{N}])(\d{1,2})\s*x\s*(\d{1,3})(?![\p{L}\p{N}])/giu)) {
+  for (const match of title.matchAll(/(?<![\p{L}\p{N}])(\d{1,2})\s*x\s*(\d{1,4})(?![\p{L}\p{N}])/giu)) {
     seasons.add(Number(match[1]));
   }
   return seasons;
@@ -214,7 +261,7 @@ export function matchesEpisode(
 
   if (season === 0 && specialHint) {
     const specialNumber =
-      /\b(?:specials?|ova|oad)\s*(?:episode|ep|e)?\s*\.?\s*(\d{1,3})(?!\d)/i.exec(title);
+      /\b(?:specials?|ova|oad)\s*(?:episode|ep|e)?\s*\.?\s*(\d{1,4})(?!\d)/i.exec(title);
     return specialNumber ? Number(specialNumber[1]) === episode : true;
   }
 

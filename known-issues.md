@@ -72,6 +72,17 @@ those cookies, or a different source. Status: unresolved.
 
 ## Gateway filtering and deduplication
 
+### Absolute episode numbering for long-running anime (2026-11-22)
+
+Episode matching now accepts four-digit episode numbers (e.g. One Piece 1100+),
+but providers that publish absolute episodes under a fixed `Season 1` label are
+not treated as matching a later requested season. `matchesEpisode` rejects a
+title whose explicit season differs, and the SA7 post-filter drops streams whose
+filename/URL names another season. This prevents wrong-season streams, at the
+cost of providers that label an absolute episode as `S01E1100` for a request
+like `S21E1100`. Providers that omit the season (`Episode 1100`, `E1100`) still
+match, and Vega uses the computed absolute episode for seasonless ranges.
+
 ### AniChan (Xandril) returns incorrect streams and false-matches non-anime (2026-11-21)
 
 AniChan (`xandril` in Nuvio, scraping `https://anichan.to`) frequently returns streams for the wrong title, season, or episode.
