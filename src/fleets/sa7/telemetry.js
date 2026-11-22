@@ -38,10 +38,19 @@ function normalizeState(value) {
 function normalizeProvider(input = {}) {
   const calls = nullableNumber(input.calls);
   const ok = nullableNumber(input.ok);
-  const successRate =
-    nullableNumber(input.successRate) ??
+  const empty = nullableNumber(input.empty);
+  const responded =
+    nullableNumber(input.responded) ??
+    (ok !== null && empty !== null ? Math.max(0, ok - empty) : null);
+  const responseRate =
+    nullableNumber(input.responseRate) ??
     (calls !== null && calls > 0 && ok !== null
       ? Math.round((ok / calls) * 1000) / 1000
+      : null);
+  const yieldRate =
+    nullableNumber(input.yieldRate) ??
+    (calls !== null && calls > 0 && responded !== null
+      ? Math.round((responded / calls) * 1000) / 1000
       : null);
 
   return {
@@ -49,11 +58,13 @@ function normalizeProvider(input = {}) {
     state: normalizeState(input.state),
     calls,
     ok,
-    empty: nullableNumber(input.empty),
+    responded,
+    empty,
     errors: nullableNumber(input.errors),
     timeouts: nullableNumber(input.timeouts),
     skipped: nullableNumber(input.skipped),
-    successRate,
+    responseRate,
+    yieldRate,
     avgMs: nullableNumber(input.avgMs),
     lastMs: nullableNumber(input.lastMs),
     maxMs: nullableNumber(input.maxMs),

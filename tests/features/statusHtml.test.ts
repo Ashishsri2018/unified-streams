@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getStatusScripts } from '../../src/addon/statusHtml.js';
+import { getStatusScripts, renderStatusPage } from '../../src/addon/statusHtml.js';
 
 interface StubElement {
   className: string;
@@ -119,5 +119,46 @@ describe('status dashboard health refresh', () => {
 
   it('does not reject non-OK responses before parsing them', () => {
     expect(getStatusScripts()).not.toContain('if (!response.ok) throw');
+  });
+
+  it('renders response and yield columns', () => {
+    const html = renderStatusPage({
+      addonName: 'Unified Streams',
+      logoUrl: 'http://example.test/logo.svg',
+      configureUrl: 'http://example.test/configure',
+      scriptNonce: 'nonce',
+    });
+    expect(html).toContain('<th>Response</th>');
+    expect(html).toContain('<th>Yield</th>');
+  });
+
+  it('renders response and yield rates per provider', async () => {
+    const report = errorReport();
+    report.providers = {
+      total: 1,
+      stats: [
+        {
+          component: 'sa7',
+          id: 'p1',
+          state: 'closed',
+          calls: 2,
+          ok: 2,
+          responded: 1,
+          empty: 1,
+          responseRate: 1,
+          yieldRate: 0.5,
+        },
+      ],
+    };
+
+    const elements = await runStatusScript(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => report,
+    }));
+
+    const rows = getElement(elements, 'provider-rows').innerHTML;
+    expect(rows).toContain('100.0%');
+    expect(rows).toContain('50.0%');
   });
 });

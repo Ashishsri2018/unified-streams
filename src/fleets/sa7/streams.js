@@ -282,6 +282,7 @@ function createCollector({
         state: 'closed',
         calls: 0,
         ok: 0,
+        responded: 0,
         empty: 0,
         errors: 0,
         timeouts: 0,

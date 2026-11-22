@@ -40,11 +40,13 @@ export interface ProviderStatusInput {
   state?: string;
   calls?: number | null;
   ok?: number | null;
+  responded?: number | null;
   empty?: number | null;
   errors?: number | null;
   timeouts?: number | null;
   skipped?: number | null;
-  successRate?: number | null;
+  responseRate?: number | null;
+  yieldRate?: number | null;
   avgMs?: number | null;
   lastMs?: number | null;
   maxMs?: number | null;
@@ -100,11 +102,13 @@ export interface AddonStatusReport {
       state: ProviderState;
       calls: number | null;
       ok: number | null;
+      responded: number | null;
       empty: number | null;
       errors: number | null;
       timeouts: number | null;
       skipped: number | null;
-      successRate: number | null;
+      responseRate: number | null;
+      yieldRate: number | null;
       avgMs: number | null;
       lastMs: number | null;
       maxMs: number | null;
@@ -163,10 +167,19 @@ function normalizeState(value: unknown): ProviderState {
 function normalizeProvider(input: ProviderStatusInput) {
   const calls = nullableNumber(input.calls);
   const ok = nullableNumber(input.ok);
-  const successRate =
-    nullableNumber(input.successRate) ??
+  const empty = nullableNumber(input.empty);
+  const responded =
+    nullableNumber(input.responded) ??
+    (ok !== null && empty !== null ? Math.max(0, ok - empty) : null);
+  const responseRate =
+    nullableNumber(input.responseRate) ??
     (calls !== null && calls > 0 && ok !== null
       ? Math.round((ok / calls) * 1000) / 1000
+      : null);
+  const yieldRate =
+    nullableNumber(input.yieldRate) ??
+    (calls !== null && calls > 0 && responded !== null
+      ? Math.round((responded / calls) * 1000) / 1000
       : null);
 
   return {
@@ -174,11 +187,13 @@ function normalizeProvider(input: ProviderStatusInput) {
     state: normalizeState(input.state),
     calls,
     ok,
-    empty: nullableNumber(input.empty),
+    responded,
+    empty,
     errors: nullableNumber(input.errors),
     timeouts: nullableNumber(input.timeouts),
     skipped: nullableNumber(input.skipped),
-    successRate,
+    responseRate,
+    yieldRate,
     avgMs: nullableNumber(input.avgMs),
     lastMs: nullableNumber(input.lastMs),
     maxMs: nullableNumber(input.maxMs),

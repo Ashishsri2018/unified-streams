@@ -200,7 +200,9 @@ describe('vega provider telemetry', () => {
     expect(stat?.empty).toBe(1);
     expect(stat?.errors).toBe(0);
     expect(stat?.timeouts).toBe(0);
-    expect(stat?.successRate).toBe(1);
+    expect(stat?.responseRate).toBe(1);
+    expect(stat?.responded).toBe(0);
+    expect(stat?.yieldRate).toBe(0);
     expect(stat?.lastError).toBeNull();
 
     pipeline.dispose();

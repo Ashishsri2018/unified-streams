@@ -22,8 +22,27 @@ describe('ProviderTelemetry canonical semantics', () => {
       errors: 0,
       timeouts: 0,
       skipped: 0,
-      successRate: 1,
+      responseRate: 1,
+      yieldRate: 0,
       lastError: null,
+    });
+  });
+
+  it('reports responseRate and yieldRate separately', () => {
+    const telemetry = new ProviderTelemetry();
+    telemetry.attempt('p');
+    telemetry.record('p', 'empty');
+    telemetry.attempt('p');
+    telemetry.record('p', 'ok');
+
+    const [entry] = telemetry.snapshot();
+    expect(entry).toMatchObject({
+      calls: 2,
+      ok: 2,
+      responded: 1,
+      empty: 1,
+      responseRate: 1,
+      yieldRate: 0.5,
     });
   });
 

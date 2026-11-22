@@ -171,7 +171,7 @@ function renderTableRows() {
 
   providerCount.textContent = filtered.length + " of " + cachedStats.length + " provider circuits reporting";
   if (filtered.length === 0) {
-    providerRows.innerHTML = '<tr><td colspan="11" class="muted">No matching providers found.</td></tr>';
+    providerRows.innerHTML = '<tr><td colspan="12" class="muted">No matching providers found.</td></tr>';
     return;
   }
   providerRows.innerHTML = filtered.map((stat) => {
@@ -186,7 +186,8 @@ function renderTableRows() {
       '<td>' + num(stat.empty) + '</td>' +
       '<td>' + num(stat.errors) + '</td>' +
       '<td>' + num(stat.timeouts) + '</td>' +
-      '<td>' + pct(stat.successRate) + '</td>' +
+      '<td>' + pct(stat.responseRate) + '</td>' +
+      '<td>' + pct(stat.yieldRate) + '</td>' +
       '<td>' + ms(stat.avgMs) + '</td>' +
       '<td class="muted">' + esc(stat.lastError || "—") + '</td>' +
     '</tr>';
@@ -330,7 +331,7 @@ export function renderStatusPage(options: StatusPageOptions): string {
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Fleet</th><th>Provider</th><th>State</th><th>Calls</th><th>OK</th><th>Empty</th><th>Errors</th><th>Timeouts</th><th>Success</th><th>Avg ms</th><th>Last error</th></tr>
+          <tr><th>Fleet</th><th>Provider</th><th>State</th><th>Calls</th><th>OK</th><th>Empty</th><th>Errors</th><th>Timeouts</th><th>Response</th><th>Yield</th><th>Avg ms</th><th>Last error</th></tr>
         </thead>
         <tbody id="provider-rows"></tbody>
       </table>

@@ -23,11 +23,13 @@ describe('gateway HTTP endpoints and contract', () => {
             state: 'closed',
             calls: 5,
             ok: 4,
+            responded: 3,
             empty: 1,
             errors: 0,
             timeouts: 0,
             skipped: 0,
-            successRate: 1,
+            responseRate: 0.8,
+            yieldRate: 0.6,
             avgMs: 120,
             lastError: null,
           },
@@ -373,6 +375,9 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.body.providers.stats.length).toBe(3);
     expect(res.body.providers.stats[0]).toHaveProperty('component');
     expect(res.body.providers.stats[0]).toHaveProperty('id', 'test-prov');
+    expect(res.body.providers.stats[0]).toHaveProperty('responded', 3);
+    expect(res.body.providers.stats[0]).toHaveProperty('responseRate', 0.8);
+    expect(res.body.providers.stats[0]).toHaveProperty('yieldRate', 0.6);
     expect(Array.isArray(res.body.components)).toBe(true);
     expect(res.body.components.length).toBe(3);
   });

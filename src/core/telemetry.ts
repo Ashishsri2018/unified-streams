@@ -8,12 +8,13 @@ export interface ProviderMetrics {
   state: CircuitState;
   calls: number;
   ok: number;
-  responded?: number;
+  responded: number;
   empty: number;
   errors: number;
   timeouts: number;
   skipped: number;
-  successRate: number | null;
+  responseRate: number | null;
+  yieldRate: number | null;
   avgMs: number | null;
   lastMs: number | null;
   maxMs?: number | null;
@@ -75,11 +76,13 @@ export interface AggregateProviderMetric {
   state: CircuitState | string;
   calls: number;
   ok: number;
+  responded: number;
   empty: number;
   errors: number;
   timeouts: number;
   skipped: number;
-  successRate: number | null;
+  responseRate: number | null;
+  yieldRate: number | null;
   avgMs: number | null;
   lastError: string | null;
 }
@@ -130,15 +133,21 @@ export interface GatewayHealth {
   };
 }
 
-export function computeRates(ok: number, empty: number, errors: number, timeouts: number): { successRate: number; failureRate: number } {
-  const effectiveAttempts = ok + empty + errors + timeouts;
-  if (effectiveAttempts === 0) {
-    return { successRate: 0, failureRate: 0 };
+export function computeRates(
+  ok: number,
+  empty: number,
+  errors: number,
+  timeouts: number,
+): { responseRate: number; yieldRate: number; failureRate: number } {
+  const attempts = ok + errors + timeouts;
+  if (attempts === 0) {
+    return { responseRate: 0, yieldRate: 0, failureRate: 0 };
   }
-  const successes = ok + empty; // Note: empty counts towards non-failure
+  const responded = Math.max(0, ok - empty);
   const failures = errors + timeouts;
   return {
-    successRate: Math.round((successes / effectiveAttempts) * 100) / 100,
-    failureRate: Math.round((failures / effectiveAttempts) * 100) / 100,
+    responseRate: Math.round((ok / attempts) * 1000) / 1000,
+    yieldRate: Math.round((responded / attempts) * 1000) / 1000,
+    failureRate: Math.round((failures / attempts) * 1000) / 1000,
   };
 }

@@ -114,7 +114,10 @@ function isWorking(stat) {
   if (String(stat.state || "closed") === "open") return false;
   const ok = Number(stat.ok) || 0;
   const empty = Number(stat.empty) || 0;
-  return ok > empty;
+  const responded = Number.isFinite(Number(stat.responded))
+    ? Number(stat.responded)
+    : ok - empty;
+  return responded > 0;
 }
 
 function render(data) {

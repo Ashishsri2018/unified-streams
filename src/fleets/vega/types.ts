@@ -473,11 +473,13 @@ export interface PipelineMetrics {
     state: "open" | "half-open" | "closed";
     calls: number | null;
     ok: number | null;
+    responded: number | null;
     empty: number | null;
     errors: number | null;
     timeouts: number | null;
     skipped: number | null;
-    successRate: number | null;
+    responseRate: number | null;
+    yieldRate: number | null;
     avgMs: number | null;
     lastMs: number | null;
     maxMs: number | null;

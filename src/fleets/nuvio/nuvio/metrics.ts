@@ -29,7 +29,8 @@ export interface ProviderStats {
   errors: number;
   timeouts: number;
   skipped: number;
-  successRate: number | null;
+  responseRate: number | null;
+  yieldRate: number | null;
   avgMs: number | null;
   p50Ms: number | null;
   p95Ms: number | null;
@@ -114,7 +115,8 @@ export class ProviderMetrics {
         errors: entry.errors,
         timeouts: entry.timeouts,
         skipped: entry.skipped,
-        successRate: entry.successRate,
+        responseRate: entry.responseRate,
+        yieldRate: entry.yieldRate,
         avgMs: entry.avgMs,
         p50Ms: percentile(samples, 50),
         p95Ms: percentile(samples, 95),

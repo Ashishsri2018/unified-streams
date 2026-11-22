@@ -134,6 +134,18 @@ Status: unresolved. Possible fix: carry `quality` and `size` onto external
 streams so filters can evaluate them consistently, or explicitly exempt
 external streams from size/resolution filtering.
 
+## Observability
+
+### `yieldRate` is query-mix dependent (2026-11-22)
+
+Provider `yieldRate` is `responded / calls` and only measures whether a provider
+returned at least one stream for the requests it received. A low yield is not
+the same as an unhealthy provider: providers are often queried for content they
+do not carry (for example cartoons-only providers queried for standard movies),
+and some empty results come from silent upstream failures caught as `[]`.
+`responseRate` measures availability; use `yieldRate` as a usefulness signal,
+not a health verdict.
+
 ## Provider patches (context)
 
 ### Zevran and Solunix parsing repaired (2026-11-19)

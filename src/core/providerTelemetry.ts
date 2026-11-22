@@ -22,7 +22,8 @@ export interface ProviderTelemetryEntry {
   lastMs: number | null;
   avgMs: number | null;
   maxMs: number;
-  successRate: number | null;
+  responseRate: number | null;
+  yieldRate: number | null;
   lastError: string | null;
   lastSuccessAt: string | null;
   openedAt: string | null;
@@ -282,7 +283,10 @@ export class ProviderTelemetry {
       lastMs: state.lastMs,
       avgMs: calls > 0 ? Math.round(state.totalLatencyMs / calls) : null,
       maxMs: state.maxMs,
-      successRate: calls > 0 ? Math.round((state.ok / calls) * 1000) / 1000 : null,
+      responseRate:
+        calls > 0 ? Math.round((state.ok / calls) * 1000) / 1000 : null,
+      yieldRate:
+        calls > 0 ? Math.round((state.responded / calls) * 1000) / 1000 : null,
       lastError: state.lastError,
       lastSuccessAt:
         state.lastSuccessAt === null

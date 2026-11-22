@@ -102,17 +102,29 @@ export function aggregateFleetProviders(
 
       if (Array.isArray(fleetHealth.providers.stats)) {
         for (const stat of fleetHealth.providers.stats) {
+          const calls = stat.calls ?? 0;
+          const ok = stat.ok ?? 0;
+          const empty = stat.empty ?? 0;
+          const responded = stat.responded ?? Math.max(0, ok - empty);
           stats.push({
             component: name,
             id: stat.id,
             state: stat.state || 'closed',
-            calls: stat.calls ?? 0,
-            ok: stat.ok ?? 0,
-            empty: stat.empty ?? 0,
+            calls,
+            ok,
+            responded,
+            empty,
             errors: stat.errors ?? 0,
             timeouts: stat.timeouts ?? 0,
             skipped: stat.skipped ?? 0,
-            successRate: stat.successRate ?? null,
+            responseRate:
+              stat.responseRate ??
+              (calls > 0 ? Math.round((ok / calls) * 1000) / 1000 : null),
+            yieldRate:
+              stat.yieldRate ??
+              (calls > 0
+                ? Math.round((responded / calls) * 1000) / 1000
+                : null),
             avgMs: stat.avgMs ?? null,
             lastError: normalizeLastError(stat.lastError),
           });
