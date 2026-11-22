@@ -79,6 +79,84 @@ describe('MAL ID support', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('fills a missing TMDB id from an AnimeAPI IMDb mapping', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('animeapi.test/myanimelist/5')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ title: 'Cowboy Bebop', imdb: 'tt0213338' }),
+        });
+      }
+      if (url.includes('tmdb.test/3/find/tt0213338')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ movie_results: [], tv_results: [{ id: 30991 }] }),
+        });
+      }
+      if (url.includes('tmdb.test/3/tv/30991')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            name: 'Cowboy Bebop',
+            first_air_date: '1998-04-03',
+            external_ids: { imdb_id: 'tt0213338' },
+          }),
+        });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resolver = new MetadataResolver('https://cinemeta.test', 'tmdb-key', undefined, {
+      animeApiUrl: 'https://animeapi.test',
+      tmdbUrl: 'https://tmdb.test/3',
+      malResolveBudgetMs: 2000,
+    });
+    const meta = await resolver.resolveMal('series', 5);
+
+    expect(meta?.imdbId).toBe('tt0213338');
+    expect(meta?.tmdbId).toBe(30991);
+    expect(meta?.year).toBe(1998);
+  });
+
+  it('fills a missing IMDb id from an AnimeAPI TMDB mapping', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('animeapi.test/myanimelist/6')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            title: 'Cowboy Bebop',
+            themoviedb: 30991,
+            themoviedb_type: 'tv',
+          }),
+        });
+      }
+      if (url.includes('tmdb.test/3/tv/30991')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            name: 'Cowboy Bebop',
+            first_air_date: '1998-04-03',
+            external_ids: { imdb_id: 'tt0213338' },
+          }),
+        });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resolver = new MetadataResolver('https://cinemeta.test', 'tmdb-key', undefined, {
+      animeApiUrl: 'https://animeapi.test',
+      tmdbUrl: 'https://tmdb.test/3',
+      malResolveBudgetMs: 2000,
+    });
+    const meta = await resolver.resolveMal('series', 6);
+
+    expect(meta?.imdbId).toBe('tt0213338');
+    expect(meta?.tmdbId).toBe(30991);
+    expect(meta?.year).toBe(1998);
+  });
+
   it('falls back to Jikan title and TMDB search when animeapi has no mapping', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url.includes('animeapi.test')) return Promise.resolve({ ok: false, json: async () => ({}) });

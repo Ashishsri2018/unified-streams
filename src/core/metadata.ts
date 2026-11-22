@@ -537,14 +537,38 @@ export class MetadataResolver {
           imdbId: mapping.imdbId,
           tmdbId: mapping.tmdbId,
         };
-        if (!meta.title && meta.tmdbId) {
-          const detail = await this.resolveTmdb(lookupType, meta.tmdbId, ctx.signal, remaining());
-          if (detail) {
-            meta.title = detail.title;
-            meta.year = detail.year;
-            meta.imdbId = detail.imdbId ?? meta.imdbId;
+
+        // AnimeAPI often exposes only one of the two ids. Fill in the missing
+        // one so every fleet gets both IMDb and TMDB when they exist.
+        if (meta.tmdbId && (!meta.imdbId || !meta.title)) {
+          if (remaining() >= 300) {
+            const detail = await this.resolveTmdb(lookupType, meta.tmdbId, ctx.signal, remaining());
+            if (detail) {
+              if (!meta.title) meta.title = detail.title;
+              meta.year = detail.year;
+              meta.imdbId = meta.imdbId ?? detail.imdbId;
+              meta.tmdbId = detail.tmdbId ?? meta.tmdbId;
+            }
+          } else {
+            this.resolutionStats.tmdbDetailSkipped += 1;
           }
         }
+
+        if (!meta.tmdbId && meta.imdbId && remaining() >= 300) {
+          const found = await this.findTmdbByImdb(type, meta.imdbId, ctx.signal, remaining());
+          if (found) {
+            meta.tmdbId = found;
+            if (!meta.title || meta.year === undefined) {
+              const detail = await this.resolveTmdb(lookupType, found, ctx.signal, remaining());
+              if (detail) {
+                if (!meta.title) meta.title = detail.title;
+                meta.year = meta.year ?? detail.year;
+                meta.imdbId = meta.imdbId ?? detail.imdbId;
+              }
+            }
+          }
+        }
+
         this.setCache(cacheKey, meta);
         return meta;
       }
