@@ -347,6 +347,11 @@ export function deriveFleetEnv(
   if (env.TMDB_URL) {
     outEnv.TMDB_URL = env.TMDB_URL;
   }
+  if (env.GITHUB_TOKEN) {
+    // Vega's in-worker updater fetches upstream heads itself; without the token
+    // it falls back to a content hash that never matches the scheduler's git SHA.
+    outEnv.GITHUB_TOKEN = env.GITHUB_TOKEN;
+  }
 
   if (fleet === 'sa7') {
     const effective = resolveEffectivePolicy(

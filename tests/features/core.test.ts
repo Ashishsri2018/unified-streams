@@ -46,6 +46,13 @@ describe('provider policy and concurrency', () => {
     expect(res2.shouldSkip).toBe(true);
   });
 
+  it('forwards GITHUB_TOKEN to every fleet worker', () => {
+    const appEnv = loadAppEnv({ GITHUB_TOKEN: 'ghp_test_token_123' });
+    expect(deriveFleetEnv(appEnv, 'sa7', 7001).GITHUB_TOKEN).toBe('ghp_test_token_123');
+    expect(deriveFleetEnv(appEnv, 'nuvio', 7002).GITHUB_TOKEN).toBe('ghp_test_token_123');
+    expect(deriveFleetEnv(appEnv, 'vega', 7003).GITHUB_TOKEN).toBe('ghp_test_token_123');
+  });
+
   it('derives vega env with febboxCookie from FEBBOX_UI_COOKIE', () => {
     const appEnv = loadAppEnv({
       FEBBOX_UI_COOKIE: 'ui=test_jwt_cookie_token_123',

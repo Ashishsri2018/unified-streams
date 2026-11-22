@@ -220,3 +220,16 @@ and `LogQueue` records `batchesFailed` and drops that batch. Gateway behavior is
 unaffected, but log delivery is lossy during a sink outage.
 
 Status: accepted; the circuit breaker protects request latency.
+
+### Vega vendored baseline is a static seed
+
+`src/fleets/vega/providers-baseline/Zenda-Cross/` is copied into `dist/` and
+seeded into `DATA_DIR/vega/providers/Zenda-Cross` only when that directory is
+absent. Runtime updates refresh `DATA_DIR`, not the committed baseline, so a
+fresh deployment without a successful update starts from the vendored snapshot.
+Re-vendor the baseline manually (manifest, urls, enabled provider dirs, and
+`state.json`) when upstream adds providers or bumps versions. The baseline
+intentionally omits providers whose manifest entry has `disabled: true`, matching
+the updater's `raw.disabled !== false` filter.
+
+Status: accepted; the runtime updater is the source of truth once it succeeds.

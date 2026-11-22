@@ -1,289 +1,296 @@
 {
-  "activeSha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+  "activeSha": "a52ea5da770585f155fd1991076c856f3de041ea",
   "previousSha": null,
   "headEtag": null,
-  "lastCheck": "2026-11-12T01:11:47.150Z",
-  "lastSuccess": "2026-11-12T01:11:47.150Z",
-  "nextCheck": "2026-11-12T01:11:47.150Z",
+  "lastCheck": "2026-11-22T10:57:58Z",
+  "lastSuccess": "2026-11-22T10:57:58Z",
+  "nextCheck": "2026-11-22T10:57:58Z",
   "lastError": null,
   "providers": {
     "vega": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.52",
-      "installedAt": "2026-11-12T01:11:44.757Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "autoEmbed": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "3.7",
-      "installedAt": "2026-11-12T01:11:44.826Z",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "3.12",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "drive": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.30",
-      "installedAt": "2026-11-12T01:11:44.880Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "4khdhub": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.21",
-      "installedAt": "2026-11-12T01:11:44.932Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "1cinevood": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.38",
-      "installedAt": "2026-11-12T01:11:44.996Z",
-      "status": "active",
-      "error": null
-    },
-    "world4u": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "1.8",
-      "installedAt": "2026-11-12T01:11:45.064Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "katmovies": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.39",
-      "installedAt": "2026-11-12T01:11:45.139Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "mod": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "2.1",
-      "installedAt": "2026-11-12T01:11:45.192Z",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "2.14",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "uhd": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.2",
-      "installedAt": "2026-11-12T01:11:45.268Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "movieBoxWeb": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "2.7",
-      "installedAt": "2026-11-12T01:11:45.338Z",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "2.9",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "gokuHD": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.7",
-      "installedAt": "2026-11-12T01:11:45.400Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "dramacool": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.4",
-      "installedAt": "2026-11-12T01:11:45.449Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "eonMovies": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.18",
-      "installedAt": "2026-11-12T01:11:45.505Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "movies4u": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.32",
-      "installedAt": "2026-11-12T01:11:45.579Z",
-      "status": "active",
-      "error": null
-    },
-    "kmMovies": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "2.35",
-      "installedAt": "2026-11-12T01:11:45.658Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "zeefliz": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "1.33",
-      "installedAt": "2026-11-12T01:11:45.719Z",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "1.40",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "netflixMirror": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.11",
-      "installedAt": "2026-11-12T01:11:45.796Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "primeMirror": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.10",
-      "installedAt": "2026-11-12T01:11:45.856Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "disneyMirror": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.2",
-      "installedAt": "2026-11-12T01:11:45.919Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "hdhub4u": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.30",
-      "installedAt": "2026-11-12T01:11:45.970Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "moviezwap": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.4",
-      "installedAt": "2026-11-12T01:11:46.026Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "showbox": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.8",
-      "installedAt": "2026-11-12T01:11:46.091Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "kissKh": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.5",
-      "installedAt": "2026-11-12T01:11:46.134Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "luxMovies": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.37",
-      "installedAt": "2026-11-12T01:11:46.196Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "topmovies": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.18",
-      "installedAt": "2026-11-12T01:11:46.257Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "torrentio": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.21",
-      "installedAt": "2026-11-12T01:11:46.317Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "anikoto": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "2.1",
-      "installedAt": "2026-11-12T01:11:46.372Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "kickAssAnime": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.6",
-      "installedAt": "2026-11-12T01:11:46.423Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "animesub": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "1.7",
-      "installedAt": "2026-11-12T01:11:46.486Z",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "1.8",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "everything": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.5",
-      "installedAt": "2026-11-12T01:11:46.533Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "castle": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.2",
-      "installedAt": "2026-11-12T01:11:46.583Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "animesalt": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.2",
-      "installedAt": "2026-11-12T01:11:46.650Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "animeworld": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.0",
-      "installedAt": "2026-11-12T01:11:46.723Z",
-      "status": "active",
-      "error": null
-    },
-    "movielinkdb": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "1.01",
-      "installedAt": "2026-11-12T01:11:46.782Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "mxplayer": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "1.1",
-      "installedAt": "2026-11-12T01:11:46.847Z",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "1.3",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "youtube": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.4",
-      "installedAt": "2026-11-12T01:11:46.904Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "kartoons": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.10",
-      "installedAt": "2026-11-12T01:11:46.974Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "1flex": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.0.6",
-      "installedAt": "2026-11-12T01:11:47.031Z",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "internetArchive": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
-      "version": "1.1",
-      "installedAt": "2026-11-12T01:11:47.108Z",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "1.2",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     },
     "rareanimes": {
-      "sha": "fc747cdca16aa4334cce42017e8b1c40789d6df1",
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
       "version": "1.0",
-      "installedAt": "2026-11-12T01:11:47.150Z",
+      "installedAt": "2026-11-22T10:57:58Z",
+      "status": "active",
+      "error": null
+    },
+    "durbinLive": {
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "1.4",
+      "installedAt": "2026-11-22T10:57:58Z",
+      "status": "active",
+      "error": null
+    },
+    "liveTgTv": {
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "1.6",
+      "installedAt": "2026-11-22T10:57:58Z",
+      "status": "active",
+      "error": null
+    },
+    "aniDream": {
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "1.4",
+      "installedAt": "2026-11-22T10:57:58Z",
+      "status": "active",
+      "error": null
+    },
+    "extraflix": {
+      "sha": "a52ea5da770585f155fd1991076c856f3de041ea",
+      "version": "1.0",
+      "installedAt": "2026-11-22T10:57:58Z",
       "status": "active",
       "error": null
     }
