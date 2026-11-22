@@ -93,8 +93,13 @@ interface InternalContext {
   generation: number;
 }
 
+interface StreamResult {
+  streams: StremioStream[];
+  partial: boolean;
+}
+
 interface InFlightRequest {
-  promise: Promise<StremioStream[]>;
+  promise: Promise<StreamResult>;
   controller: AbortController;
   waiters: number;
 }
@@ -308,7 +313,7 @@ export class StreamPipeline implements StreamHandlerApi {
 
   private readonly searchCache: TtlCache<string, Post[]>;
   private readonly mappingCache: TtlCache<string, Candidate>;
-  private readonly streamCache: TtlCache<string, StremioStream[]>;
+  private readonly streamCache: TtlCache<string, StreamResult>;
   private readonly telemetry: ProviderTelemetry;
   private readonly inFlight = new Map<string, InFlightRequest>();
   private readonly metrics = {
@@ -340,7 +345,7 @@ export class StreamPipeline implements StreamHandlerApi {
     this.mappingCache = new TtlCache<string, Candidate>(
       deps.config.providerCacheTtlMs,
     );
-    this.streamCache = new TtlCache<string, StremioStream[]>(
+    this.streamCache = new TtlCache<string, StreamResult>(
       deps.config.streamCacheTtlMs,
       500,
     );
@@ -392,15 +397,23 @@ export class StreamPipeline implements StreamHandlerApi {
   }
 
   async handle(request: StreamRequest, signal?: AbortSignal): Promise<StremioStream[]> {
+    const result = await this.handleResult(request, signal);
+    return result.streams;
+  }
+
+  async handleResult(
+    request: StreamRequest,
+    signal?: AbortSignal,
+  ): Promise<StreamResult> {
     const parsed = parseRequest(request);
-    if (!parsed || signal?.aborted) return [];
+    if (!parsed || signal?.aborted) return { streams: [], partial: false };
 
     this.metrics.requests += 1;
     const cacheKey = this.streamCacheKey(parsed);
     const cached = this.streamCache.get(cacheKey);
     if (cached !== undefined) {
       this.metrics.cacheHits += 1;
-      return cached.slice();
+      return { streams: cached.streams.slice(), partial: cached.partial };
     }
     this.metrics.cacheMisses += 1;
 
@@ -411,7 +424,7 @@ export class StreamPipeline implements StreamHandlerApi {
       const created: InFlightRequest = {
         controller,
         waiters: 0,
-        promise: Promise.resolve([]),
+        promise: Promise.resolve({ streams: [], partial: false }),
       };
       created.promise = this.execute(parsed, cacheKey, controller.signal, lease).finally(
         () => {
@@ -452,19 +465,24 @@ export class StreamPipeline implements StreamHandlerApi {
   }
 
   private awaitShared(
-    promise: Promise<StremioStream[]>,
+    promise: Promise<StreamResult>,
     signal?: AbortSignal,
-  ): Promise<StremioStream[]> {
-    if (!signal) return promise.then((streams) => streams.slice());
-    if (signal.aborted) return Promise.resolve([]);
+  ): Promise<StreamResult> {
+    if (!signal) {
+      return promise.then((result) => ({
+        streams: result.streams.slice(),
+        partial: result.partial,
+      }));
+    }
+    if (signal.aborted) return Promise.resolve({ streams: [], partial: false });
 
-    return new Promise<StremioStream[]>((resolve, reject) => {
-      const onAbort = (): void => resolve([]);
+    return new Promise<StreamResult>((resolve, reject) => {
+      const onAbort = (): void => resolve({ streams: [], partial: false });
       signal.addEventListener("abort", onAbort, { once: true });
       promise.then(
-        (streams) => {
+        (result) => {
           signal.removeEventListener("abort", onAbort);
-          resolve(streams.slice());
+          resolve({ streams: result.streams.slice(), partial: result.partial });
         },
         (error: unknown) => {
           signal.removeEventListener("abort", onAbort);
@@ -479,7 +497,7 @@ export class StreamPipeline implements StreamHandlerApi {
     cacheKey: string,
     workSignal: AbortSignal,
     lease: ReturnType<PipelineDeps["registry"]["acquire"]>,
-  ): Promise<StremioStream[]> {
+  ): Promise<StreamResult> {
     let deadlineTimer: NodeJS.Timeout | undefined;
     let settleTimer: NodeJS.Timeout | undefined;
     let abortHandler: (() => void) | undefined;
@@ -487,12 +505,12 @@ export class StreamPipeline implements StreamHandlerApi {
 
     try {
       const snapshot = lease.snapshot;
-      if (!snapshot || snapshot.bundles.size === 0) return [];
+      if (!snapshot || snapshot.bundles.size === 0) return { streams: [], partial: false };
 
       const startedAt = Date.now();
       const deadlineAt = startedAt + Math.max(1, this.config.globalDeadlineMs);
       const info = await this.resolveInfo(parsed, controller, deadlineAt, workSignal);
-      if (!info) return [];
+      if (!info) return { streams: [], partial: false };
 
       const combinedSignal = AbortSignal.any([workSignal, controller.signal]);
       const ctx: InternalContext = {
@@ -508,12 +526,12 @@ export class StreamPipeline implements StreamHandlerApi {
         generation: this.generation,
       };
 
-      let resolveEarly: ((streams: StremioStream[]) => void) | undefined;
-      const earlyPromise = new Promise<StremioStream[]>((resolve) => {
+      let resolveEarly: ((result: StreamResult) => void) | undefined;
+      const earlyPromise = new Promise<StreamResult>((resolve) => {
         resolveEarly = resolve;
       });
       const finishEarly = (): void => {
-        resolveEarly?.(this.finalize(ctx.collected));
+        resolveEarly?.(this.currentResult(ctx));
       };
       deadlineTimer = setTimeout(() => {
         if (ctx.stopped) return;
@@ -526,23 +544,23 @@ export class StreamPipeline implements StreamHandlerApi {
       deadlineTimer.unref?.();
       settleTimer = this.startSettleTimer(ctx, startedAt, controller, finishEarly);
 
-      const abortPromise = new Promise<StremioStream[]>((resolve) => {
+      const abortPromise = new Promise<StreamResult>((resolve) => {
         if (workSignal.aborted) {
-          resolve(this.finalize(ctx.collected));
+          resolve(this.currentResult(ctx));
           return;
         }
         abortHandler = () => {
           if (ctx.stopped) return;
           ctx.stopped = true;
           controller.abort(new Error("request aborted"));
-          resolve(this.finalize(ctx.collected));
+          resolve(this.currentResult(ctx));
         };
         workSignal.addEventListener("abort", abortHandler, { once: true });
       });
 
       const work = this.runRequest(ctx, snapshot)
-        .then(() => this.finalize(ctx.collected))
-        .catch(() => this.finalize(ctx.collected))
+        .then(() => this.currentResult(ctx))
+        .catch(() => this.currentResult(ctx))
         .finally(() => {
           if (ctx.stopped) {
             this.logger.debug("pipeline.late_finish", {
@@ -563,14 +581,18 @@ export class StreamPipeline implements StreamHandlerApi {
       if (
         !workSignal.aborted &&
         this.generation === ctx.generation &&
-        result.length > 0
+        result.streams.length > 0
       ) {
-        const ttl = ctx.truncated
+        const ttl = result.partial
           ? Math.min(this.config.streamPartialCacheTtlMs, this.config.streamCacheTtlMs)
           : this.config.streamCacheTtlMs;
-        this.streamCache.set(cacheKey, result.slice(), ttl);
+        this.streamCache.set(
+          cacheKey,
+          { streams: result.streams.slice(), partial: result.partial },
+          ttl,
+        );
       }
-      if (result.length === 0) this.metrics.emptyResults += 1;
+      if (result.streams.length === 0) this.metrics.emptyResults += 1;
 
       return result;
     } finally {
@@ -578,6 +600,13 @@ export class StreamPipeline implements StreamHandlerApi {
       if (settleTimer) clearInterval(settleTimer);
       if (abortHandler) workSignal.removeEventListener("abort", abortHandler);
     }
+  }
+
+  private currentResult(ctx: InternalContext): StreamResult {
+    return {
+      streams: this.finalize(ctx.collected),
+      partial: ctx.truncated || ctx.deadlineHit,
+    };
   }
 
   clearCaches(): void {
@@ -883,6 +912,8 @@ export class StreamPipeline implements StreamHandlerApi {
         const mapping = await this.resolveCandidate(bundle, ranked, ctx);
         if (ctx.stopped) return;
         if (!mapping.candidate) {
+          if (mapping.error !== undefined) failure = mapping.error;
+          else if (mapping.failed) failure = new Error("meta resolution failed");
           finished = true;
           return;
         }
@@ -890,6 +921,7 @@ export class StreamPipeline implements StreamHandlerApi {
         const links = await this.resolveLinks(bundle, mapping.candidate, ctx);
         if (ctx.stopped) return;
         if (links.links.length === 0) {
+          if (links.failed) failure = new Error("link resolution failed");
           finished = true;
           return;
         }
@@ -897,11 +929,15 @@ export class StreamPipeline implements StreamHandlerApi {
         const streams = await this.fetchStreams(bundle, links.links, ctx);
         if (ctx.stopped) return;
         if (streams.streams.length === 0) {
-          this.logger.warn("pipeline.provider_no_streams", {
-            provider: providerValue,
-            stage: "stream",
-            ...requestLogFields(ctx.info.request),
-          });
+          if (streams.failures > 0) {
+            failure = streams.error ?? new Error("stream resolution failed");
+          } else {
+            this.logger.warn("pipeline.provider_no_streams", {
+              provider: providerValue,
+              stage: "stream",
+              ...requestLogFields(ctx.info.request),
+            });
+          }
           finished = true;
           return;
         }
@@ -932,7 +968,11 @@ export class StreamPipeline implements StreamHandlerApi {
         this.telemetry.record(providerKey, "skipped");
       } else {
         if (!collected && failure === undefined) {
-          const classified = classifyEmptyResult(tracker, Date.now() - startedAt, this.config.searchTimeoutMs);
+          const classified = classifyEmptyResult(
+            tracker,
+            Date.now() - startedAt,
+            this.config.globalDeadlineMs,
+          );
           if (classified.outcome !== "empty") {
             failure = new Error(classified.lastError ?? "provider failed");
           }
@@ -1026,13 +1066,14 @@ export class StreamPipeline implements StreamHandlerApi {
     bundle: ProviderBundle,
     ranked: Array<{ post: Post; score: number }>,
     ctx: InternalContext,
-  ): Promise<{ candidate: Candidate | null; failed: boolean }> {
+  ): Promise<{ candidate: Candidate | null; failed: boolean; error?: unknown }> {
     const providerValue = trimString(bundle.entry.value);
     const cacheKey = `${providerValue}|${ctx.info.contentId}|${ctx.info.request.type}`;
     const cached = this.mappingCache.get(cacheKey);
     if (cached) return { candidate: cached, failed: false };
 
     let failed = false;
+    let lastError: unknown;
     for (const entry of ranked.slice(0, MAX_CANDIDATES)) {
       if (ctx.stopped) break;
       try {
@@ -1051,6 +1092,7 @@ export class StreamPipeline implements StreamHandlerApi {
         }
       } catch (error) {
         failed = true;
+        lastError = error;
         if (!ctx.stopped) {
           this.logger.debug("pipeline.provider_meta_failed", {
             provider: providerValue,
@@ -1061,7 +1103,7 @@ export class StreamPipeline implements StreamHandlerApi {
       }
     }
 
-    return { candidate: null, failed };
+    return { candidate: null, failed, error: lastError };
   }
 
   private metaMatches(meta: ProviderMeta, info: RequestInfo): boolean {
@@ -1257,8 +1299,10 @@ export class StreamPipeline implements StreamHandlerApi {
     bundle: ProviderBundle,
     links: ResolvedLink[],
     ctx: InternalContext,
-  ): Promise<{ streams: ProviderStream[]; attempted: number }> {
+  ): Promise<{ streams: ProviderStream[]; attempted: number; failures: number; error?: unknown }> {
     let attempted = 0;
+    let failures = 0;
+    let lastError: unknown;
     const providerValue = trimString(bundle.entry.value);
 
     const results = await mapLimit(
@@ -1292,6 +1336,8 @@ export class StreamPipeline implements StreamHandlerApi {
               quality: trimString(stream.quality) || item.quality,
             }));
         } catch (error) {
+          failures += 1;
+          lastError = error;
           if (!ctx.stopped) {
             this.logger.debug("pipeline.provider_stream_failed", {
               provider: providerValue,
@@ -1307,6 +1353,8 @@ export class StreamPipeline implements StreamHandlerApi {
     return {
       streams: results.flat(),
       attempted,
+      failures,
+      error: lastError,
     };
   }
 

@@ -171,7 +171,7 @@ describe('review fixes', () => {
     scheduler.stop();
   });
 
-  it('only enforces strict snapshot SHA verification for SA7', async () => {
+  it('enforces snapshot SHA verification after every fleet reload', async () => {
     vi.mocked(fetchGitHubHead).mockResolvedValue({ sha });
     vi.mocked(fetchCodebergHead).mockResolvedValue({ sha });
     vi.mocked(updateSa7Providers).mockResolvedValue({
@@ -189,7 +189,7 @@ describe('review fixes', () => {
       { dataDir: tmpDir, minHours: 20, maxHours: 24, updateOnStart: false },
     );
 
-    expect(await scheduler.checkFleet('nuvio')).toBe(true);
+    expect(await scheduler.checkFleet('nuvio')).toBe(false);
     expect(await scheduler.checkFleet('sa7')).toBe(false);
     expect(scheduler.getStatus('sa7').sha).toBeNull();
     scheduler.stop();

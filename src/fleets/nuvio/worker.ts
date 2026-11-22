@@ -68,11 +68,11 @@ export function createNuvioHandlers(fleetEnv: NodeJS.ProcessEnv): FleetInstance 
     };
     res.on('close', abortOnClose);
     try {
-      const rawStreams = await pipeline.handle(streamRequest, controller.signal);
-      const streams = Array.isArray(rawStreams) ? (rawStreams as StremioStream[]) : [];
-      sendJson(res, 200, { streams }, requestId);
+      const result = await pipeline.handleResult(streamRequest, controller.signal);
+      const streams = Array.isArray(result.streams) ? (result.streams as StremioStream[]) : [];
+      sendJson(res, 200, { streams, partial: result.partial }, requestId);
     } catch {
-      sendJson(res, 200, { streams: [] }, requestId);
+      sendJson(res, 200, { streams: [], partial: false }, requestId);
     } finally {
       res.off('close', abortOnClose);
     }
@@ -158,6 +158,10 @@ export function createNuvioHandlers(fleetEnv: NodeJS.ProcessEnv): FleetInstance 
     }
     if (!refreshed) {
       return sendJson(res, 500, { ok: false, error: 'snapshot refresh failed' }, requestId);
+    }
+    const health = snapshots.getHealth();
+    if (health.lastError) {
+      return sendJson(res, 500, { ok: false, error: health.lastError }, requestId);
     }
     return sendJson(res, 200, { ok: true, reloadedAt: new Date().toISOString() }, requestId);
   }

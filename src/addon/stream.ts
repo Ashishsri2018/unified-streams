@@ -27,6 +27,12 @@ export interface StreamHandlerContext {
   };
 }
 
+function sanitizeRequestId(value: unknown): string {
+  const raw = typeof value === 'string' ? value : '';
+  if (/^[A-Za-z0-9._:-]{1,128}$/.test(raw)) return raw;
+  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // Stream responses must not be cached by Cloudflare or browsers. Cloudflare is
 // used for log delivery only; caching stays in the gateway.
 function setStreamCacheHeaders(res: Response): void {
@@ -40,7 +46,7 @@ export async function handleStreamRoute(
 ): Promise<void> {
   const rawType = req.params.type;
   const rawId = req.params.id;
-  const requestId = (req.headers['x-request-id'] as string) || `req-${Date.now()}`;
+  const requestId = sanitizeRequestId(req.headers['x-request-id']);
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -74,6 +80,10 @@ export async function handleStreamRoute(
   const filterConfig = toFilterConfig(userConfig);
 
   const requestController = new AbortController();
+  const deadlineAt = Date.now() + Math.max(1, ctx.globalDeadlineMs);
+  res.on('close', () => {
+    if (!res.writableEnded) requestController.abort(new Error('client disconnected'));
+  });
 
   const requiresCanonicalRewrite =
     parsedId.family === 'mal' || parsedId.family === 'kitsu' || parsedId.family === 'tvdb';
@@ -120,6 +130,13 @@ export async function handleStreamRoute(
     }
   }
 
+  if (requestController.signal.aborted) {
+    setStreamCacheHeaders(res);
+    res.setHeader('X-Cache', 'bypass');
+    res.status(200).json({ streams: [] });
+    return;
+  }
+
   if (requiresCanonicalRewrite && forwardId === rawId) {
     setStreamCacheHeaders(res);
     res.setHeader('X-Cache', 'bypass');
@@ -138,7 +155,8 @@ export async function handleStreamRoute(
   try {
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {
       const selectedFleets = userConfig.backends.filter((b) => ctx.workers[b]);
-      const workerTimeoutMs = Math.min(ctx.workerTimeoutMs, ctx.globalDeadlineMs);
+      const remainingMs = Math.max(1, deadlineAt - Date.now());
+      const workerTimeoutMs = Math.min(ctx.workerTimeoutMs, remainingMs);
       const fleetPromises = selectedFleets.map(async (fleetName) => {
         const worker = ctx.workers[fleetName];
         const resStream = await worker.fetchStream(
@@ -148,6 +166,7 @@ export async function handleStreamRoute(
           workerTimeoutMs,
           requestId,
           forwardedMeta,
+          requestController.signal,
         );
         return { fleet: fleetName, streams: resStream.streams, outcome: resStream.outcome };
       });

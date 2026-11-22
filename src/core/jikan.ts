@@ -24,8 +24,8 @@ export class JikanClient {
     this.maxRpm = Math.max(1, maxRpm);
   }
 
-  private async waitForSlot(): Promise<void> {
-    const acquire = this.queue.then(() => this.reserveSlot());
+  private async waitForSlot(signal?: AbortSignal): Promise<void> {
+    const acquire = this.queue.then(() => this.reserveSlot(signal));
     this.queue = acquire.then(
       () => undefined,
       () => undefined,
@@ -33,7 +33,8 @@ export class JikanClient {
     await acquire;
   }
 
-  private async reserveSlot(): Promise<void> {
+  private async reserveSlot(signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) throw signal.reason ?? new Error('aborted');
     const minIntervalMs = Math.ceil(1000 / this.maxRps);
     let now = Date.now();
     let waitMs = 0;
@@ -46,7 +47,22 @@ export class JikanClient {
       waitMs = Math.max(waitMs, (this.requestTimes[0] ?? now) + 60_000 - now);
     }
     if (waitMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      await new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) {
+          reject(signal.reason ?? new Error('aborted'));
+          return;
+        }
+        const timer = setTimeout(() => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve();
+        }, waitMs);
+        const onAbort = (): void => {
+          clearTimeout(timer);
+          reject(signal?.reason ?? new Error('aborted'));
+        };
+        signal?.addEventListener('abort', onAbort, { once: true });
+      });
+      if (signal?.aborted) throw signal.reason ?? new Error('aborted');
       now = Date.now();
     }
 
@@ -64,8 +80,6 @@ export class JikanClient {
   }
 
   async getAnime(malNumericId: number, timeoutMs = 8000, signal?: AbortSignal): Promise<JikanAnimeData | null> {
-    await this.waitForSlot();
-
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const onAbort = () => controller.abort();
@@ -73,6 +87,9 @@ export class JikanClient {
     else signal?.addEventListener('abort', onAbort, { once: true });
 
     try {
+      await this.waitForSlot(controller.signal);
+      if (controller.signal.aborted) return null;
+
       const res = await fetch(`${this.baseUrl}/anime/${malNumericId}`, {
         signal: controller.signal,
         headers: { 'accept': 'application/json' },

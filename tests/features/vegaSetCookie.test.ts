@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createProviderContext,
   installGlobalFetch,
+  vegaNetworkStorage,
 } from '../../src/fleets/vega/providers/sdk/context.js';
+import { createNetworkTracker } from '../../src/core/networkClassifier.js';
 import type {
   CookieJarApi,
   HttpTransportApi,
@@ -51,7 +53,10 @@ describe('Vega SDK set-cookie normalization', () => {
         getActiveUrls: () => null,
       });
 
-      const response = (await fetch('https://example.com/page')) as Response;
+      const response = await vegaNetworkStorage.run(
+        createNetworkTracker(),
+        async () => (await fetch('https://example.com/page')) as Response,
+      );
       expect(response.headers.getSetCookie()).toEqual([
         'a=1; Path=/',
         'b=2; Path=/',

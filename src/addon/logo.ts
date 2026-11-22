@@ -22,16 +22,27 @@ const ASSETS = {
   },
 };
 
-function serveAsset(type: 'png' | 'svg' | 'ico', req: Request, res: Response): void {
+const assetCache = new Map<string, Buffer>();
+
+async function serveAsset(
+  type: 'png' | 'svg' | 'ico',
+  req: Request,
+  res: Response,
+): Promise<void> {
   const asset = ASSETS[type];
-  if (!fs.existsSync(asset.path)) {
-    res.status(404).end();
-    return;
+  let body = assetCache.get(asset.path);
+  if (!body) {
+    try {
+      body = await fs.promises.readFile(asset.path);
+      assetCache.set(asset.path, body);
+    } catch {
+      res.status(404).end();
+      return;
+    }
   }
 
-  const stat = fs.statSync(asset.path);
   res.setHeader('Content-Type', asset.contentType);
-  res.setHeader('Content-Length', stat.size);
+  res.setHeader('Content-Length', body.length);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -41,17 +52,17 @@ function serveAsset(type: 'png' | 'svg' | 'ico', req: Request, res: Response): v
     return;
   }
 
-  fs.createReadStream(asset.path).pipe(res);
+  res.status(200).end(body);
 }
 
-export function handleLogoPng(req: Request, res: Response): void {
-  serveAsset('png', req, res);
+export async function handleLogoPng(req: Request, res: Response): Promise<void> {
+  await serveAsset('png', req, res);
 }
 
-export function handleLogoSvg(req: Request, res: Response): void {
-  serveAsset('svg', req, res);
+export async function handleLogoSvg(req: Request, res: Response): Promise<void> {
+  await serveAsset('svg', req, res);
 }
 
-export function handleFavicon(req: Request, res: Response): void {
-  serveAsset('ico', req, res);
+export async function handleFavicon(req: Request, res: Response): Promise<void> {
+  await serveAsset('ico', req, res);
 }

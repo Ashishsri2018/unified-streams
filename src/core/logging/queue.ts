@@ -19,6 +19,8 @@ export class LogQueue {
   private queue: LogEvent[] = [];
   private timer: NodeJS.Timeout | null = null;
   private isFlushing = false;
+  private activeFlush: Promise<void> | null = null;
+  private closed = false;
   private readonly options: LogQueueOptions;
   private readonly sinks: LogSink[];
   private readonly metrics: LogQueueMetrics = {
@@ -46,6 +48,10 @@ export class LogQueue {
   }
 
   enqueue(event: LogEvent): void {
+    if (this.closed) {
+      this.metrics.dropped++;
+      return;
+    }
     this.metrics.enqueued++;
     if (this.queue.length >= this.options.maxSize) {
       this.queue.shift(); // Drop oldest
@@ -59,26 +65,38 @@ export class LogQueue {
   }
 
   async flush(): Promise<void> {
-    if (this.isFlushing || this.queue.length === 0) return;
+    if (this.isFlushing) {
+      await this.activeFlush;
+      return;
+    }
+    if (this.queue.length === 0) return;
     this.isFlushing = true;
 
-    const batch = this.queue.splice(0, this.options.batchSize);
-    try {
-      for (const sink of this.sinks) {
-        if (sink.writeBatch) {
-          await sink.writeBatch(batch);
-        } else {
-          for (const item of batch) {
-            await sink.write(item);
+    const task = (async () => {
+      const batch = this.queue.splice(0, this.options.batchSize);
+      try {
+        for (const sink of this.sinks) {
+          if (sink.writeBatch) {
+            await sink.writeBatch(batch);
+          } else {
+            for (const item of batch) {
+              await sink.write(item);
+            }
           }
         }
+        this.metrics.flushed += batch.length;
+        this.metrics.batchesSent++;
+      } catch {
+        this.metrics.batchesFailed++;
       }
-      this.metrics.flushed += batch.length;
-      this.metrics.batchesSent++;
-    } catch {
-      this.metrics.batchesFailed++;
+    })();
+    this.activeFlush = task;
+
+    try {
+      await task;
     } finally {
       this.isFlushing = false;
+      this.activeFlush = null;
       if (this.queue.length >= this.options.batchSize) {
         void this.flush();
       }
@@ -101,9 +119,14 @@ export class LogQueue {
   }
 
   async close(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.activeFlush) {
+      await this.activeFlush;
     }
     while (this.queue.length > 0) {
       await this.flush();

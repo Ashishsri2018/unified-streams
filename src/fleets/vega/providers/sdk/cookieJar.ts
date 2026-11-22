@@ -14,6 +14,7 @@ interface StoredCookie {
   value: string;
   expiresAt?: number;
   path?: string;
+  secure?: boolean;
   createdAt: number;
 }
 
@@ -29,6 +30,7 @@ interface ParsedSetCookie {
   deleteCookie: boolean;
   domain?: string;
   path?: string;
+  secure: boolean;
 }
 
 const DEFAULT_FLUSH_MS = 500;
@@ -125,34 +127,18 @@ function isPublicSuffix(domain: string): boolean {
   return labels.length === 2 && MULTI_PART_SUFFIXES.has(domain);
 }
 
-function registrableDomain(host: string): string {
-  const normalized = normalizeHost(host);
-  if (!normalized) return "";
-  if (isIpAddress(normalized)) return normalized;
-  const labels = normalized.split(".").filter(Boolean);
-  if (labels.length <= 2) return normalized;
-  const suffix = labels.slice(-2).join(".");
-  if (MULTI_PART_SUFFIXES.has(suffix)) {
-    return labels.slice(-3).join(".");
-  }
-  return suffix;
-}
-
 function isDomainMatch(host: string, domain: string): boolean {
   return host === domain || host.endsWith(`.${domain}`);
 }
 
 function captureDomain(host: string, domainAttribute: string | undefined): string | null {
-  const requestDomain = registrableDomain(host);
-  if (!domainAttribute) return requestDomain || null;
+  if (!domainAttribute) return host || null;
   const attribute = normalizeHost(domainAttribute.replace(/^\.+/, ""));
-  if (!attribute) return requestDomain || null;
+  if (!attribute) return host || null;
   if (isIpAddress(host)) return attribute === host ? host : null;
   if (!isDomainMatch(host, attribute)) return null;
-  if (isPublicSuffix(attribute)) {
-    return attribute === host ? requestDomain || null : null;
-  }
-  return registrableDomain(attribute) || null;
+  if (isPublicSuffix(attribute)) return attribute === host ? attribute : null;
+  return attribute;
 }
 
 function pathMatches(cookiePath: string, requestPath: string): boolean {
@@ -177,6 +163,7 @@ function parseSetCookie(line: string, now: number): ParsedSetCookie | null {
   let maxAgeSeconds: number | undefined;
   let domain: string | undefined;
   let path: string | undefined;
+  let secure = false;
 
   if (firstSemicolon !== -1) {
     for (const segment of trimmed.slice(firstSemicolon + 1).split(";")) {
@@ -197,6 +184,8 @@ function parseSetCookie(line: string, now: number): ParsedSetCookie | null {
         if (attributeValue) domain = attributeValue;
       } else if (key === "path") {
         if (attributeValue.startsWith("/")) path = attributeValue;
+      } else if (key === "secure") {
+        secure = true;
       }
     }
   }
@@ -213,7 +202,7 @@ function parseSetCookie(line: string, now: number): ParsedSetCookie | null {
     deleteCookie = true;
   }
 
-  return { name, value, expiresAt, deleteCookie, domain, path: path ?? "/" };
+  return { name, value, expiresAt, deleteCookie, domain, path: path ?? "/", secure };
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -240,6 +229,7 @@ function parseStoredCookie(value: unknown): StoredCookie | null {
   if (typeof value.path === "string" && value.path.startsWith("/")) {
     cookie.path = value.path;
   }
+  if (value.secure === true) cookie.secure = true;
   return cookie;
 }
 
@@ -349,6 +339,7 @@ export class CookieJar implements CookieJarApi {
         value: parsed.value,
         expiresAt: parsed.expiresAt,
         path: parsed.path,
+        secure: parsed.secure,
         createdAt: now,
       });
       changed = true;
@@ -418,25 +409,28 @@ export class CookieJar implements CookieJarApi {
       return [];
     }
     const host = normalizeHost(parsedUrl.hostname);
-    const domain = registrableDomain(host);
-    if (!domain) return [];
-    const cookies = this.domains.get(domain);
-    if (!cookies) return [];
-
+    if (!host) return [];
     const requestPath = parsedUrl.pathname || "/";
+    const isSecureRequest = parsedUrl.protocol === "https:";
     const now = Date.now();
     const result: Array<[string, StoredCookie]> = [];
     let changed = false;
-    for (const [name, cookie] of cookies) {
-      if (cookie.expiresAt !== undefined && cookie.expiresAt <= now) {
-        cookies.delete(name);
-        changed = true;
-        continue;
+
+    for (const [domain, cookies] of this.domains) {
+      if (!isDomainMatch(host, domain)) continue;
+      for (const [name, cookie] of cookies) {
+        if (cookie.expiresAt !== undefined && cookie.expiresAt <= now) {
+          cookies.delete(name);
+          changed = true;
+          continue;
+        }
+        if (cookie.secure && !isSecureRequest) continue;
+        if (!pathMatches(cookie.path ?? "/", requestPath)) continue;
+        result.push([name, cookie]);
       }
-      if (!pathMatches(cookie.path ?? "/", requestPath)) continue;
-      result.push([name, cookie]);
+      if (cookies.size === 0) this.domains.delete(domain);
     }
-    if (cookies.size === 0) this.domains.delete(domain);
+
     if (changed) this.scheduleFlush();
     return result;
   }

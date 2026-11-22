@@ -8,7 +8,6 @@ import type {
 } from "axios";
 import * as cheerio from "cheerio";
 import type { NetworkTracker } from "../../../../core/networkClassifier.js";
-import { nativeFetch } from "../../util/nativeFetch.js";
 import type {
   CookieJarApi,
   HttpRequestOptions,
@@ -485,16 +484,25 @@ export function installGlobalFetch(options: {
   };
   if (!globalRecord.providerGlobal) globalRecord.providerGlobal = globalThis;
 
+  const currentFetch = globalThis.fetch;
+  const baseFetch =
+    (currentFetch as typeof fetch & { __vegaBaseFetch?: typeof fetch })
+      .__vegaBaseFetch ?? currentFetch;
+
   const shim = async (
     input: string | URL | Request,
     init?: RequestInit,
   ): Promise<TransportResponse | Response> => {
+    if (!vegaNetworkStorage.getStore()) {
+      return baseFetch(input, init);
+    }
+
     const request = typeof Request !== "undefined" && input instanceof Request ? input : null;
     const rawUrl = request ? request.url : input instanceof URL ? input.toString() : String(input);
     const parsedUrl = new URL(rawUrl);
 
     if (isLoopbackHost(parsedUrl.hostname)) {
-      return nativeFetch(input, init);
+      return baseFetch(input, init);
     }
 
     if (isSnapshotUrl(parsedUrl)) {
@@ -540,6 +548,10 @@ export function installGlobalFetch(options: {
     });
   };
 
+  Object.defineProperty(shim, "__vegaBaseFetch", {
+    value: baseFetch,
+    enumerable: false,
+  });
   globalThis.fetch = shim as unknown as typeof fetch;
 }
 

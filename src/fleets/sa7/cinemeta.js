@@ -16,6 +16,7 @@ async function fetchJson(url) {
 
 function createMetadataResolver({
   cinemetaUrl = config.cinemetaUrl,
+  tmdbUrl = config.tmdbUrl,
   tmdbApiKey = config.tmdbApiKey,
   cacheMaxEntries = config.tmdbCacheMaxEntries,
   now = Date.now,
@@ -25,6 +26,7 @@ function createMetadataResolver({
   const cache = createLru({ maxEntries: cacheMaxEntries, now });
   const inFlight = new Map();
   const base = String(cinemetaUrl || '').replace(/\/$/, '');
+  const tmdbBase = String(tmdbUrl || '').replace(/\/$/, '');
 
   async function fromCinemeta(imdbId, type) {
     const data = await fetchJsonFn(`${base}/meta/${type}/${imdbId}.json`);
@@ -36,7 +38,7 @@ function createMetadataResolver({
     if (!tmdbApiKey) return null;
     const resultKey = type === 'series' ? 'tv_results' : 'movie_results';
     const data = await fetchJsonFn(
-      `https://api.themoviedb.org/3/find/${imdbId}?external_source=imdb_id&api_key=${encodeURIComponent(tmdbApiKey)}`
+      `${tmdbBase}/find/${imdbId}?external_source=imdb_id&api_key=${encodeURIComponent(tmdbApiKey)}`
     );
     const hit = Array.isArray(data[resultKey]) ? data[resultKey][0] : null;
     return hit && Number.isFinite(Number(hit.id)) ? Number(hit.id) : null;

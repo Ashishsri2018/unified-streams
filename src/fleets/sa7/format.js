@@ -2,6 +2,37 @@ const { normalizeSubtitles } = require('./filters');
 const { isBlockerUrl, isArchiveUrl, isWebPage, isExternalUrl } = require('./lib/url-classifier');
 const { qualityRank, sizeBytesOf } = require('./lib/stream-quality');
 
+const BLOCKED_PROXY_HEADERS = new Set([
+  'host',
+  'connection',
+  'content-length',
+  'transfer-encoding',
+  'upgrade',
+  'proxy-authorization',
+  'proxy-authenticate',
+  'te',
+  'trailer',
+  'keep-alive',
+]);
+const PROXY_HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+function sanitizeProxyHeaders(headers) {
+  if (!headers || typeof headers !== 'object' || Array.isArray(headers)) return null;
+  const result = {};
+  let count = 0;
+  for (const [rawName, rawValue] of Object.entries(headers)) {
+    if (count >= 50) break;
+    const name = String(rawName).trim();
+    if (!name || name.length > 128 || !PROXY_HEADER_NAME.test(name)) continue;
+    if (BLOCKED_PROXY_HEADERS.has(name.toLowerCase())) continue;
+    if (typeof rawValue !== 'string' || rawValue.length > 8192) continue;
+    if (/[\r\n]/.test(rawValue)) continue;
+    result[name] = rawValue;
+    count += 1;
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 function toStremioStream(stream, provider) {
   if (!stream) return null;
 
@@ -41,8 +72,9 @@ function toStremioStream(stream, provider) {
       const hints = {};
       const videoSize = sizeBytesOf(stream);
       if (videoSize != null) hints.videoSize = videoSize;
-      if (stream.headers && typeof stream.headers === 'object' && Object.keys(stream.headers).length > 0) {
-        hints.proxyHeaders = { request: stream.headers };
+      const proxyHeaders = sanitizeProxyHeaders(stream.headers);
+      if (proxyHeaders) {
+        hints.proxyHeaders = { request: proxyHeaders };
         hints.notWebReady = true;
       }
       if (stream.behaviorHints && stream.behaviorHints.bingeGroup) {

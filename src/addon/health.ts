@@ -174,6 +174,10 @@ export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: nu
     : undefined;
 
   const { providers, components } = aggregateFleetProviders(fleets, startedAt, latencies, updater);
+  const deadlineHits = Object.values(fleets).reduce((total, fleetHealth) => {
+    if ('error' in fleetHealth) return total;
+    return total + (fleetHealth.metrics?.deadlineHits ?? 0);
+  }, 0);
 
   const hasError = components.length > 0 && components.every((c) => c.status === 'error');
   const isDegraded = components.some((c) => c.status !== 'ok');
@@ -200,13 +204,7 @@ export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: nu
     fleets,
     providers,
     components,
-    updater: ctx.scheduler
-      ? {
-          sa7: ctx.scheduler.getStatus('sa7'),
-          nuvio: ctx.scheduler.getStatus('nuvio'),
-          vega: ctx.scheduler.getStatus('vega'),
-        }
-      : {},
+    updater: updater ?? {},
     sink: {
       queueDepth: logger.getQueueDepth(),
       dropped: queueMetrics.dropped,
@@ -218,7 +216,7 @@ export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: nu
       cacheHits: cacheStats.hits,
       cacheMisses: cacheStats.misses,
       emptyResults: cacheStats.emptySkips,
-      deadlineHits: 0,
+      deadlineHits,
     },
   };
 }

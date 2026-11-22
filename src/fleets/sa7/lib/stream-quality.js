@@ -60,6 +60,7 @@ function qualityRank(stream) {
   }
   if (!stream) return 4;
   const text = `${stream.quality || ''} ${stream.title || ''} ${stream.name || ''}`;
+  if (/(\bcam\b|hdcam|\bcamrip\b|\bts\b|telesync)/i.test(text)) return 5;
   for (const [pattern, rank] of QUALITY_PATTERNS) {
     if (pattern.test(text)) return rank;
   }

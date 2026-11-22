@@ -1,6 +1,6 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { parseDefaultsEnv } from '../src/core/env.js';
 
 const { values } = parseArgs({
   options: {
@@ -12,6 +12,22 @@ const { values } = parseArgs({
 });
 
 const defaultsPath = path.resolve(process.cwd(), 'config', 'defaults.env');
+
+function parseDefaultsEnv(filePath) {
+  if (!fs.existsSync(filePath)) return {};
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const result = {};
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx !== -1) {
+      result[trimmed.slice(0, eqIdx).trim()] = trimmed.slice(eqIdx + 1).trim();
+    }
+  }
+  return result;
+}
+
 const defaults = parseDefaultsEnv(defaultsPath);
 
 const allowedKeys = new Set([

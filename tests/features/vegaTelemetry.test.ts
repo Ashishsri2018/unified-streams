@@ -150,7 +150,7 @@ describe('vega provider telemetry', () => {
           }),
         },
         stream: {
-          getStreams: async () => [],
+          getStream: async () => [],
         },
       },
     };

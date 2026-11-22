@@ -2,9 +2,10 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 
 const sa7NetworkStorage = new AsyncLocalStorage();
 
-function createTracker() {
+function createTracker(signal) {
   return {
     attempts: [],
+    signal,
   };
 }
 
@@ -18,6 +19,13 @@ function initNetworkHooks() {
       globalThis.fetch = async function (input, init) {
         const tracker = sa7NetworkStorage.getStore();
         if (!tracker) return origFetch.call(this, input, init);
+        const signals = [];
+        if (init && init.signal) signals.push(init.signal);
+        if (tracker.signal) signals.push(tracker.signal);
+        const mergedInit =
+          signals.length === 0
+            ? init
+            : { ...(init || {}), signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals) };
         const startedAt = Date.now();
         const url =
           typeof input === 'string'
@@ -28,7 +36,7 @@ function initNetworkHooks() {
                 ? input.url
                 : '';
         try {
-          const res = await origFetch.call(this, input, init);
+          const res = await origFetch.call(this, input, mergedInit);
           tracker.attempts.push({
             url,
             status: res.status,
@@ -62,6 +70,10 @@ function initNetworkHooks() {
       if (axios && axios.interceptors) {
         axios.interceptors.request.use((reqConfig) => {
           reqConfig.__sa7StartedAt = Date.now();
+          const tracker = sa7NetworkStorage.getStore();
+          if (tracker && tracker.signal && !reqConfig.signal) {
+            reqConfig.signal = tracker.signal;
+          }
           return reqConfig;
         });
         axios.interceptors.response.use(

@@ -74,16 +74,20 @@ export class WorkerClient {
     timeoutMs: number,
     requestId?: string,
     metadata?: ForwardedMetadata,
+    signal?: AbortSignal,
   ): Promise<InternalStreamResponse> {
     const startTime = Date.now();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const combinedSignal = signal
+      ? AbortSignal.any([controller.signal, signal])
+      : controller.signal;
 
     const url = `${this.baseUrl}/internal/stream/${type}/${encodeURIComponent(id)}.json?config=${encodeURIComponent(encodedConfig)}`;
 
     try {
       const res = await fetch(url, {
-        signal: controller.signal,
+        signal: combinedSignal,
         headers: this.buildHeaders(requestId, timeoutMs, metadata),
       });
 

@@ -6,6 +6,10 @@ export class Semaphore {
     if (limit < 1) throw new Error("Semaphore limit must be >= 1");
   }
 
+  isIdle(): boolean {
+    return this.active === 0 && this.waiters.length === 0;
+  }
+
   async acquire(): Promise<() => void> {
     if (this.active < this.limit) {
       this.active += 1;

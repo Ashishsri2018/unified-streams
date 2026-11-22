@@ -37,6 +37,7 @@ interface CacheEntry {
   expiresAt: number;
   streams: StremioStream[];
   meta: StreamsMeta;
+  partial: boolean;
 }
 
 interface CollectedStreams {
@@ -71,6 +72,7 @@ interface ProduceResult {
   streams: StremioStream[];
   outcome: Outcome;
   meta: StreamsMeta | null;
+  partial?: boolean;
 }
 
 interface InFlightEntry {
@@ -149,12 +151,14 @@ async function collectStreams(options: {
       if (attempt && !attempt(scraper.entry.id)) continue;
       const startedAt = Date.now();
       const tracker = createNetworkTracker();
+      const timeoutMs =
+        perProviderTimeoutMs > 0
+          ? Math.min(remaining, perProviderTimeoutMs)
+          : remaining;
+      const deadlineLimited =
+        perProviderTimeoutMs <= 0 || timeoutMs < perProviderTimeoutMs;
       try {
-        const timeoutMs =
-          perProviderTimeoutMs > 0
-            ? Math.min(remaining, perProviderTimeoutMs)
-            : remaining;
-        const streams = await scraperNetworkStorage.run(tracker, () =>
+        const streams = await scraperNetworkStorage.run({ tracker, signal }, () =>
           withTimeout(
             Promise.resolve(run(scraper)),
             timeoutMs,
@@ -166,7 +170,11 @@ async function collectStreams(options: {
         if (Array.isArray(streams)) {
           if (streams.length === 0) {
             const classified = classifyEmptyResult(tracker, latencyMs, timeoutMs);
-            if (classified.outcome === "empty") {
+            const outcome =
+              deadlineLimited && classified.outcome === "timeout"
+                ? "deadline"
+                : classified.outcome;
+            if (outcome === "empty") {
               stats.push({
                 id: scraper.entry.id,
                 ok: true,
@@ -179,8 +187,11 @@ async function collectStreams(options: {
                 ok: false,
                 streams: 0,
                 latencyMs,
-                error: classified.outcome,
-                lastError: classified.lastError ?? undefined,
+                error: outcome,
+                lastError:
+                  outcome === "deadline"
+                    ? "provider execution deadline"
+                    : classified.lastError ?? undefined,
               });
             }
           } else {
@@ -205,13 +216,20 @@ async function collectStreams(options: {
       } catch (error) {
         const aborted = Boolean(signal?.aborted);
         const isTimeout = error instanceof TimeoutError;
+        const deadlineHit = aborted || (isTimeout && deadlineLimited);
         stats.push({
           id: scraper.entry.id,
           ok: false,
           streams: 0,
           latencyMs: Date.now() - startedAt,
-          error: aborted ? "deadline" : isTimeout ? "timeout" : "error",
-          lastError: aborted ? "request aborted" : isTimeout ? "timeout" : errorMessage(error),
+          error: deadlineHit ? "deadline" : isTimeout ? "timeout" : "error",
+          lastError: aborted
+            ? "request aborted"
+            : deadlineHit
+              ? "provider execution deadline"
+              : isTimeout
+                ? "timeout"
+                : errorMessage(error),
         });
         if (!aborted) {
           logger.debug("nuvio_scraper_failed", {
@@ -331,6 +349,14 @@ export class StreamPipeline {
     request: StreamRequest,
     signal?: AbortSignal,
   ): Promise<StremioStream[]> {
+    const result = await this.handleResult(request, signal);
+    return result.streams;
+  }
+
+  async handleResult(
+    request: StreamRequest,
+    signal?: AbortSignal,
+  ): Promise<{ streams: StremioStream[]; partial: boolean }> {
     const startedAt = Date.now();
     if (signal?.aborted) {
       this.logSummary(request, startedAt, "miss", false, {
@@ -338,7 +364,7 @@ export class StreamPipeline {
         outcome: "aborted",
         meta: null,
       });
-      return [];
+      return { streams: [], partial: false };
     }
 
     this.requestMetrics.requests += 1;
@@ -352,7 +378,7 @@ export class StreamPipeline {
           outcome: "ok",
           meta: cached.meta,
         });
-        return cached.streams;
+        return { streams: cached.streams, partial: cached.partial };
       }
       this.cache.delete(cacheKey);
       this.cacheStats.expired += 1;
@@ -382,7 +408,7 @@ export class StreamPipeline {
       const result = await this.awaitShared(entry.promise, signal);
       if (result.streams.length === 0) this.requestMetrics.emptyResults += 1;
       this.logSummary(request, startedAt, "miss", shared, result);
-      return result.streams;
+      return { streams: result.streams, partial: result.partial === true };
     } catch (error) {
       this.requestMetrics.emptyResults += 1;
       this.logRequestFailure(request, error);
@@ -391,7 +417,7 @@ export class StreamPipeline {
         outcome: "error",
         meta: null,
       });
-      return [];
+      return { streams: [], partial: false };
     } finally {
       entry.waiters -= 1;
       if (entry.waiters <= 0) {
@@ -557,10 +583,10 @@ export class StreamPipeline {
         this.config.streamCacheTtlMs > 0 &&
         !signal?.aborted
       ) {
-        this.store(cacheKey, streams, meta, ttl);
+        this.store(cacheKey, streams, meta, ttl, partial);
       }
 
-      return { streams, outcome: "ok", meta };
+      return { streams, outcome: "ok", meta, partial };
     } catch (error) {
       this.logger.error("nuvio_stream_request_failed", {
         type: request.type,
@@ -612,6 +638,7 @@ export class StreamPipeline {
     streams: StremioStream[],
     meta: StreamsMeta,
     ttlMs: number,
+    partial: boolean,
   ): void {
     if (this.cache.size >= MAX_CACHE_ENTRIES) {
       const oldest = this.cache.keys().next().value;
@@ -624,6 +651,7 @@ export class StreamPipeline {
       expiresAt: Date.now() + ttlMs,
       streams,
       meta,
+      partial,
     });
     this.cacheStats.sets += 1;
   }

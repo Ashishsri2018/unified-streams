@@ -28,7 +28,7 @@ export class CloudflareSink implements LogSink {
 
   async writeBatch(events: LogEvent[]): Promise<void> {
     if (Date.now() < this.circuitOpenUntil) {
-      return; // Circuit open, skip to protect application
+      throw new Error('Cloudflare log sink circuit is open');
     }
 
     const payload = events.map((e) => redactObject(e));
@@ -55,12 +55,13 @@ export class CloudflareSink implements LogSink {
       }
 
       this.consecutiveFailures = 0;
-    } catch {
+    } catch (error) {
       this.consecutiveFailures++;
       if (this.consecutiveFailures >= 3) {
         // Open circuit for 2 minutes
         this.circuitOpenUntil = Date.now() + 120000;
       }
+      throw error instanceof Error ? error : new Error(String(error));
     } finally {
       clearTimeout(timer);
     }

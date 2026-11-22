@@ -2,11 +2,21 @@
  * Server-rendered HTML and client JS for the Unified Streams /configure page.
  */
 
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 export function renderConfigurePageHtml(
   baseUrl: string,
   prefillConfigJson: string,
   scriptNonce: string,
 ): string {
+  const htmlBaseUrl = escapeHtmlAttribute(baseUrl);
+  const jsBaseUrl = JSON.stringify(baseUrl);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +24,7 @@ export function renderConfigurePageHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#070b14">
   <title>Unified Streams — Configure</title>
-  <link rel="icon" type="image/x-icon" href="${baseUrl}/favicon.ico">
+  <link rel="icon" type="image/x-icon" href="${htmlBaseUrl}/favicon.ico">
   <style nonce="${scriptNonce}">
     :root {
       color-scheme: dark;
@@ -240,14 +250,14 @@ export function renderConfigurePageHtml(
   <main class="container">
     <header class="header">
       <div class="brand">
-        <img class="logo" src="${baseUrl}/logo.png" alt="">
+        <img class="logo" src="${htmlBaseUrl}/logo.png" alt="">
         <div>
           <h1>Unified Streams</h1>
           <p class="subtitle">Build a Stremio install link for SA7, Nuvio, and Vega streams.</p>
         </div>
       </div>
       <div class="header-actions">
-        <a class="button" href="${baseUrl}/providers">Working providers</a>
+        <a class="button" href="${htmlBaseUrl}/providers">Working providers</a>
       </div>
     </header>
 
@@ -364,7 +374,7 @@ export function renderConfigurePageHtml(
   </main>
 
   <script nonce="${scriptNonce}">
-    const BASE_URL = "${baseUrl}";
+    const BASE_URL = ${jsBaseUrl};
     const PREFILL_CONFIG = ${prefillConfigJson};
     const PREFILL = PREFILL_CONFIG && typeof PREFILL_CONFIG === 'object' ? PREFILL_CONFIG : {};
     const BACKENDS = ['sa7', 'nuvio', 'vega'];
@@ -489,6 +499,18 @@ export function renderConfigurePageHtml(
         el('manifestUrlBox').textContent = 'Fix the settings above to generate an install link.';
         el('btnOpen').removeAttribute('href');
       }
+    }
+
+    function base64UrlJson(value) {
+      const bytes = new TextEncoder().encode(JSON.stringify(value));
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary)
+        .replace(/\\+/g, '-')
+        .replace(/\\//g, '_')
+        .replace(/=+$/, '');
     }
 
     function updateUrl() {

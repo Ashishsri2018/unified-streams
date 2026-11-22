@@ -111,19 +111,38 @@ function createSa7Handlers(fleetEnv = process.env) {
       cinemeta.prime(contentId, type, metaTmdb);
     }
 
+    const controller = new AbortController();
+    const abortOnClose = () => {
+      if (!res.writableEnded) controller.abort(new Error('client disconnected'));
+    };
+    res.on('close', abortOnClose);
+
     let streams = [];
+    let partial = false;
     try {
-      const rawStreams = await collectStreams(contentId, type, season, episode);
-      if (Array.isArray(rawStreams)) streams = rawStreams;
+      const result = await collectStreams(
+        contentId,
+        type,
+        season,
+        episode,
+        null,
+        controller.signal,
+      );
+      if (result && Array.isArray(result.streams)) {
+        streams = result.streams;
+        partial = result.partial === true;
+      }
     } catch {
       streams = [];
+    } finally {
+      res.off('close', abortOnClose);
     }
     res.writeHead(200, {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
       ...(requestId ? { 'x-request-id': requestId } : {}),
     });
-    res.end(JSON.stringify({ streams }));
+    res.end(JSON.stringify({ streams, partial }));
   }
 
   function handleReload(req, res, requestId) {

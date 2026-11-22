@@ -180,14 +180,24 @@ export class SnapshotManager {
       await this.cleanupSnapshots(targetSha);
       return snapshot;
     } catch (error) {
+      const message = errorMessage(error);
+      if (this.snapshot) {
+        this.lastError = message;
+        this.logger.warn("nuvio_snapshot_refresh_failed_keeping_active", {
+          error: message,
+        });
+        return this.snapshot;
+      }
       const bundled = await this.loadBundled(false);
       if (bundled) {
         this.logger.warn("nuvio_snapshot_refresh_failed_using_bundled", {
-          error: errorMessage(error),
+          error: message,
         });
-        return this.activate(bundled, "bundled");
+        const active = this.activate(bundled, "bundled");
+        this.lastError = message;
+        return active;
       }
-      this.lastError = errorMessage(error);
+      this.lastError = message;
       this.logger.error("nuvio_snapshot_refresh_failed", {
         error: this.lastError,
       });

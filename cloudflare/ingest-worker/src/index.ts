@@ -28,18 +28,34 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
-    // Auth check
-    if (env.AUTH_TOKEN) {
-      const authHeader = req.headers.get('authorization') || '';
-      if (authHeader !== `Bearer ${env.AUTH_TOKEN}`) {
-        return new Response('Unauthorized', { status: 401 });
-      }
+    if (!env.AUTH_TOKEN) {
+      return new Response('Ingest token not configured', { status: 503 });
+    }
+    const authHeader = req.headers.get('authorization') || '';
+    if (authHeader !== `Bearer ${env.AUTH_TOKEN}`) {
+      return new Response('Unauthorized', { status: 401 });
     }
 
     if (url.pathname === '/v1/logs' && req.method === 'POST') {
       try {
-        const body = (await req.json()) as { events?: RawLogEvent[] };
-        const events = Array.isArray(body?.events) ? body.events : [];
+        const rawBody = await req.text();
+        if (rawBody.length > 1_000_000) {
+          return new Response('Payload too large', { status: 413 });
+        }
+        const body = JSON.parse(rawBody) as { events?: unknown };
+        const incoming = Array.isArray(body?.events) ? body.events : [];
+        const events = incoming
+          .slice(0, 500)
+          .filter((value): value is RawLogEvent => {
+            if (typeof value !== 'object' || value === null) return false;
+            const e = value as Record<string, unknown>;
+            return (
+              typeof e.ts === 'string' && e.ts.length <= 64 &&
+              typeof e.level === 'string' && e.level.length <= 16 &&
+              typeof e.service === 'string' && e.service.length <= 32 &&
+              typeof e.event === 'string' && e.event.length <= 128
+            );
+          });
         if (events.length === 0) return new Response('OK', { status: 200 });
 
         // Insert batch to D1
@@ -71,8 +87,12 @@ export default {
     }
 
     if (url.pathname === '/v1/query' && req.method === 'GET') {
-      const limit = parseInt(url.searchParams.get('limit') || '50', 10);
-      const fleet = url.searchParams.get('fleet');
+      const parsedLimit = Number.parseInt(url.searchParams.get('limit') || '50', 10);
+      const limit = Number.isFinite(parsedLimit)
+        ? Math.min(500, Math.max(1, parsedLimit))
+        : 50;
+      const fleetParam = url.searchParams.get('fleet');
+      const fleet = fleetParam && /^[A-Za-z0-9_-]{1,32}$/.test(fleetParam) ? fleetParam : null;
       let query = 'SELECT * FROM log_events';
       const params: unknown[] = [];
       if (fleet) {

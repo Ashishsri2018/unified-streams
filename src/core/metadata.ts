@@ -131,6 +131,8 @@ export class MetadataResolver {
       this.misses++;
       return undefined;
     }
+    this.cache.delete(key);
+    this.cache.set(key, item);
     this.hits++;
     return item.data;
   }
@@ -569,7 +571,11 @@ export class MetadataResolver {
           }
         }
 
-        this.setCache(cacheKey, meta);
+        this.setCache(
+          cacheKey,
+          meta,
+          meta.imdbId || meta.tmdbId ? undefined : this.transientTtlMs,
+        );
         return meta;
       }
 
@@ -596,7 +602,11 @@ export class MetadataResolver {
       }
 
       const meta: CanonicalMetadata = { title, year: anime.year, type, imdbId, tmdbId };
-      this.setCache(cacheKey, meta);
+      this.setCache(
+        cacheKey,
+        meta,
+        meta.imdbId || meta.tmdbId ? undefined : this.transientTtlMs,
+      );
       return meta;
     } catch {
       if (!ctx.aborted()) this.setCache(cacheKey, null, this.transientTtlMs);
@@ -654,7 +664,11 @@ export class MetadataResolver {
       }
 
       const meta: CanonicalMetadata = { title: anime.title, year: anime.year, type, imdbId, tmdbId };
-      this.setCache(cacheKey, meta);
+      this.setCache(
+        cacheKey,
+        meta,
+        meta.imdbId || meta.tmdbId ? undefined : this.transientTtlMs,
+      );
       return meta;
     } catch {
       if (!ctx.aborted()) this.setCache(cacheKey, null, this.transientTtlMs);

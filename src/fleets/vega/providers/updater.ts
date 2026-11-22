@@ -354,6 +354,10 @@ export class Updater {
     }
   }
 
+  wasLockSkipped(): boolean {
+    return this.lastLockSkipped;
+  }
+
   getHealth(): HealthReport {
     const state = this.getState();
     const bundles = this.registry.listProviders();

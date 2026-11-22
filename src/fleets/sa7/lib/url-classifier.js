@@ -14,8 +14,10 @@ try {
 const ARCHIVE_EXTENSIONS = /\.(zip|rar|7z|tar|gz|bz2|iso|xz|tgz|tbz2|zst)($|\?|&|#)/i;
 const BLOCKER_URL_PATTERN = /\/(slowdown|ratelimit|antibot)\b/i;
 const DIRECT_MEDIA_PATTERN =
-  /(?:\.|\/)(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])/i;
+  /\.(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])|\/(mp4|mkv|m4v|webm|avi|flv|m3u8|mpd|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])/i;
 const HTML_EXTENSIONS = /\.(html?|php|aspx?|jsp|cgi)($|\?|&|#)/i;
+const DIRECT_ENDPOINT_HOST_PATTERN = /streamtape\./i;
+const DIRECT_ENDPOINT_PATH_PATTERN = /\/(?:get_video)(?:$|[?&#/])/i;
 
 const EMBED_PATH_PATTERNS = [
   /\/embed(?:\/|\?|$)/i,
@@ -90,6 +92,12 @@ function isDirectMediaUrl(rawUrl) {
     const parsed = new URL(rawUrl);
     const pathname = parsed.pathname;
     if (DIRECT_MEDIA_PATTERN.test(pathname)) return true;
+    if (
+      DIRECT_ENDPOINT_HOST_PATTERN.test(parsed.hostname) &&
+      DIRECT_ENDPOINT_PATH_PATTERN.test(pathname)
+    ) {
+      return true;
+    }
     for (const param of ['url', 'stream', 'link', 'source', 'src', 'file', 'm3u8']) {
       const val = parsed.searchParams.get(param);
       if (val && DIRECT_MEDIA_PATTERN.test(val)) return true;
@@ -125,7 +133,8 @@ function isWebPage(url, stream = {}) {
   if (
     hostname.startsWith('proxy.') ||
     hostname.endsWith('.r2.cloudflarestorage.com') ||
-    hostname === 'video-downloads.googleusercontent.com' ||
+    hostname.endsWith('.googleusercontent.com') ||
+    hostname.includes('direct-stream') ||
     (hostname === 'pixeldrain.com' && pathname.startsWith('/api/file/'))
   ) {
     return false;
@@ -139,7 +148,11 @@ function isWebPage(url, stream = {}) {
   }
 
   for (const domain of KNOWN_EMBED_DOMAINS) {
-    if (hostname.includes(domain)) return true;
+    if (domain.endsWith('.')) {
+      if (hostname.startsWith(domain)) return true;
+    } else if (hostname === domain || hostname.endsWith(`.${domain}`)) {
+      return true;
+    }
   }
 
   return false;

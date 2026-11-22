@@ -91,8 +91,10 @@ export class GatewayStreamCache<T extends { streams: unknown[] }> {
     const ttl = isPartial ? this.partialTtlMs : this.fullTtlMs;
     const expiresAt = Date.now() + ttl;
 
-    // Evict oldest if full
-    if (this.map.size >= this.maxEntries && !this.map.has(key)) {
+    // Refresh LRU order on overwrite, otherwise evict the oldest entry.
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    } else if (this.map.size >= this.maxEntries) {
       const oldestKey = this.map.keys().next().value;
       if (oldestKey !== undefined) {
         this.map.delete(oldestKey);

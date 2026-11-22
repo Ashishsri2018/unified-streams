@@ -8,7 +8,12 @@ import { nativeFetch } from "../util/nativeFetch.js";
 
 const ON_SETTINGS_TIMEOUT_MS = 3000;
 
-export const scraperNetworkStorage = new AsyncLocalStorage<NetworkTracker>();
+export interface ScraperNetworkContext {
+  tracker: NetworkTracker;
+  signal?: AbortSignal;
+}
+
+export const scraperNetworkStorage = new AsyncLocalStorage<ScraperNetworkContext>();
 
 type EvaluatedModule = Record<string, unknown>;
 
@@ -26,13 +31,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function createProviderFetch(timeoutMs: number): typeof fetch {
   return (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
-    const tracker = scraperNetworkStorage.getStore();
+    const context = scraperNetworkStorage.getStore();
+    const tracker = context?.tracker;
     const startedAt = Date.now();
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url || "";
     const timeoutSignal = AbortSignal.timeout(Math.max(1, timeoutMs));
-    const signal = init?.signal
-      ? AbortSignal.any([init.signal, timeoutSignal])
-      : timeoutSignal;
+    const signals = [timeoutSignal];
+    if (init?.signal) signals.push(init.signal);
+    if (context?.signal) signals.push(context.signal);
+    const signal = signals.length > 1 ? AbortSignal.any(signals) : timeoutSignal;
     try {
       const response = await nativeFetch(input, { ...init, signal });
       if (tracker) {

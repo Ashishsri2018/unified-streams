@@ -168,3 +168,44 @@ until the next deploy or snapshot refresh.
 
 The Vidlink (Haylox) HTTP 428 issue above is separate and remains open; no
 Vidlink patch has been applied.
+
+## Isolation and deployment caveats (2026-11-22)
+
+### Provider code runs in-process with worker privileges
+
+Nuvio and Vega scraper/provider modules are evaluated inside the fleet worker
+process, and all three fleets run in the gateway process tree. The loopback
+worker split (`127.0.0.1:7001-7003`) isolates HTTP failure domains and stream
+caches, but it is not a security sandbox: provider code can read `process.env`,
+open files, or mutate globals. Treat provider snapshots as trusted code and
+review them before enabling a new source.
+
+Status: accepted architecture. A real sandbox would require a separate runtime
+or VM boundary; it is out of scope for the current deployment.
+
+### Cookie jar is shared per Vega worker
+
+`CookieJar` now stores cookies by host (host-only cookies) or by the explicit
+`Domain` attribute, and only sends `Secure` cookies over HTTPS. Cookies with a
+shared parent domain are still visible to every provider served by the same
+Vega worker, matching browser behavior for `Domain` cookies. There is no
+per-provider partition.
+
+Status: accepted. Provider modules are not mutually untrusted.
+
+### Rollback workflow is a stub
+
+`.github/workflows/rollback.yml` checks out the requested commit and only prints
+a message; it does not redeploy Beamup, Railway, or Cloudflare. Use the normal
+deploy workflow or the provider-specific CLIs for an actual rollback.
+
+Status: unresolved by design; documented to avoid treating the workflow as a
+real rollback mechanism.
+
+### Log sink circuit breaker drops queued batches
+
+When the Cloudflare log sink circuit is open, `CloudflareSink.writeBatch` throws
+and `LogQueue` records `batchesFailed` and drops that batch. Gateway behavior is
+unaffected, but log delivery is lossy during a sink outage.
+
+Status: accepted; the circuit breaker protects request latency.

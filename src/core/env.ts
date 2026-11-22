@@ -33,7 +33,12 @@ export const EnvSchema = z.object({
   SA7_CONCURRENCY: z.coerce.number().int().min(1).default(30),
   CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().min(1).default(3),
   CIRCUIT_COOLDOWN_MS: z.coerce.number().int().min(1000).default(300000),
-  UPDATE_ON_START: z.preprocess((val) => val === 'true' || val === true || val === '1', z.boolean()).default(true),
+  UPDATE_ON_START: z.preprocess((val) => {
+    if (val === undefined) return undefined;
+    if (typeof val === 'boolean') return val;
+    const normalized = String(val).trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'yes';
+  }, z.boolean()).default(true),
   UPDATE_INTERVAL_MIN_HOURS: z.coerce.number().int().min(1).default(20),
   UPDATE_INTERVAL_MAX_HOURS: z.coerce.number().int().min(1).default(24),
   CINEMETA_URL: z.string().url().default('https://v3-cinemeta.strem.io'),
@@ -225,6 +230,12 @@ function resolveEffectivePolicy(
   const disableSet = new Set(disabledOverride.map((id) => id.toLowerCase()));
 
   if (base.mode === 'allow' || enabledOverride.length > 0) {
+    if (enabledOverride.includes('*')) {
+      return {
+        enabled: null,
+        disabled: dedupeList([...hardDisabled, ...disabledOverride]),
+      };
+    }
     const allowed = enabledOverride.length > 0 ? enabledOverride : base.ids;
     const enabled = dedupeList(
       allowed.filter((id) => {
@@ -420,9 +431,13 @@ export function deriveFleetEnv(
       outEnv.SCRAPER_SETTINGS_JSON = JSON.stringify(scraperSettings);
     }
   } else if (fleet === 'vega') {
+    const vegaBasePolicy: FleetPolicy = {
+      ...basePolicy,
+      ids: aliasVegaDisabled([...basePolicy.ids]),
+    };
     const effective = resolveEffectivePolicy(
-      basePolicy,
-      cleanEnvList(env.VEGA_ENABLED_PROVIDERS),
+      vegaBasePolicy,
+      aliasVegaDisabled(cleanEnvList(env.VEGA_ENABLED_PROVIDERS)),
       aliasVegaDisabled(cleanEnvList(env.VEGA_DISABLED_PROVIDERS)),
     );
     applyPolicyEnv(outEnv, 'VEGA', 'ENABLED_PROVIDERS', 'DISABLED_PROVIDERS', effective, {

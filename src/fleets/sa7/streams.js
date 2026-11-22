@@ -99,7 +99,6 @@ function createCollector({
   }),
   providerTimeoutMs = config.providerTimeoutMs,
   deadlineMs = config.deadlineMs,
-  minProviderTimeoutMs = 1000,
   maxPerProviderStreams = config.maxPerProviderStreams,
   maxTotalStreams = config.maxTotalStreams,
   now = Date.now,
@@ -112,45 +111,54 @@ function createCollector({
     providerFailures: 0,
   };
 
-  async function runProviders(contentId, type, season, episode) {
+  async function runProviders(contentId, type, season, episode, signal) {
     const deadline = now() + deadlineMs;
     const mediaType = type === 'series' ? 'tv' : 'movie';
+    if (signal?.aborted) return { value: [], partial: false };
     let tmdbId = tmdbIdOf(contentId);
     if (!tmdbId) {
       const lookupTimeoutMs = Math.max(
-        minProviderTimeoutMs,
+        1,
         Math.min(providerTimeoutMs, deadline - now())
       );
       try {
         tmdbId = await withTimeout(
           Promise.resolve().then(() => resolveTmdbId(contentId, type)),
           lookupTimeoutMs,
-          'tmdb lookup'
+          'tmdb lookup',
+          signal
         );
       } catch (err) {
         logger.warn(`[streams] TMDB lookup failed for ${contentId}: ${err.message}`);
-        return [];
+        return { value: [], partial: signal?.aborted === true };
       }
     }
     if (!tmdbId) {
       logger.warn(`[streams] no TMDB id resolved for ${contentId}`);
-      return [];
+      return { value: [], partial: false };
     }
 
-    const timeoutMs = Math.max(
-      minProviderTimeoutMs,
-      Math.min(providerTimeoutMs, deadline - now())
-    );
     const providers = providersForFn(mediaType);
     let partial = false;
     const results = await mapWithConcurrency(
       providers,
       config.providerConcurrency,
       async (provider) => {
+        if (signal?.aborted) {
+          partial = true;
+          return [];
+        }
+        const remaining = deadline - now();
+        if (remaining <= 0) {
+          partial = true;
+          return [];
+        }
         if (!breaker.attempt(provider.id)) return [];
 
+        const timeoutMs = Math.max(1, Math.min(providerTimeoutMs, remaining));
+        const deadlineLimited = timeoutMs < providerTimeoutMs;
         const started = now();
-        const tracker = createTracker();
+        const tracker = createTracker(signal);
         try {
           const streams = await sa7NetworkStorage.run(tracker, () =>
             withTimeout(
@@ -158,7 +166,8 @@ function createCollector({
                 provider.getStreams(String(tmdbId), mediaType, season, episode)
               ),
               timeoutMs,
-              provider.id
+              provider.id,
+              signal
             )
           );
           const list = (Array.isArray(streams) ? streams : [])
@@ -188,9 +197,9 @@ function createCollector({
           }
           return list;
         } catch (err) {
-          const deadlineExpired = now() >= deadline;
+          const deadlineExpired = now() >= deadline || signal?.aborted === true;
           const outcome =
-            err instanceof TimeoutError && deadlineExpired
+            err instanceof TimeoutError && (deadlineExpired || deadlineLimited)
               ? 'skipped'
               : err instanceof TimeoutError
                 ? 'timeout'
@@ -219,12 +228,23 @@ function createCollector({
     return { value: dedupe(results), partial: partial || deadlineHit };
   }
 
-  async function collectStreams(contentId, type, season, episode, userConfig = null) {
+  async function collectStreams(
+    contentId,
+    type,
+    season,
+    episode,
+    userConfig = null,
+    signal,
+  ) {
     counters.requests += 1;
+    if (signal?.aborted) return { streams: [], partial: false };
     const key = streamKey(type, contentId, season, episode);
-    const raw = await cache.getOrLoad(key, () =>
-      runProviders(contentId, type, season, episode)
+    const result = await cache.getOrLoadResult(
+      key,
+      (loadSignal) => runProviders(contentId, type, season, episode, loadSignal),
+      signal,
     );
+    const raw = Array.isArray(result.value) ? result.value : [];
 
     const filtered = raw
       .map((item) => ({ ...item, rank: qualityRank(item.stream) }))
@@ -247,7 +267,7 @@ function createCollector({
       .filter(Boolean)
       .slice(0, maxTotalStreams);
     if (streams.length === 0) counters.emptyResults += 1;
-    return streams;
+    return { streams, partial: result.partial === true };
   }
 
   async function collectSubtitles(contentId, type, season, episode, userConfig = null) {

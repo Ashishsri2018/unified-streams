@@ -32,6 +32,17 @@ type Fleet = 'sa7' | 'nuvio' | 'vega';
 const FLEET_PORTS: Record<Fleet, number> = { sa7: 7001, nuvio: 7002, vega: 7003 };
 const nodeRequire = createRequire(import.meta.url);
 
+function portFromUrl(rawUrl: string | undefined, fallback: number): number {
+  if (!rawUrl) return fallback;
+  try {
+    const parsed = new URL(rawUrl);
+    const port = Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80));
+    return Number.isInteger(port) && port > 0 && port <= 65535 ? port : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function loadSa7Factory(): (env: NodeJS.ProcessEnv) => FleetInstance {
   const distWorker = path.resolve(process.cwd(), 'dist/fleets/sa7/worker.js');
   const srcWorker = path.resolve(process.cwd(), 'src/fleets/sa7/worker.js');
@@ -54,7 +65,13 @@ async function startFleets(env: AppEnv): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = [];
 
   for (const fleet of Object.keys(FLEET_PORTS) as Fleet[]) {
-    const port = FLEET_PORTS[fleet];
+    const configuredUrl =
+      fleet === 'sa7'
+        ? env.SA7_INTERNAL_URL
+        : fleet === 'nuvio'
+          ? env.NUVIO_INTERNAL_URL
+          : env.VEGA_INTERNAL_URL;
+    const port = portFromUrl(configuredUrl, FLEET_PORTS[fleet]);
     const fleetEnv = deriveFleetEnv(env, fleet, port);
     const instance: FleetInstance =
       fleet === 'sa7'
@@ -107,6 +124,7 @@ async function main(): Promise<void> {
     logger.error('process.uncaught_exception', {
       error: error instanceof Error ? error.message : String(error),
     });
+    process.exit(1);
   });
 
   const cache = new GatewayStreamCache<{ streams: StremioStream[] }>({
@@ -165,10 +183,15 @@ async function main(): Promise<void> {
     logger.info('gateway.ready', { port: env.PORT, url: `http://localhost:${env.PORT}` });
   });
 
+  let shuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info('gateway.shutting_down', { signal });
-    server.close();
     scheduler.stop();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
     await stopFleets();
     uninstallConsoleGuard();
     await logger.close();

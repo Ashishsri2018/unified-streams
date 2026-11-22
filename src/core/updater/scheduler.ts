@@ -224,7 +224,10 @@ export class UpdaterScheduler {
     if (!health.ok) {
       throw new Error(`${fleet} worker reported unhealthy after reload`);
     }
-    if (fleet === 'sa7' && health.snapshot?.sha && health.snapshot.sha !== sha) {
+    if (health.snapshot?.lastError) {
+      throw new Error(`${fleet} worker reported snapshot error: ${health.snapshot.lastError}`);
+    }
+    if (health.snapshot?.sha && health.snapshot.sha !== sha) {
       throw new Error(
         `${fleet} worker still reports snapshot ${health.snapshot.sha}, expected ${sha}`,
       );

@@ -80,7 +80,7 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
       streamRequest,
       typeof rawImdb === 'string' ? rawImdb : undefined,
     );
-    if (cinemeta && metaTitle && 'imdbId' in streamRequest) {
+    if (cinemeta && metaTitle && streamRequest.type === 'movie' && 'imdbId' in streamRequest) {
       cinemeta.prime(streamRequest.type, streamRequest.imdbId, {
         id: streamRequest.imdbId,
         type: streamRequest.type,
@@ -98,11 +98,11 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
     };
     res.on('close', abortOnClose);
     try {
-      const rawStreams = await pipeline.handle(streamRequest, controller.signal);
-      const streams = Array.isArray(rawStreams) ? (rawStreams as StremioStream[]) : [];
-      sendJson(res, 200, { streams }, requestId);
+      const result = await pipeline.handleResult(streamRequest, controller.signal);
+      const streams = Array.isArray(result.streams) ? (result.streams as StremioStream[]) : [];
+      sendJson(res, 200, { streams, partial: result.partial }, requestId);
     } catch {
-      sendJson(res, 200, { streams: [] }, requestId);
+      sendJson(res, 200, { streams: [], partial: false }, requestId);
     } finally {
       res.off('close', abortOnClose);
     }
@@ -211,6 +211,13 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
         requestId,
       );
     }
+    if (runtime.updater.wasLockSkipped()) {
+      return sendJson(res, 500, { ok: false, error: 'provider update already running' }, requestId);
+    }
+    const health = runtime.updater.getHealth();
+    if (health.lastError) {
+      return sendJson(res, 500, { ok: false, error: health.lastError }, requestId);
+    }
     return sendJson(res, 200, { ok: true, reloadedAt: new Date().toISOString() }, requestId);
   }
 
@@ -219,7 +226,8 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
     internalToken: fleetEnv.INTERNAL_TOKEN || '',
     handlers: { health: handleHealth, stream: handleStream, reload: handleReload },
     dispose: async () => {
-      if (runtime) await runtime.updater.stop();
+      pipeline?.dispose();
+      if (runtime) await runtime.dispose();
     },
   };
 }

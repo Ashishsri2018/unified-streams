@@ -38,6 +38,7 @@ function parseContentId(raw, type) {
   for (const { source, pattern } of CONTENT_PATTERNS) {
     const match = pattern.exec(raw);
     if (!match) continue;
+    if (type === 'movie' && match[2] !== undefined) return null;
     return {
       source,
       id: source === 'tmdb' ? Number(match[1]) : match[1],

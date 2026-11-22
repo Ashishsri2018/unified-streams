@@ -54,6 +54,7 @@ function createConfig(env = process.env) {
     enabledProviders: envList(env, 'ENABLED_PROVIDERS', 'SA7_ENABLED_PROVIDERS'),
     disabledProviders: envList(env, 'DISABLED_PROVIDERS', 'SA7_DISABLED_PROVIDERS'),
     cinemetaUrl: (env.CINEMETA_URL || 'https://v3-cinemeta.strem.io').replace(/\/$/, ''),
+    tmdbUrl: (env.TMDB_URL || 'https://api.themoviedb.org/3').replace(/\/$/, ''),
     tmdbApiKey: env.TMDB_API_KEY || '',
   };
 }

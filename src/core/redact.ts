@@ -48,7 +48,7 @@ export function redactString(input: string): string {
 /**
  * Deeply redacts an object, sanitizing URLs and masking sensitive keys.
  */
-export function redactObject<T>(obj: T): T {
+export function redactObject<T>(obj: T, seen: WeakSet<object> = new WeakSet()): T {
   if (obj === null || typeof obj !== 'object') {
     if (typeof obj === 'string') {
       return redactString(obj) as unknown as T;
@@ -56,8 +56,13 @@ export function redactObject<T>(obj: T): T {
     return obj;
   }
 
+  if (seen.has(obj)) {
+    return '[Circular]' as unknown as T;
+  }
+  seen.add(obj);
+
   if (Array.isArray(obj)) {
-    return obj.map((item) => redactObject(item)) as unknown as T;
+    return obj.map((item) => redactObject(item, seen)) as unknown as T;
   }
 
   const output: Record<string, unknown> = {};
@@ -86,7 +91,7 @@ export function redactObject<T>(obj: T): T {
     } else if (typeof value === 'string' && (lowerKey.includes('url') || lowerKey.includes('link'))) {
       output[key] = sanitizeUrl(value);
     } else {
-      output[key] = redactObject(value);
+      output[key] = redactObject(value, seen);
     }
   }
 

@@ -12,13 +12,35 @@ function escapeJsonForScript(json: string): string {
     .replace(/\u2029/g, '\\u2029');
 }
 
+function normalizeBaseUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (!url.hostname || url.username || url.password) return null;
+    const path = url.pathname.replace(/\/+$/, '');
+    return `${url.protocol}//${url.host}${path}`;
+  } catch {
+    return null;
+  }
+}
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw?.split(',')[0]?.trim() || undefined;
+}
+
 export function getPublicBaseUrl(req: Request, configuredPublicUrl?: string): string {
   if (configuredPublicUrl && configuredPublicUrl.trim()) {
-    return configuredPublicUrl.replace(/\/+$/, '');
+    const configured = normalizeBaseUrl(configuredPublicUrl.trim());
+    if (configured) return configured;
   }
-  const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol || 'http';
-  const host = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.headers.host || 'localhost:7000';
-  return `${proto}://${host}`;
+  const proto = firstHeaderValue(req.headers['x-forwarded-proto']);
+  const host = firstHeaderValue(req.headers['x-forwarded-host']) ?? req.headers.host;
+  const candidateProto = proto === 'https' || proto === 'http' ? proto : req.protocol;
+  const candidate = host ? normalizeBaseUrl(`${candidateProto}://${host}`) : null;
+  if (candidate) return candidate;
+  const fallbackProto = req.protocol === 'https' ? 'https' : 'http';
+  return `${fallbackProto}://localhost:7000`;
 }
 
 export function handleConfigure(req: Request, res: Response, configuredPublicUrl?: string): void {

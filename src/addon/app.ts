@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, NextFunction, Request, RequestHandler, Response } from 'express';
 import compression from 'compression';
 import { StreamHandlerContext, handleStreamRoute } from './stream.js';
 import { handleHealth, handleStats } from './health.js';
@@ -7,6 +7,15 @@ import { handleProvidersPage } from './providers.js';
 import { handleConfigure, getPublicBaseUrl } from './configure.js';
 import { buildManifest } from './manifest.js';
 import { handleLogoPng, handleLogoSvg, handleFavicon } from './logo.js';
+import { logger } from '../core/logger.js';
+
+function asyncRoute(
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
+): RequestHandler {
+  return (req, res, next) => {
+    void handler(req, res, next).catch(next);
+  };
+}
 
 export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): Express {
   const app = express();
@@ -70,29 +79,38 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
   app.head(['/configure', '/:config/configure'], (req, res) => handleConfigure(req, res, ctx.publicBaseUrl));
 
   // Stream routes
-  app.get(['/stream/:type/:id.json', '/:config/stream/:type/:id.json'], (req, res) => handleStreamRoute(req, res, ctx));
-  app.head(['/stream/:type/:id.json', '/:config/stream/:type/:id.json'], (req, res) => handleStreamRoute(req, res, ctx));
+  const streamRoute = asyncRoute((req, res) => handleStreamRoute(req, res, ctx));
+  app.get(['/stream/:type/:id.json', '/:config/stream/:type/:id.json'], streamRoute);
+  app.head(['/stream/:type/:id.json', '/:config/stream/:type/:id.json'], streamRoute);
 
   // Observability routes
-  app.get('/health', (req, res) => handleHealth(req, res, ctx, startedAt));
-  app.head('/health', (req, res) => handleHealth(req, res, ctx, startedAt));
+  const healthRoute = asyncRoute((req, res) => handleHealth(req, res, ctx, startedAt));
+  app.get('/health', healthRoute);
+  app.head('/health', healthRoute);
 
-  app.get('/stats', (req, res) => handleStats(req, res, ctx, startedAt));
-  app.head('/stats', (req, res) => handleStats(req, res, ctx, startedAt));
+  const statsRoute = asyncRoute((req, res) => handleStats(req, res, ctx, startedAt));
+  app.get('/stats', statsRoute);
+  app.head('/stats', statsRoute);
 
-  app.get('/status', (req, res) => handleStatusPage(req, res, ctx, startedAt, ctx.publicBaseUrl));
-  app.head('/status', (req, res) => handleStatusPage(req, res, ctx, startedAt, ctx.publicBaseUrl));
+  const statusRoute = asyncRoute((req, res) =>
+    handleStatusPage(req, res, ctx, startedAt, ctx.publicBaseUrl),
+  );
+  app.get('/status', statusRoute);
+  app.head('/status', statusRoute);
 
   app.get('/providers', (req, res) => handleProvidersPage(req, res, ctx.publicBaseUrl));
   app.head('/providers', (req, res) => handleProvidersPage(req, res, ctx.publicBaseUrl));
 
   // Branding asset routes
-  app.get('/logo.png', handleLogoPng);
-  app.head('/logo.png', handleLogoPng);
-  app.get('/logo.svg', handleLogoSvg);
-  app.head('/logo.svg', handleLogoSvg);
-  app.get('/favicon.ico', handleFavicon);
-  app.head('/favicon.ico', handleFavicon);
+  const logoPng = asyncRoute((req, res) => handleLogoPng(req, res));
+  app.get('/logo.png', logoPng);
+  app.head('/logo.png', logoPng);
+  const logoSvg = asyncRoute((req, res) => handleLogoSvg(req, res));
+  app.get('/logo.svg', logoSvg);
+  app.head('/logo.svg', logoSvg);
+  const favicon = asyncRoute((req, res) => handleFavicon(req, res));
+  app.get('/favicon.ico', favicon);
+  app.head('/favicon.ico', favicon);
 
   // Method not allowed handler for known routes
   app.all('*', (req: Request, res: Response) => {
@@ -102,6 +120,25 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
       return;
     }
     res.status(404).json({ error: 'Not Found' });
+  });
+
+  app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('gateway_route_failed', error, {
+      route: req.path,
+      method: req.method,
+      error: message,
+    });
+    if (res.headersSent) {
+      res.end();
+      return;
+    }
+    if (req.path.includes('/stream/')) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ streams: [] });
+      return;
+    }
+    res.status(500).json({ error: 'Internal Server Error' });
   });
 
   return app;

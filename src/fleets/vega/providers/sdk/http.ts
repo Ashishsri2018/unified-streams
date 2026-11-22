@@ -330,18 +330,24 @@ export class HttpTransport implements HttpTransportApi {
 
   async request(options: HttpRequestOptions): Promise<HttpResponseData> {
     const timeoutMs = Math.max(1, options.timeoutMs ?? this.defaultTimeoutMs);
-    const semaphore = this.semaphoreFor(options.url);
-    return semaphore.run(() => this.performRequest(options, timeoutMs));
+    const { host, semaphore } = this.semaphoreFor(options.url);
+    try {
+      return await semaphore.run(() => this.performRequest(options, timeoutMs));
+    } finally {
+      if (semaphore.isIdle() && this.hostSemaphores.get(host) === semaphore) {
+        this.hostSemaphores.delete(host);
+      }
+    }
   }
 
-  private semaphoreFor(url: string): Semaphore {
+  private semaphoreFor(url: string): { host: string; semaphore: Semaphore } {
     const host = hostnameOf(url) || "invalid";
     let semaphore = this.hostSemaphores.get(host);
     if (!semaphore) {
       semaphore = new Semaphore(this.maxPerHost);
       this.hostSemaphores.set(host, semaphore);
     }
-    return semaphore;
+    return { host, semaphore };
   }
 
   private async performRequest(
@@ -462,7 +468,7 @@ export class HttpTransport implements HttpTransportApi {
         headers: options.headers ?? {},
         data: options.body,
         impersonate: this.impersonate,
-        verify: false,
+        verify: true,
         allowRedirects: followRedirects,
         followRedirects,
         timeout: timeoutMs / 1000,
@@ -564,11 +570,7 @@ export class HttpTransport implements HttpTransportApi {
       const collected = collectHeaders(response.headers);
       const finalUrl = response.url || options.url;
       this.captureCookies(finalUrl, collected.setCookies);
-      const rawBody = await readResponseBody(response, this.maxResponseBytes, controller);
-      const body = await this.decodeBody(
-        rawBody,
-        collected.headers["content-encoding"],
-      );
+      const body = await readResponseBody(response, this.maxResponseBytes, controller);
       return {
         status: response.status,
         statusText: response.statusText || defaultStatusText(response.status),

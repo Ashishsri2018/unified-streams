@@ -11,9 +11,10 @@
 export const ARCHIVE_EXTENSIONS = /\.(zip|rar|7z|tar|gz|bz2|iso|xz|tgz|tbz2|zst)($|\?|&|#)/i;
 export const BLOCKER_URL_PATTERN = /\/(slowdown|ratelimit|antibot)\b/i;
 
-// Direct media extensions or path segments (e.g. .m3u8, /m3u8, .mp4, /mp4, .mpd, /mpd, .3gp, etc.)
+// Direct media extensions or unambiguous path segments (e.g. .m3u8, /m3u8, .mp4, /mp4, .mpd, /mpd).
+// Ambiguous two/three-letter path segments such as /ts/ and /mov/ are intentionally excluded.
 export const DIRECT_MEDIA_PATTERN =
-  /(?:\.|\/)(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])/i;
+  /\.(mp4|mkv|m4v|webm|avi|mov|flv|m3u8|mpd|ts|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])|\/(mp4|mkv|m4v|webm|avi|flv|m3u8|mpd|3gp|3g2|ogv|ogg|mpg|mpeg|wmv|asf|vob|m2ts|mp3|aac|flac|wav|m4a|opus)(?:$|[?&#/])/i;
 const DIRECT_ENDPOINT_HOST_PATTERN = /streamtape\./i;
 const DIRECT_ENDPOINT_PATH_PATTERN = /\/(?:get_video)(?:$|[?&#/])/i;
 export const HTML_EXTENSIONS = /\.(html?|php|aspx?|jsp|cgi)($|\?|&|#)/i;
@@ -173,7 +174,11 @@ export function isWebPage(rawUrl: string, hint?: StreamTextHint): boolean {
 
     // Known embed / web player domains
     for (const domain of KNOWN_EMBED_DOMAINS) {
-      if (hostname.includes(domain)) return true;
+      if (domain.endsWith('.')) {
+        if (hostname.startsWith(domain)) return true;
+      } else if (hostname === domain || hostname.endsWith(`.${domain}`)) {
+        return true;
+      }
     }
 
     return false;

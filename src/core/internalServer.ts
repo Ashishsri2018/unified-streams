@@ -41,17 +41,41 @@ export function sendJson(
   res.end(JSON.stringify(body));
 }
 
+function sanitizeRequestId(value: string | string[] | undefined): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw && /^[A-Za-z0-9._:-]{1,128}$/.test(raw)) return raw;
+  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function safeSendJson(
+  res: http.ServerResponse,
+  status: number,
+  body: unknown,
+  requestId?: string,
+): void {
+  if (res.headersSent) {
+    res.end();
+    return;
+  }
+  sendJson(res, status, body, requestId);
+}
+
 export function createInternalServer(host: string, instance: FleetInstance): http.Server {
   const { internalToken, handlers } = instance;
   return http.createServer(async (req, res) => {
-    const requestId = (req.headers['x-request-id'] as string) || '';
+    const requestId = sanitizeRequestId(req.headers['x-request-id']);
 
     if (internalToken && req.headers['x-internal-token'] !== internalToken) {
-      return sendJson(res, 401, { error: 'Unauthorized' }, requestId);
+      return safeSendJson(res, 401, { error: 'Unauthorized' }, requestId);
     }
 
-    const parsedUrl = new URL(req.url || '/', `http://${host}:${instance.port}`);
-    const pathname = parsedUrl.pathname;
+    let pathname: string;
+    try {
+      const parsedUrl = new URL(req.url || '/', `http://${host}:${instance.port}`);
+      pathname = parsedUrl.pathname;
+    } catch {
+      return safeSendJson(res, 400, { error: 'Bad Request' }, requestId);
+    }
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
@@ -88,12 +112,12 @@ export function createInternalServer(host: string, instance: FleetInstance): htt
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (pathname.startsWith('/internal/stream/')) {
-        return sendJson(res, 200, { streams: [], error: message }, requestId);
+        return safeSendJson(res, 200, { streams: [], error: message }, requestId);
       }
-      return sendJson(res, 500, { error: message }, requestId);
+      return safeSendJson(res, 500, { error: message }, requestId);
     }
 
-    return sendJson(res, 404, { error: 'Not Found' }, requestId);
+    return safeSendJson(res, 404, { error: 'Not Found' }, requestId);
   });
 }
 
