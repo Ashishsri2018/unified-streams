@@ -12,3 +12,4 @@ docs/provider-compatibility.md
 config/provider-audit.csv
 bugs.md
 memory-improvement.md
+cloudflare/proxy-worker/

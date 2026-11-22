@@ -1,6 +1,0 @@
-name = "unified-streams-proxy"
-main = "src/index.js"
-compatibility_date = "2024-11-12"
-
-[vars]
-ORIGIN = "http://203-188-173-134.sslip.io:7000"
