@@ -163,26 +163,62 @@ export class MetadataResolver {
 
     const ctx = this.abortable(this.metadataBudgetMs, signal);
     try {
-      const res = await fetch(`${this.cinemetaUrl}/meta/${type}/${imdbId}.json`, {
-        signal: ctx.signal,
-      });
-      if (!res.ok) {
-        this.cacheError(cacheKey, ctx, res.status);
-        return null;
+      let title = '';
+      let year: number | undefined;
+      let tmdbId: number | undefined;
+      let cinemetaMiss = false;
+
+      try {
+        const res = await fetch(`${this.cinemetaUrl}/meta/${type}/${imdbId}.json`, {
+          signal: ctx.signal,
+        });
+        if (!res.ok) {
+          cinemetaMiss = true;
+        } else {
+          const json = (await res.json()) as {
+            meta?: { name?: string; year?: number | string; moviedb_id?: number };
+          };
+          if (!json?.meta) {
+            cinemetaMiss = true;
+          } else {
+            title = json.meta.name || '';
+            year = parseCanonicalYear(json.meta.year);
+            const moviedbId = json.meta.moviedb_id;
+            if (
+              typeof moviedbId === 'number' &&
+              Number.isSafeInteger(moviedbId) &&
+              moviedbId > 0
+            ) {
+              tmdbId = moviedbId;
+            }
+          }
+        }
+      } catch {
+        cinemetaMiss = true;
       }
-      const json = (await res.json()) as { meta?: { name?: string; year?: number | string; moviedb_id?: number } };
-      if (!json?.meta) {
-        this.cacheError(cacheKey, ctx, 404);
+
+      // Cinemeta often lacks a TMDB mapping (especially for anime and
+      // regional titles). Ask TMDB directly so every fleet receives both ids.
+      if (tmdbId === undefined) {
+        const found = await this.findTmdbByImdb(type, imdbId, ctx.signal);
+        if (found !== undefined) {
+          tmdbId = found;
+          if (!title || year === undefined) {
+            const detail = await this.resolveTmdb(type, found, ctx.signal);
+            if (detail) {
+              if (!title) title = detail.title;
+              year = year ?? detail.year;
+            }
+          }
+        }
+      }
+
+      if (!title && tmdbId === undefined) {
+        this.cacheError(cacheKey, ctx, cinemetaMiss ? 404 : undefined);
         return null;
       }
 
-      const meta: CanonicalMetadata = {
-        title: json.meta.name || '',
-        year: parseCanonicalYear(json.meta.year),
-        type,
-        imdbId,
-        tmdbId: json.meta.moviedb_id,
-      };
+      const meta: CanonicalMetadata = { title, year, type, imdbId, tmdbId };
       this.setCache(cacheKey, meta);
       return meta;
     } catch {
@@ -301,6 +337,41 @@ export class MetadataResolver {
       if (best.score < 40) return undefined;
       this.resolutionStats.tmdbSearchOk += 1;
       return best.id;
+    } catch {
+      return undefined;
+    } finally {
+      ctx.cleanup();
+    }
+  }
+
+  private async findTmdbByImdb(
+    type: 'movie' | 'series',
+    imdbId: string,
+    signal: AbortSignal,
+    timeoutMs?: number,
+  ): Promise<number | undefined> {
+    if (!this.tmdbApiKey) return undefined;
+
+    const ctx = this.abortable(timeoutMs ?? this.metadataBudgetMs, signal);
+    try {
+      const params = new URLSearchParams();
+      params.set('api_key', this.tmdbApiKey);
+      params.set('external_source', 'imdb_id');
+      const res = await fetch(`${this.tmdbUrl}/find/${encodeURIComponent(imdbId)}?${params.toString()}`, {
+        signal: ctx.signal,
+      });
+      if (!res.ok) return undefined;
+
+      const json = (await res.json()) as {
+        movie_results?: unknown[];
+        tv_results?: unknown[];
+      };
+      const results = type === 'movie' ? json.movie_results : json.tv_results;
+      for (const raw of Array.isArray(results) ? results : []) {
+        const id = (raw as { id?: unknown } | null)?.id;
+        if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) return id;
+      }
+      return undefined;
     } catch {
       return undefined;
     } finally {

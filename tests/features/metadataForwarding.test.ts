@@ -158,4 +158,103 @@ describe('Metadata Forwarding between Gateway and Loopback Workers', () => {
       imdbId: 'tt0944947',
     });
   });
+
+  it('resolves a TMDB id from IMDb via TMDB /find when Cinemeta has no mapping', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('cinemeta.test/meta/series/tt0409591.json')) {
+        return Promise.resolve({ ok: true, json: async () => ({ meta: { name: 'Naruto' } }) });
+      }
+      if (url.includes('tmdb.test/3/find/tt0409591')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ movie_results: [], tv_results: [{ id: 46260 }] }),
+        });
+      }
+      if (url.includes('tmdb.test/3/tv/46260')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            name: 'Naruto',
+            first_air_date: '2002-10-03',
+            external_ids: { imdb_id: 'tt0409591' },
+          }),
+        });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resolver = new MetadataResolver('https://cinemeta.test', 'tmdb-key', undefined, {
+      tmdbUrl: 'https://tmdb.test/3',
+    });
+    const meta = await resolver.resolveImdb('series', 'tt0409591');
+
+    expect(meta?.title).toBe('Naruto');
+    expect(meta?.year).toBe(2002);
+    expect(meta?.tmdbId).toBe(46260);
+    expect(meta?.imdbId).toBe('tt0409591');
+  });
+
+  it('forwards both IMDb and TMDB ids and shares the cache between them', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('cinemeta.test/meta/movie/tt1375666.json')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ meta: { name: 'Inception', year: '2010', moviedb_id: 27205 } }),
+        });
+      }
+      if (url.includes('tmdb.test/3/movie/27205')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            title: 'Inception',
+            release_date: '2010-07-16',
+            external_ids: { imdb_id: 'tt1375666' },
+          }),
+        });
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const fetchStream = vi.fn().mockResolvedValue({
+      streams: [{ title: 'Inception', url: 'https://test/1.mp4' }],
+      outcome: 'ok',
+    });
+    const worker = { fetchStream } as unknown as WorkerClient;
+    const ctx: StreamHandlerContext = {
+      cache: new GatewayStreamCache(),
+      workers: { sa7: worker, nuvio: worker, vega: worker },
+      addonVersion: '1.0.0',
+      policyVersion: '1.0.0',
+      maxStreams: 100,
+      globalDeadlineMs: 13000,
+      workerTimeoutMs: 12000,
+      metadataResolver: new MetadataResolver(
+        'https://cinemeta.test',
+        'tmdb-key',
+        undefined,
+        { tmdbUrl: 'https://tmdb.test/3' },
+      ),
+    };
+    const app = createGatewayApp(ctx, Date.now());
+
+    const imdbRes = await request(app).get('/stream/movie/tt1375666.json');
+    expect(imdbRes.status).toBe(200);
+    expect(fetchStream).toHaveBeenCalledTimes(3);
+    expect(fetchStream.mock.calls[0]?.[1]).toBe('tt1375666');
+    expect(fetchStream.mock.calls[0]?.[5]).toMatchObject({
+      title: 'Inception',
+      year: 2010,
+      tmdbId: 27205,
+      imdbId: 'tt1375666',
+    });
+
+    fetchStream.mockClear();
+    const tmdbRes = await request(app).get('/stream/movie/tmdb:27205.json');
+    expect(tmdbRes.status).toBe(200);
+    expect(tmdbRes.body.streams.length).toBeGreaterThan(0);
+    expect(tmdbRes.headers['x-cache']).toBe('hit');
+    expect(fetchStream).not.toHaveBeenCalled();
+  });
 });

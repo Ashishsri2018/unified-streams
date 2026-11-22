@@ -73,59 +73,70 @@ export async function handleStreamRoute(
   const userConfig = decodeUserConfig(rawConfig);
   const filterConfig = toFilterConfig(userConfig);
 
-  const cacheKey = `${rawConfig}:${rawType}:${rawId}:${ctx.policyVersion}:${ctx.addonVersion}`;
-
   const requestController = new AbortController();
 
   const requiresCanonicalRewrite =
     parsedId.family === 'mal' || parsedId.family === 'kitsu' || parsedId.family === 'tvdb';
 
+  // Resolve canonical metadata once before the cache lookup so equivalent
+  // IMDb/TMDB/MAL/Kitsu/TVDB requests share a single cache entry and every
+  // worker receives both ids when they are available.
+  let forwardedMeta: ForwardedMetadata | undefined;
+  let forwardId = rawId;
+  if (parsedId.family === 'tmdb') {
+    const numericTmdb = Number(parsedId.cleanId.slice('tmdb:'.length));
+    if (Number.isSafeInteger(numericTmdb) && numericTmdb > 0) {
+      forwardedMeta = { tmdbId: numericTmdb };
+    }
+  } else if (parsedId.family === 'tt') {
+    forwardedMeta = { imdbId: parsedId.cleanId };
+  }
+
+  if (ctx.metadataResolver) {
+    try {
+      const resolved = await ctx.metadataResolver.resolveContent(
+        rawType,
+        parsedId,
+        requestController.signal,
+      );
+      if (resolved) {
+        forwardedMeta = {
+          title: resolved.title,
+          year: resolved.year,
+          tmdbId: resolved.tmdbId ?? forwardedMeta?.tmdbId,
+          imdbId: resolved.imdbId ?? forwardedMeta?.imdbId,
+        };
+        if (requiresCanonicalRewrite) {
+          const suffix = canonicalIdSuffix(parsedId);
+          if (resolved.imdbId) {
+            forwardId = `${resolved.imdbId}${suffix}`;
+          } else if (resolved.tmdbId && resolved.tmdbId > 0) {
+            forwardId = `tmdb:${resolved.tmdbId}${suffix}`;
+          }
+        }
+      }
+    } catch {
+      // Proceed with existing metadata on resolver error
+    }
+  }
+
+  if (requiresCanonicalRewrite && forwardId === rawId) {
+    setStreamCacheHeaders(res);
+    res.setHeader('X-Cache', 'bypass');
+    res.status(200).json({ streams: [] });
+    return;
+  }
+
+  const idSuffix = canonicalIdSuffix(parsedId);
+  const canonicalId = forwardedMeta?.imdbId
+    ? `${forwardedMeta.imdbId}${idSuffix}`
+    : forwardedMeta?.tmdbId && forwardedMeta.tmdbId > 0
+      ? `tmdb:${forwardedMeta.tmdbId}${idSuffix}`
+      : rawId;
+  const cacheKey = `${rawConfig}:${rawType}:${canonicalId}:${ctx.policyVersion}:${ctx.addonVersion}`;
+
   try {
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {
-      // Resolve canonical metadata once in the gateway to eliminate redundant upstream calls
-      let forwardedMeta: ForwardedMetadata | undefined;
-      let forwardId = rawId;
-      if (parsedId.family === 'tmdb') {
-        const numericTmdb = Number(parsedId.cleanId.slice('tmdb:'.length));
-        if (Number.isSafeInteger(numericTmdb) && numericTmdb > 0) {
-          forwardedMeta = { tmdbId: numericTmdb };
-        }
-      } else if (parsedId.family === 'tt') {
-        forwardedMeta = { imdbId: parsedId.cleanId };
-      }
-
-      if (ctx.metadataResolver) {
-        try {
-          const resolved = await ctx.metadataResolver.resolveContent(
-            rawType,
-            parsedId,
-            requestController.signal,
-          );
-          if (resolved) {
-            forwardedMeta = {
-              title: resolved.title,
-              year: resolved.year,
-              tmdbId: resolved.tmdbId ?? forwardedMeta?.tmdbId,
-              imdbId: resolved.imdbId ?? forwardedMeta?.imdbId,
-            };
-            if (requiresCanonicalRewrite) {
-              const suffix = canonicalIdSuffix(parsedId);
-              if (resolved.imdbId) {
-                forwardId = `${resolved.imdbId}${suffix}`;
-              } else if (resolved.tmdbId && resolved.tmdbId > 0) {
-                forwardId = `tmdb:${resolved.tmdbId}${suffix}`;
-              }
-            }
-          }
-        } catch {
-          // Proceed with existing metadata on resolver error
-        }
-      }
-
-      if (requiresCanonicalRewrite && forwardId === rawId) {
-        return { value: { streams: [] }, isPartial: false };
-      }
-
       const selectedFleets = userConfig.backends.filter((b) => ctx.workers[b]);
       const workerTimeoutMs = Math.min(ctx.workerTimeoutMs, ctx.globalDeadlineMs);
       const fleetPromises = selectedFleets.map(async (fleetName) => {
