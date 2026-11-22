@@ -308,6 +308,124 @@ export class MetadataResolver {
     }
   }
 
+  private async findTmdbByTvdb(
+    type: 'movie' | 'series',
+    tvdbNumericId: number,
+    signal: AbortSignal,
+    timeoutMs?: number,
+  ): Promise<number | undefined> {
+    if (!this.tmdbApiKey) return undefined;
+
+    const ctx = this.abortable(timeoutMs ?? this.metadataBudgetMs, signal);
+    try {
+      const params = new URLSearchParams();
+      params.set('api_key', this.tmdbApiKey);
+      params.set('external_source', 'tvdb_id');
+      const res = await fetch(`${this.tmdbUrl}/find/${tvdbNumericId}?${params.toString()}`, {
+        signal: ctx.signal,
+      });
+      if (!res.ok) return undefined;
+
+      const json = (await res.json()) as {
+        movie_results?: unknown[];
+        tv_results?: unknown[];
+      };
+      const results = type === 'movie' ? json.movie_results : json.tv_results;
+      for (const raw of Array.isArray(results) ? results : []) {
+        const id = (raw as { id?: unknown } | null)?.id;
+        if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) return id;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    } finally {
+      ctx.cleanup();
+    }
+  }
+
+  async resolveTvdb(
+    type: 'movie' | 'series',
+    tvdbNumericId: number,
+    signal?: AbortSignal,
+  ): Promise<CanonicalMetadata | null> {
+    const cacheKey = `tvdb:${type}:${tvdbNumericId}`;
+    const cached = this.getCached(cacheKey);
+    if (cached !== undefined) return cached;
+
+    const budgetMs = this.metadataBudgetMs;
+    const deadlineAt = Date.now() + budgetMs;
+    const remaining = () =>
+      Math.max(RESOLVE_MIN_MS, Math.min(budgetMs, deadlineAt - Date.now()));
+    const ctx = this.abortable(budgetMs, signal);
+    let definitiveMiss = false;
+
+    try {
+      let title = '';
+      let year: number | undefined;
+      let imdbId: string | undefined;
+      let tmdbId: number | undefined;
+
+      if (type === 'series') {
+        const lookup = await this.tvmaze.lookupByTvdb(tvdbNumericId, ctx.signal, remaining());
+        if (lookup.status === 'ok') {
+          title = lookup.show.title;
+          year = lookup.show.year;
+          imdbId = lookup.show.imdbId;
+        } else if (lookup.status === 'not_found') {
+          definitiveMiss = true;
+        }
+      }
+
+      if (!imdbId) {
+        const found = await this.findTmdbByTvdb(type, tvdbNumericId, ctx.signal, remaining());
+        if (found) {
+          tmdbId = found;
+          const detail = remaining() >= 300
+            ? await this.resolveTmdb(type, found, ctx.signal, remaining())
+            : null;
+          if (detail) {
+            imdbId = detail.imdbId;
+            tmdbId = detail.tmdbId ?? found;
+            if (!title) title = detail.title;
+            year = year ?? detail.year;
+          }
+        }
+      }
+
+      if (!imdbId && !tmdbId && title) {
+        const found = await this.searchTmdbByTitle(type, title, year, ctx.signal, remaining());
+        if (found) {
+          tmdbId = found;
+          const detail = remaining() >= 300
+            ? await this.resolveTmdb(type, found, ctx.signal, remaining())
+            : null;
+          if (detail) {
+            imdbId = detail.imdbId;
+            tmdbId = detail.tmdbId ?? found;
+            if (!title) title = detail.title;
+            year = year ?? detail.year;
+          }
+        }
+      }
+
+      if (!imdbId && !tmdbId) {
+        if (!ctx.aborted()) {
+          this.setCache(cacheKey, null, definitiveMiss ? this.notFoundTtlMs : this.transientTtlMs);
+        }
+        return null;
+      }
+
+      const meta: CanonicalMetadata = { title, year, type, imdbId, tmdbId };
+      this.setCache(cacheKey, meta);
+      return meta;
+    } catch {
+      if (!ctx.aborted()) this.setCache(cacheKey, null, this.transientTtlMs);
+      return null;
+    } finally {
+      ctx.cleanup();
+    }
+  }
+
   async resolveMal(
     type: 'movie' | 'series',
     malNumericId: number,
@@ -470,6 +588,10 @@ export class MetadataResolver {
     if (parsed.family === 'kitsu') {
       const id = Number(parsed.cleanId.slice('kitsu:'.length));
       return this.resolveKitsu(type, id, signal);
+    }
+    if (parsed.family === 'tvdb') {
+      const id = Number(parsed.cleanId.slice('tvdb:'.length));
+      return this.resolveTvdb(type, id, signal);
     }
     return null;
   }

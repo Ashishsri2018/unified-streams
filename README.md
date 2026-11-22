@@ -7,7 +7,7 @@ Unified Stremio stream addon combining SA7, Nuvio, and Vega provider fleets behi
 - **Three Internal Fleets**: SA7, Nuvio, and Vega run as loopback worker processes (`127.0.0.1`).
 - **One Stream Cache**: Response cache at the gateway with 180s TTL for full results and 30s TTL for partial results. Non-empty results only.
 - **Unified Filtering**: Gateway filtering for resolution ranges and file size caps. Inline subtitle tracks returned with a stream are passed through unchanged.
-- **Full ID Support**: Resolves IMDb (`tt`) and TMDB (`tmdb:`) directly. `mal:` IDs are mapped to a canonical IMDb/TMDB ID via AnimeAPI (Jikan + TMDB search fallback) before fleet fan-out. `kitsu:` IDs are first mapped to MAL through the Kitsu API and then follow the same path; the manifest advertises all four prefixes.
+- **Full ID Support**: Resolves IMDb (`tt`) and TMDB (`tmdb:`) directly. `mal:` IDs are mapped to a canonical IMDb/TMDB ID via AnimeAPI (Jikan + TMDB search fallback) before fleet fan-out. `kitsu:` IDs are first mapped to MAL through the Kitsu API and then follow the same path. `tvdb:` IDs resolve through TVMaze (series) and TMDB external-ID lookup (movies); the manifest advertises all five prefixes.
 - **HTTP/1.1 Strict Compatibility**: Explicit `GET`, `HEAD`, and `OPTIONS` handling across all endpoints.
 - **In-Process Updaters**: 20-24 hour jittered background refresh for provider definitions without external cron dependencies.
 
@@ -16,7 +16,7 @@ See [architecture.md](architecture.md) for detailed component architecture and r
 
 ## Content IDs
 
-The manifest advertises the `tt`, `tmdb:`, `mal:`, and `kitsu:` prefixes. Stream requests use `/stream/{movie|series}/{id}.json`.
+The manifest advertises the `tt`, `tmdb:`, `mal:`, `kitsu:`, and `tvdb:` prefixes. Stream requests use `/stream/{movie|series}/{id}.json`.
 
 | ID type | Movie | Series | Example |
 |---|---|---|---|
@@ -24,17 +24,19 @@ The manifest advertises the `tt`, `tmdb:`, `mal:`, and `kitsu:` prefixes. Stream
 | TMDB | `tmdb:N` | `tmdb:N:S:E` or `tmdb:N:S` (season pack) | `tmdb:1399:1:1` |
 | MyAnimeList | `mal:N` | `mal:N:E` (season 1) or `mal:N:S:E` | `mal:1535:1:1` |
 | Kitsu | `kitsu:N` | `kitsu:N:E` (season 1) or `kitsu:N:S:E` | `kitsu:1376:1:1` |
+| TheTVDB | `tvdb:N` | `tvdb:N:S:E` or `tvdb:N:S` (season pack) | `tvdb:460458:1:1` |
 
-MAL and Kitsu series require at least one numeric suffix: `N:E` is season 1, episode E; `N:S:E` is season S, episode E. Unlike IMDb/TMDB, a single suffix is interpreted as an episode, not a season pack.
+MAL and Kitsu series require at least one numeric suffix: `N:E` is season 1, episode E; `N:S:E` is season S, episode E. Unlike IMDb/TMDB, a single suffix is interpreted as an episode, not a season pack. TVDB uses IMDb/TMDB semantics: `tvdb:N:S` is a season pack.
 
-### How anime IDs work
+### How anime and TVDB IDs work
 
 - Kitsu IDs are first resolved to a MAL ID through the Kitsu mappings API (`GET {KITSU_URL}/anime/{id}/mappings`, default `https://kitsu.io/api/edge`), then follow the MAL path below.
+- TVDB series are resolved through TVMaze (`GET {TVMAZE_URL}/lookup/shows?thetvdb={id}`, default `https://api.tvmaze.com`). If TVMaze has no IMDb mapping, or for TVDB movies, the gateway uses TMDB's external-ID lookup (`/find/{id}?external_source=tvdb_id`) when `TMDB_API_KEY` is configured.
 - The gateway queries AnimeAPI (`GET {ANIMEAPI_URL}/myanimelist/{id}`) for an IMDb/TMDB mapping, using at most 40% of the resolution budget so the fallback still has time to run. AnimeAPI's `themoviedb_type` selects the TMDB endpoint when a TMDB ID is used.
 - If no mapping is found, it falls back to Jikan (title/year) plus a ranked TMDB title search. When a Kitsu ID has no MAL mapping, the Kitsu canonical title/year is used for the same TMDB search. The TMDB detail call is skipped when too little budget remains; the search result still yields a `tmdb:N` ID.
-- The anime ID is rewritten to the canonical `tt...` or `tmdb:N` ID (preserving season/episode suffixes) before fan-out, so all three fleets handle it with their normal IMDb/TMDB logic. If resolution fails, the response is HTTP 200 with `{ "streams": [] }` and no worker fan-out.
-- `ANIMEAPI_URL` defaults to `https://animeapi.my.id` and `KITSU_URL` defaults to `https://kitsu.io/api/edge`; both can be overridden in `config/defaults.env` or a per-instance env file.
-- Resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped: 500–2000ms for anime, 250–5000ms for other metadata; 1s/2s anime on Beamup/Railway), so worker deadlines and platform proxy limits are unchanged. Kitsu mapping uses the first 35% of that budget and the MAL pipeline the remainder. Budget expiries and transient upstream failures are not cached as misses; only definitive 404s keep the 60s negative TTL, while other failures use a 5s TTL.
+- The source ID is rewritten to the canonical `tt...` or `tmdb:N` ID (preserving season/episode suffixes) before fan-out, so all three fleets handle it with their normal IMDb/TMDB logic. If resolution fails, the response is HTTP 200 with `{ "streams": [] }` and no worker fan-out.
+- `ANIMEAPI_URL`, `KITSU_URL`, and `TVMAZE_URL` can be overridden in `config/defaults.env` or a per-instance env file.
+- Resolution uses a budget derived from `GLOBAL_DEADLINE_MS - BACKEND_TIMEOUT_MS` (clamped: 500–2000ms for anime, 250–5000ms for other metadata; 1s/2s anime on Beamup/Railway), so worker deadlines and platform proxy limits are unchanged. Kitsu mapping uses the first 35% of that budget and the MAL pipeline the remainder. TVDB uses the general metadata budget. Budget expiries and transient upstream failures are not cached as misses; only definitive 404s keep the 60s negative TTL, while other failures use a 5s TTL.
 
 ## Running with Docker
 
@@ -83,6 +85,7 @@ services:
       # - TMDB_API_KEY=your_tmdb_key
       # - ANIMEAPI_URL=https://animeapi.my.id
       # - KITSU_URL=https://kitsu.io/api/edge
+      # - TVMAZE_URL=https://api.tvmaze.com
       # - FEBBOX_UI_COOKIE=your_febbox_cookie
       # - GRAMCINEMA_TOKEN=your_gramcinema_token
       # - KARTOONS_TOKEN=your_kartoons_token

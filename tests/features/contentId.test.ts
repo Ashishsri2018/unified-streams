@@ -103,6 +103,23 @@ describe('contentId parser', () => {
     expect(parseContentId('movie', 'kitsu:46474:1')).toBeNull();
   });
 
+  it('parses TVDB IDs', () => {
+    const movie = parseContentId('movie', 'tvdb:357063');
+    expect(movie).toEqual({ family: 'tvdb', rawId: 'tvdb:357063', cleanId: 'tvdb:357063' });
+
+    const seriesEp = parseContentId('series', 'tvdb:460458:1:2');
+    expect(seriesEp).toEqual({
+      family: 'tvdb',
+      rawId: 'tvdb:460458:1:2',
+      cleanId: 'tvdb:460458',
+      season: 1,
+      episode: 2,
+    });
+
+    expect(parseContentId('movie', 'tvdb:357063:1')).toBeNull();
+    expect(parseContentId('series', 'tvdb:460458')).toBeNull();
+  });
+
   it('handles URL-encoded IDs', () => {
     const encoded = parseContentId('series', 'tt0944947%3A1%3A2');
     expect(encoded).toEqual({

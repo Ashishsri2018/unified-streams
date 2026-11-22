@@ -77,7 +77,8 @@ export async function handleStreamRoute(
 
   const requestController = new AbortController();
 
-  const requiresCanonicalRewrite = parsedId.family === 'mal' || parsedId.family === 'kitsu';
+  const requiresCanonicalRewrite =
+    parsedId.family === 'mal' || parsedId.family === 'kitsu' || parsedId.family === 'tvdb';
 
   try {
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {

@@ -138,6 +138,7 @@ async function main(): Promise<void> {
     jikanMaxRpm: env.JIKAN_MAX_RPM,
     animeApiUrl: env.ANIMEAPI_URL,
     kitsuUrl: env.KITSU_URL,
+    tvmazeUrl: env.TVMAZE_URL,
     malResolveBudgetMs: deriveMalResolveBudgetMs(env),
     metadataBudgetMs: deriveMetadataResolveBudgetMs(env),
   });
