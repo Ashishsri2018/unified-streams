@@ -112,12 +112,9 @@ describe('disabled providers derivation', () => {
         'castle',
         'hdhub4u',
         'netmirror',
-        'moviebox',
-        'moviesdrive',
         '4khdhub',
         'animesalt',
         'anizen',
-        'animeworld',
       ],
       enabled: [
         'anizone',
@@ -129,6 +126,9 @@ describe('disabled providers derivation', () => {
         'reanime',
         'vegamovies',
         'vidrock',
+        'moviebox',
+        'moviesdrive',
+        'animeworld',
       ],
     });
     expect(Number(sa7Env.PROVIDER_CONCURRENCY)).toBe(40);
@@ -137,7 +137,7 @@ describe('disabled providers derivation', () => {
     const nuvioDisabled = nuvioEnv.DISABLED_SCRAPERS.split(',');
     expect(nuvioEnv.ENABLED_SCRAPERS).toBeUndefined();
     expectFleetPolicy(nuvioDisabled, {
-      disabled: ['bdix-cf', 'bdix-df', 'bdix-fh', 'brellor', 'xylos', 'hexion', 'qorva'],
+      disabled: ['bdix-cf', 'bdix-df', 'bdix-fh', 'brellor', 'xylos', 'hexion', 'qorva', 'soryn'],
       enabled: [
         'sylphera',
         'lyrin',
@@ -149,7 +149,6 @@ describe('disabled providers derivation', () => {
         'qyrvaen',
         'fyron',
         'fastrion',
-        'soryn',
         'mavonyx',
         'pynvix',
         'gravix',
@@ -166,17 +165,14 @@ describe('disabled providers derivation', () => {
         'hdhub4u',
         'showbox',
         'animeworld',
-        'netflixMirror',
         'primeMirror',
         'disneyMirror',
         'mod',
-        'castle',
-        'anikoto',
-        'multi',
         'kissKh',
       ],
       enabled: [
         'movies4u',
+        'netflixMirror',
         'luxMovies',
         'dramacool',
         'eonMovies',
@@ -188,6 +184,9 @@ describe('disabled providers derivation', () => {
         'animesalt',
         'katmovies',
         'movielinkdb',
+        'castle',
+        'anikoto',
+        'multi',
       ],
     });
     expect(vegaEnv.SEARCH_CONCURRENCY).toBe('40');
