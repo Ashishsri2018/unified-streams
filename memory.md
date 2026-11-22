@@ -95,3 +95,13 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Re-vendored to upstream `a52ea5d`:** 68 manifest entries, 41 enabled provider dirs, 53 URL entries. Adds `extraflix`, `aniDream`, `durbinLive`, `liveTgTv`; drops now-disabled `kmMovies`, `movielinkdb`, `world4u` (still listed as `disabled: true` in the manifest). Updated `state.json` to the new `activeSha` and provider versions.
 - **Worker updater auth:** `deriveFleetEnv` now forwards `GITHUB_TOKEN` to fleet workers. Without it Vega's in-worker updater falls back to a content-hash SHA that never matches the scheduler's git SHA, causing repeated failed-update accounting. Added a regression test.
 - **Docs:** Documented the static-seed caveat in `known-issues.md`.
+
+## Beamup Backup Instance Activation & 3-Copy Allocation (Nov 22 2026)
+- **3-copy provider allocation (1 on Railway, 2 on Beamup):** Updated `config/providers.json` `instances.beamup` so that for all 9 providers with 3 copies, Railway runs 1 active copy and Beamup runs the remaining 2 copies as backup.
+  - `4khdhub`: Railway active `nuvio:hexion`; Beamup active `vega:4khdhub` + `sa7:4khdhub` (removed `4khdhub` from Beamup SA7 deny list).
+  - `hdhub4u`: Railway active `sa7:hdhub4u`; Beamup active `nuvio:qyrvaen` + `vega:hdhub4u` (removed `hdhub4u` from Beamup Vega deny list).
+  - `netmirror`: Railway active `sa7:netmirror`; Beamup active `vega:netflixMirror` + `nuvio:soryn` (removed `soryn` from Beamup Nuvio deny list).
+  - The other 6 three-copy providers (`anikoto`, `castle`, `moviesdrive`, `multimovies`, `moviebox`, `animeworld`) were already running both remaining copies on Beamup.
+- **Railway deactivated providers activated on Beamup:** All deactivated providers on Railway (dual-fleet backup copies and zero-yield providers `kurage`, `puretoons`, `toonstream`, `lyrin`, `novus`, `vyranel`, `kethrax`, `dramacool`, `eonMovies`, `gokuHD`, `kickAssAnime`, `rareanimes`) are active on Beamup as backup.
+- **Docs & audit:** Updated `architecture.md`, `config/provider-audit.csv` notes for 4KHDHub, HDHub4u, and NetMirror, and created `scratchpad.md` tracking the full allocation matrix.
+- **Verification:** Updated `tests/features/disabledProviders.test.ts` to assert `4khdhub` on SA7, `soryn` on Nuvio, and `hdhub4u` on Vega are enabled on Beamup.

@@ -112,11 +112,11 @@ describe('disabled providers derivation', () => {
         'castle',
         'hdhub4u',
         'netmirror',
-        '4khdhub',
         'animesalt',
         'anizen',
       ],
       enabled: [
+        '4khdhub',
         'anizone',
         'kurage',
         'puretoons',
@@ -137,8 +137,10 @@ describe('disabled providers derivation', () => {
     const nuvioDisabled = nuvioEnv.DISABLED_SCRAPERS.split(',');
     expect(nuvioEnv.ENABLED_SCRAPERS).toBeUndefined();
     expectFleetPolicy(nuvioDisabled, {
-      disabled: ['bdix-cf', 'bdix-df', 'bdix-fh', 'brellor', 'xylos', 'hexion', 'qorva', 'soryn'],
+      disabled: ['bdix-cf', 'bdix-df', 'bdix-fh', 'brellor', 'xylos', 'hexion', 'qorva'],
       enabled: [
+        'soryn',
+        'kethrax',
         'sylphera',
         'lyrin',
         'novus',
@@ -162,7 +164,6 @@ describe('disabled providers derivation', () => {
     expectFleetPolicy(vegaDisabled, {
       disabled: [
         'mxplayer',
-        'hdhub4u',
         'showbox',
         'animeworld',
         'primeMirror',
@@ -171,6 +172,7 @@ describe('disabled providers derivation', () => {
         'kissKh',
       ],
       enabled: [
+        'hdhub4u',
         'movies4u',
         'netflixMirror',
         'luxMovies',
