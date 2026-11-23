@@ -151,3 +151,8 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Problem:** Nuvio and Vega aborted snapshot installation when runtime selection disabled every provider (`no scrapers/bundles could be loaded`), so disabled-provider updates paused until one was re-enabled.
 - **Fix:** Nuvio now distinguishes an empty manifest from zero enabled scrapers in download, refresh, and disk-load paths; it installs a snapshot with zero loaded scrapers when the selection is empty. Vega's full update does the same instead of treating zero loaded bundles as an install failure. SA7 already updated independently of selection.
 - **Verification:** `npm run lint`, `npm run typecheck`, and `npm run test:feature` pass (281 tests). Disabled providers remain downloaded/updated so re-enabling never needs a re-download.
+
+## Admin table UI refresh (Nov 23 2026)
+- **Admin UI:** Reworked `/admin` to reuse the status page CSS and render a single unified providers table (Fleet/Provider/Types/Selection/Bundle/Actions) with the status page's search bar, sticky header, and table wrapper instead of one table per fleet.
+- **Row actions:** Each row now shows a single Enable or Disable button matching the provider's current state (Disable when enabled, Enable when disabled) plus Reset; locked providers keep all actions disabled.
+- **Verification:** `npm run lint`, `npm run typecheck`, and admin/status Vitest suites pass.

@@ -1,5 +1,5 @@
 import type { AdminRuntimeSettings } from './stream.js';
-import { getProvidersCss } from './providersHtml.js';
+import { getStatusCss } from './statusHtml.js';
 
 export interface AdminPageOptions {
   addonName: string;
@@ -35,21 +35,21 @@ function escapeHtml(value: string): string {
 }
 
 function baseCss(): string {
-  return `${getProvidersCss()}
-.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
-.toolbar input { padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0a121f; color: var(--text); font: inherit; min-width: 220px; }
-.fleet { margin-bottom: 18px; }
-.fleet h2 { margin: 0; font-size: 16px; text-transform: uppercase; letter-spacing: .12em; }
-.fleet-meta { color: var(--muted); font-size: 12px; }
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 9px 8px; vertical-align: middle; }
-th { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-.provider-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted); }
-.pill { display: inline-flex; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid var(--line); }
+  return `${getStatusCss()}
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.section-head h2 { margin: 0; }
+.provider-name { font-weight: 650; }
+.provider-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); }
+td.provider-cell { white-space: normal; min-width: 180px; }
+.pill { display: inline-flex; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid var(--line); white-space: nowrap; }
 .on { color: #bbf7d0; border-color: #166534; background: #052e16; }
 .off { color: #fecdd3; border-color: #7f1d1d; background: #2a0a10; }
 .locked { color: #fde68a; border-color: #78350f; background: #2b1a05; }
-.warn { color: #fecdd3; font-size: 12px; }
+.warn { color: #fecdd3; font-size: 12px; word-break: break-word; }
+td.row-actions { text-align: right; white-space: nowrap; }
+td.row-actions button { padding: 6px 12px; font-size: 12px; }
+td.row-actions button + button { margin-left: 6px; }
+td.row-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .setting { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #0a121f; }
 .setting span { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
@@ -131,14 +131,19 @@ export function renderAdminPage(options: AdminPageOptions): string {
 <p class="footer">Timeouts are deploy-time settings. Change and restart to apply.</p>`
     : '<p class="empty">Runtime settings unavailable.</p>';
 
-  const scripts = `const fleetRoot = document.getElementById("fleets");
+  const scripts = `const providerRows = document.getElementById("provider-rows");
 const statusLine = document.getElementById("status");
 const versionLabel = document.getElementById("policy-version");
 const searchInput = document.getElementById("search");
 const duplicatesLine = document.getElementById("duplicates");
+const countLabel = document.getElementById("provider-count");
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]);
+}
+
+function pill(kind, text) {
+  return '<span class="pill ' + kind + '">' + esc(text) + '</span>';
 }
 
 function setStatus(message, isError) {
@@ -148,15 +153,18 @@ function setStatus(message, isError) {
 
 function applySearch() {
   const query = (searchInput.value || "").trim().toLowerCase();
-  for (const row of fleetRoot.querySelectorAll("tbody tr")) {
-    row.hidden = query.length > 0 && !String(row.dataset.search || "").includes(query);
+  for (const row of providerRows.querySelectorAll("tr")) {
+    if (!row.dataset.search) continue;
+    row.hidden = query.length > 0 && !row.dataset.search.includes(query);
   }
 }
 
 function render(fleets, version) {
   versionLabel.textContent = "policy v" + version;
   if (!Array.isArray(fleets) || fleets.length === 0) {
-    fleetRoot.innerHTML = '<p class="empty">No fleets responded.</p>';
+    providerRows.innerHTML = '<tr><td colspan="6" class="muted">No fleets responded.</td></tr>';
+    countLabel.textContent = "";
+    duplicatesLine.textContent = "";
     return;
   }
   const enabledCopies = new Map();
@@ -169,32 +177,43 @@ function render(fleets, version) {
   }
   const duplicates = Array.from(enabledCopies.entries()).filter(([, count]) => count > 1).map(([id]) => id).sort();
   duplicatesLine.textContent = duplicates.length ? "Enabled in multiple fleets: " + duplicates.join(", ") : "";
-  fleetRoot.innerHTML = fleets.map((fleet) => {
+
+  const rows = [];
+  let total = 0;
+  for (const fleet of fleets) {
+    if (fleet.error) {
+      rows.push('<tr><td colspan="6"><div class="error-line">' + esc(fleet.fleet + ": " + fleet.error) + '</div></td></tr>');
+      continue;
+    }
     const providers = Array.isArray(fleet.providers) ? fleet.providers : [];
-    const rows = providers.map((provider) => {
-      const loaded = provider.loaded ? '<span class="pill on">loaded</span>' : '<span class="pill off">unloaded</span>';
-      const enabled = provider.enabled ? '<span class="pill on">on</span>' : '<span class="pill off">off</span>';
-      const locked = provider.locked ? ' <span class="pill locked">locked</span>' : '';
-      const missing = provider.missing ? ' <span class="pill locked">missing</span>' : '';
+    if (providers.length === 0) {
+      rows.push('<tr><td colspan="6" class="muted">' + esc(fleet.fleet) + ' reported no providers.</td></tr>');
+      continue;
+    }
+    for (const provider of providers) {
+      total += 1;
+      const loaded = provider.loaded ? pill("on", "loaded") : pill("off", "unloaded");
+      const selection = provider.enabled ? pill("on", "on") : pill("off", "off");
+      const locked = provider.locked ? " " + pill("locked", "locked") : "";
+      const missing = provider.missing ? " " + pill("locked", "missing") : "";
       const error = provider.lastError ? '<div class="warn">' + esc(provider.lastError) + '</div>' : '';
       const disabled = provider.locked ? " disabled" : "";
-      return '<tr data-search="' + esc((provider.id + " " + provider.name).toLowerCase()) + '">'
-        + '<td><div>' + esc(provider.name) + '</div><div class="provider-id">' + esc(provider.id) + '</div>' + error + '</td>'
+      const action = provider.enabled
+        ? '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="false"' + disabled + '>Disable</button>'
+        : '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="true"' + disabled + '>Enable</button>';
+      const reset = '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="reset"' + disabled + '>Reset</button>';
+      rows.push('<tr data-search="' + esc((fleet.fleet + " " + provider.id + " " + provider.name).toLowerCase()) + '">'
+        + '<td class="mono">' + esc(fleet.fleet) + ' <span class="muted">v' + esc(fleet.version) + '</span></td>'
+        + '<td class="provider-cell"><div class="provider-name">' + esc(provider.name) + '</div><div class="provider-id">' + esc(provider.id) + '</div>' + error + '</td>'
         + '<td>' + esc((provider.types || []).join(", ")) + '</td>'
-        + '<td>' + enabled + locked + missing + '</td>'
+        + '<td>' + selection + locked + missing + '</td>'
         + '<td>' + loaded + '</td>'
-        + '<td><button data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="true"' + disabled + '>Enable</button> '
-        + '<button data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="false"' + disabled + '>Disable</button> '
-        + '<button data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="reset"' + disabled + '>Reset</button></td>'
-        + '</tr>';
-    }).join("");
-    const error = fleet.error ? '<p class="error-line">' + esc(fleet.error) + '</p>' : "";
-    return '<section class="section fleet"><div class="section-head"><h2>' + esc(fleet.fleet) + '</h2>'
-      + '<span class="fleet-meta">version ' + esc(fleet.version) + '</span></div>'
-      + error
-      + (rows ? '<table><thead><tr><th>Provider</th><th>Types</th><th>Selection</th><th>Bundle</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<p class="empty">No providers reported.</p>')
-      + '</section>';
-  }).join("");
+        + '<td class="row-actions">' + action + reset + '</td>'
+        + '</tr>');
+    }
+  }
+  providerRows.innerHTML = rows.join("");
+  countLabel.textContent = total + (total === 1 ? " provider" : " providers");
   applySearch();
 }
 
@@ -230,7 +249,7 @@ async function toggle(fleet, id, enabled) {
   }
 }
 
-fleetRoot.addEventListener("click", (event) => {
+providerRows.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-fleet]");
   if (!button || button.disabled) return;
   void toggle(button.dataset.fleet, button.dataset.id, button.dataset.enabled);
@@ -266,14 +285,27 @@ setInterval(load, 30000);`;
     <button type="button" id="logout">Sign out</button>
   </div>
 </header>
-<div class="toolbar">
-  <input id="search" type="search" placeholder="Filter providers" aria-label="Filter providers" />
-  <span class="status" id="status"></span>
-  <span class="status" id="duplicates"></span>
-</div>
-<div id="fleets"><section class="section"><p class="empty">Loading provider catalog...</p></section></div>
-<section class="section fleet">
-  <div class="section-head"><h2>Runtime settings</h2><span class="fleet-meta">read-only</span></div>
+<section class="section">
+  <div class="section-head">
+    <h2>Providers</h2>
+    <span class="muted" id="provider-count"></span>
+  </div>
+  <div class="search-bar">
+    <input id="search" class="search-input" type="search" placeholder="Filter providers (e.g. vega, anime, movie)..." aria-label="Filter providers" />
+    <span class="status" id="status"></span>
+    <span class="status" id="duplicates"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Fleet</th><th>Provider</th><th>Types</th><th>Selection</th><th>Bundle</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="provider-rows"><tr><td colspan="6" class="muted">Loading provider catalog...</td></tr></tbody>
+    </table>
+  </div>
+</section>
+<section class="section">
+  <div class="section-head"><h2>Runtime settings</h2><span class="muted">read-only</span></div>
   ${settingsHtml}
 </section>
 <p class="footer">Locked providers are hard-disabled by policy. Overrides are stored in DATA_DIR/provider-overrides.json.</p>`,
