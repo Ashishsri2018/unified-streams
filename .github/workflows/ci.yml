@@ -102,7 +102,10 @@ jobs:
           set -e
           BEAMUP_HOST="${BEAMUP_REMOTE#*@}"
           BEAMUP_HOST="${BEAMUP_HOST%:*}"
+          # Beamup's git remote uses "<deployment>/<app>", but Dokku config
+          # commands address the deployed app with a dash-separated name.
           APP="${BEAMUP_REMOTE#*:}"
+          APP="${APP//\//-}"
           CONFIG_PAIRS=()
           # Selects config/instances/beamup.env. CI only sets the profile and
           # credentials; any per-instance setting changed later in Dokku wins on

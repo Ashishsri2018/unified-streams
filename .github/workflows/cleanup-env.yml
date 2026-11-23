@@ -38,7 +38,10 @@ jobs:
           set -euo pipefail
           BEAMUP_HOST="${BEAMUP_REMOTE#*@}"
           BEAMUP_HOST="${BEAMUP_HOST%:*}"
+          # Beamup's git remote uses "<deployment>/<app>", but Dokku config
+          # commands address the deployed app with a dash-separated name.
           APP="${BEAMUP_REMOTE#*:}"
+          APP="${APP//\//-}"
 
           # Beamup's deploy key permits config:set but rejects config:unset and
           # config:show. Empty values are treated as "no override" by

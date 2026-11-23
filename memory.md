@@ -135,6 +135,10 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Tests:** Added `tests/features/sa7MissingProviders.test.ts`; full suite 274 tests pass, lint/typecheck clean.
 - **Docs:** Updated the missing-provider caveat in `known-issues.md` to cover all three fleets and their cold-start limitations.
 
+## Admin deployment fix (Nov 23 2026)
+- **Beamup APP name:** `BEAMUP_REMOTE` uses `<deployment>/<app>` for git pushes, but Dokku `config:set` needs the deployed app name with a dash. Derive `APP` by replacing `/` with `-` in `ci.yml` and `cleanup-env.yml`; otherwise env sync reports success but does not affect the running app, leaving `/admin` at 404.
+- **Proxy-safe admin origin check:** Accept `Sec-Fetch-Site: same-origin/none` and compare against `x-forwarded-host` as well as `Host`; log rejected origins. Verified Railway and Beamup admin login end-to-end.
+
 ## Runtime provider admin (Nov 23 2026)
 - **Core:** Added `src/core/providerOverrides.ts` (Zod file schema, atomic store, versioning) and extended `src/core/policy.ts` with hard-disable/override precedence. `src/core/env.ts` exports `HARD_DISABLED_PROVIDERS`, accepts `ADMIN_TOKEN`, and derives `RUNTIME_OVERRIDES_JSON`, `HARD_DISABLED_PROVIDERS`, and `SELECTION_VERSION` per worker. Gateway cache key now uses the live policy version.
 - **Internal contract:** Added `GET /internal/providers` and `POST /internal/providers/selection` to `internalServer`, `WorkerClient`, and each fleet. SA7 retains its direct-worker route table too.
