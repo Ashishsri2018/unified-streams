@@ -774,6 +774,7 @@ export class Updater {
     if (data.entries.length === 0) {
       throw new Error("manifest.json has no enabled providers");
     }
+    const enabledCount = data.entries.filter((entry) => this.isEnabled(entry.value)).length;
 
     let previousProviderIds = await this.readManifestProviderIds(
       previousActive?.rootDir,
@@ -866,7 +867,7 @@ export class Updater {
       }
       for (const [value, error] of loadFailures) errors.set(value, error);
 
-      if (bundles.size === 0) {
+      if (bundles.size === 0 && (enabledCount > 0 || successes.length === 0)) {
         if (target.sha !== state.previousSha) {
           await removeDir(finalDir).catch(() => undefined);
         }

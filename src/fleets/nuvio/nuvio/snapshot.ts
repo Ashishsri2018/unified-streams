@@ -294,8 +294,9 @@ export class SnapshotManager {
       }
 
       if (!data) data = await this.downloadSnapshot(fetchSha);
+      const enabledCount = this.enabledEntries(data.manifest.scrapers).length;
       const scrapers = await this.evaluateSnapshot(data);
-      if (scrapers.length === 0) {
+      if (enabledCount > 0 && scrapers.length === 0) {
         throw new Error("no scrapers could be loaded from the new snapshot");
       }
 
@@ -399,8 +400,8 @@ export class SnapshotManager {
     }
     const manifest = parseNuvioManifest(manifestBytes);
     const entries = manifest.scrapers;
-    if (this.enabledEntries(entries).length === 0) {
-      throw new Error("manifest.json has no enabled scrapers");
+    if (entries.length === 0) {
+      throw new Error("manifest.json has no scrapers");
     }
 
     const results = await mapLimitSettled(
@@ -569,8 +570,9 @@ export class SnapshotManager {
         files,
         failed: 0,
       };
+      const enabledCount = this.enabledEntries(manifest.scrapers).length;
       const scrapers = await this.evaluateSnapshot(data);
-      if (scrapers.length === 0) return null;
+      if (enabledCount > 0 && scrapers.length === 0) return null;
 
       this.logger.info("nuvio_snapshot_loaded_from_directory", {
         dir,

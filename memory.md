@@ -146,3 +146,8 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Admin:** Added `/admin`, `/admin/login`, `/admin/logout`, `/admin/api/catalog`, and `/admin/api/providers/toggle` in `src/addon/admin*.ts`, gated by `ADMIN_TOKEN`; successful toggles persist, clear the gateway cache, and apply without a restart.
 - **Docs/config:** Added `ADMIN_TOKEN` to `config/defaults.env` and `.env.example`; updated `architecture.md` and `known-issues.md`.
 - **Verification:** `npm run lint`, `npm run typecheck`, and `npm run test:feature` pass (281 tests). Added provider policy/persistence and admin gateway coverage. Not committed or deployed.
+
+## All-fleets-disabled updates (Nov 23 2026)
+- **Problem:** Nuvio and Vega aborted snapshot installation when runtime selection disabled every provider (`no scrapers/bundles could be loaded`), so disabled-provider updates paused until one was re-enabled.
+- **Fix:** Nuvio now distinguishes an empty manifest from zero enabled scrapers in download, refresh, and disk-load paths; it installs a snapshot with zero loaded scrapers when the selection is empty. Vega's full update does the same instead of treating zero loaded bundles as an install failure. SA7 already updated independently of selection.
+- **Verification:** `npm run lint`, `npm run typecheck`, and `npm run test:feature` pass (281 tests). Disabled providers remain downloaded/updated so re-enabling never needs a re-download.
