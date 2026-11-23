@@ -90,6 +90,11 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
 
   router.post('/login', express.urlencoded({ extended: false, limit: '4kb' }), (req, res) => {
     if (!sameOrigin(req)) {
+      logger.warn('admin.origin_rejected', {
+        origin: req.header('origin')?.slice(0, 200),
+        host: req.header('host'),
+        forwardedHost: req.header('x-forwarded-host'),
+      });
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
@@ -115,6 +120,12 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
 
   router.post('/logout', (req, res) => {
     if (!sameOrigin(req)) {
+      logger.warn('admin.origin_rejected', {
+        origin: req.header('origin')?.slice(0, 200),
+        host: req.header('host'),
+        forwardedHost: req.header('x-forwarded-host'),
+        route: 'logout',
+      });
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
@@ -171,6 +182,12 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
     express.json({ limit: '16kb' }),
     async (req, res) => {
       if (!sameOrigin(req)) {
+        logger.warn('admin.origin_rejected', {
+          origin: req.header('origin')?.slice(0, 200),
+          host: req.header('host'),
+          forwardedHost: req.header('x-forwarded-host'),
+          route: 'toggle',
+        });
         res.status(403).json({ error: 'Forbidden' });
         return;
       }

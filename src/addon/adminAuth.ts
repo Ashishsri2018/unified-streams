@@ -68,14 +68,32 @@ function isSecure(req: Request): boolean {
   return req.secure;
 }
 
+function hostNames(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((item) => item.trim().toLowerCase().replace(/\.$/, ''))
+    .filter(Boolean)
+    .map((item) => item.replace(/:\d+$/, ''));
+}
+
 export function sameOrigin(req: Request): boolean {
+  const site = req.header('sec-fetch-site');
+  if (site === 'same-origin' || site === 'none') return true;
+
   const origin = req.header('origin');
   if (!origin) return true;
-  const host = req.header('host');
-  if (!host) return false;
+
+  let originHost: string;
   try {
-    return new URL(origin).host === host;
+    originHost = new URL(origin).hostname.toLowerCase().replace(/\.$/, '');
   } catch {
     return false;
   }
+
+  const candidates = [
+    ...hostNames(req.header('host')),
+    ...hostNames(req.header('x-forwarded-host')),
+  ];
+  return candidates.includes(originHost);
 }
