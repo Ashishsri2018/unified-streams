@@ -208,6 +208,113 @@ describe('vega provider telemetry', () => {
     pipeline.dispose();
   }, 10000);
 
+  it('preserves provider telemetry when the registry reactivates after a selection change', async () => {
+    const config = loadConfig({
+      PORT: '7003',
+      DATA_DIR: '/tmp/vega-telemetry-test',
+      UPDATE_ON_START: 'false',
+      GLOBAL_DEADLINE_MS: '2000',
+      SEARCH_TIMEOUT_MS: '10000',
+      SETTLE_MS: '0',
+      EMPTY_FENCE_MS: '0',
+      STREAM_CACHE_TTL_MS: '0',
+      PROVIDER_CACHE_TTL_MS: '1000',
+    });
+
+    const bundle: ProviderBundle = {
+      entry: {
+        display_name: 'Selected Provider',
+        value: 'selected-provider',
+        version: '1.0.0',
+        disabled: false,
+      },
+      dir: '/tmp/vega-telemetry-test/selected-provider',
+      modules: {
+        posts: {
+          getSearchPosts: async () => [
+            { title: 'Test Movie', link: 'https://example.test/movie' },
+          ],
+        },
+        meta: {
+          getMeta: async () => ({
+            imdbId: 'tt1234567',
+            type: 'movie',
+            title: 'Test Movie',
+            year: '2020',
+            linkList: [
+              {
+                directLinks: [
+                  { link: 'https://example.test/1.mp4', type: 'movie' },
+                ],
+              },
+            ],
+          }),
+        },
+        stream: {
+          getStream: async () => [
+            { link: 'https://cdn.test/1080p.mp4', quality: '1080p' },
+          ],
+        },
+      },
+    };
+
+    const snapshot: ProviderSnapshot = {
+      sha: 'test',
+      rootDir: '/tmp/vega-telemetry-test',
+      urls: {},
+      bundles: new Map([['selected-provider', bundle]]),
+      createdAt: Date.now(),
+    };
+
+    let activate: ((next: ProviderSnapshot) => void) | null = null;
+    const registry: ProviderRegistryApi = {
+      context: {} as ProviderContextLike,
+      listProviders: () => [bundle],
+      getActiveSnapshot: () => snapshot,
+      acquire: () => ({ snapshot, release: () => {} }),
+      onActivate: (listener) => {
+        activate = listener;
+        return () => {
+          activate = null;
+        };
+      },
+    };
+
+    const cinemeta: CinemetaApi = {
+      getMeta: async () => ({
+        id: 'tt1234567',
+        type: 'movie',
+        name: 'Test Movie',
+        year: '2020',
+      }),
+    };
+
+    const pipeline = new StreamPipeline({
+      config,
+      logger: logger(),
+      registry,
+      cinemeta,
+    });
+
+    await pipeline.handle({ type: 'movie', imdbId: 'tt1234567' });
+
+    const first = pipeline
+      .getMetrics()
+      .providerStats.find((entry) => entry.id === 'selected-provider');
+    expect(first?.calls).toBe(1);
+    expect(first?.ok).toBe(1);
+
+    activate?.({ ...snapshot, createdAt: Date.now() });
+
+    const afterSelection = pipeline
+      .getMetrics()
+      .providerStats.find((entry) => entry.id === 'selected-provider');
+    expect(afterSelection?.calls).toBe(1);
+    expect(afterSelection?.ok).toBe(1);
+
+    pipeline.dispose();
+  }, 10000);
+
   it('classifies abort/cancel errors as timeouts, not provider errors', async () => {
     const config = loadConfig({
       PORT: '7003',

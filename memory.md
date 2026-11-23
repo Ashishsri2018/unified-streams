@@ -157,3 +157,9 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Row actions:** Each row now shows a single Enable or Disable button matching the provider's current state (Disable when enabled, Enable when disabled) plus Reset; locked providers keep all actions disabled.
 - **Verification:** `npm run lint`, `npm run typecheck`, and admin/status Vitest suites pass.
 - **Admin table columns:** Added the full `/status` provider metrics (state, calls, ok, empty, errors, timeouts, response, yield, avg ms, last error) to the `/admin` table by merging `/health` stats; dropped the per-row policy version, suppressed the redundant id line when it matches the name, and replaced the `locked` text with a lock symbol.
+
+## Vega telemetry no longer resets on admin toggle (Nov 23 2026)
+- **Symptom:** After disabling providers in `/admin`, Vega's per-provider `calls` dropped to 0 while SA7/Nuvio kept incrementing, making Vega look dead. `metrics.requests` and `providerFailures` kept their values, so the table was also internally inconsistent.
+- **Root cause:** Vega's `StreamPipeline.clearCaches()` called `telemetry.reset()` and is wired to `registry.onActivate`. Every admin selection apply re-activates a snapshot, wiping all cumulative provider counters and breaker state. SA7 and Nuvio never reset telemetry on selection, so only Vega went to zero.
+- **Fix:** `clearCaches()` now clears search/mapping/stream caches and bumps the generation only; provider telemetry is reset only in `dispose()`. Toggling providers preserves call/ok/empty/error counters, matching SA7/Nuvio.
+- **Tests:** Added a regression in `tests/features/vegaTelemetry.test.ts` that executes one request, triggers a registry activation, and asserts `calls`/`ok` are still 1. `npm run lint`, `npm run typecheck`, and the telemetry suite pass.

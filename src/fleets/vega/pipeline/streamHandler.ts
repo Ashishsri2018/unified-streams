@@ -615,7 +615,6 @@ export class StreamPipeline implements StreamHandlerApi {
     this.searchCache.clear();
     this.mappingCache.clear();
     this.streamCache.clear();
-    this.telemetry.reset();
   }
 
   dispose(): void {
@@ -623,6 +622,7 @@ export class StreamPipeline implements StreamHandlerApi {
     this.disposed = true;
     this.unsubscribe();
     this.clearCaches();
+    this.telemetry.reset();
     for (const entry of this.inFlight.values()) {
       entry.controller.abort(new Error("pipeline disposed"));
     }
