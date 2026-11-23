@@ -2,11 +2,69 @@ const { AsyncLocalStorage } = require('node:async_hooks');
 
 const sa7NetworkStorage = new AsyncLocalStorage();
 
+// Scrapers only parse text payloads (HTML/JSON). A provider can be tricked into
+// following a download redirect to a multi-gigabyte media file (for example
+// HDHub4u's hubcloud `t3dl.php` links); buffering that with `.text()` aborts the
+// whole worker. Refuse obviously non-text or oversized responses before the
+// provider reads the body.
+const MAX_SAFE_RESPONSE_BYTES = 16 * 1024 * 1024;
+const BINARY_MEDIA_CONTENT_TYPE =
+  /^(?:video|audio|image|font)\/|(?:octet-stream|zip|rar|7z|gzip|x-tar|pdf)/i;
+const TEXTUAL_CONTENT_TYPE =
+  /^(?:text\/|application\/(?:json|xml|javascript|ecmascript|x-www-form-urlencoded|ld\+json|rss\+xml|atom\+xml|xhtml\+xml|graphql))/i;
+const ARCHIVE_OR_MEDIA_PATH =
+  /\.(?:mkv|mp4|m4v|avi|mov|webm|flv|wmv|mpe?g|m2ts|zip|rar|7z|tar|gz|tgz|bz2|xz|zst|iso|mp3|aac|flac|wav|m4a|opus)$/i;
+
 function createTracker(signal) {
   return {
     attempts: [],
     signal,
   };
+}
+
+function safeUrlHost(rawUrl) {
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return 'unknown';
+  }
+}
+
+function safeUrlPath(rawUrl) {
+  try {
+    return new URL(rawUrl).pathname;
+  } catch {
+    return '';
+  }
+}
+
+function isBinaryContentType(contentType) {
+  const normalized = String(contentType || '')
+    .split(';')[0]
+    .trim()
+    .toLowerCase();
+  if (!normalized || TEXTUAL_CONTENT_TYPE.test(normalized)) return false;
+  return BINARY_MEDIA_CONTENT_TYPE.test(normalized);
+}
+
+function assertSafeSa7Response(url, response) {
+  const contentType = response.headers.get('content-type') || '';
+  const rawLength = response.headers.get('content-length');
+  const contentLength = rawLength == null || rawLength === '' ? NaN : Number(rawLength);
+  const host = safeUrlHost(url || response.url || '');
+
+  if (Number.isFinite(contentLength) && contentLength > MAX_SAFE_RESPONSE_BYTES) {
+    throw new Error(
+      `blocked oversized response (${contentLength} bytes, ${contentType || 'unknown type'}) from ${host}`
+    );
+  }
+  if (isBinaryContentType(contentType)) {
+    throw new Error(`blocked binary response (${contentType}) from ${host}`);
+  }
+  const path = safeUrlPath(response.url || url || '');
+  if (ARCHIVE_OR_MEDIA_PATH.test(path)) {
+    throw new Error(`blocked media/archive response from ${host}`);
+  }
 }
 
 function initNetworkHooks() {
@@ -37,6 +95,13 @@ function initNetworkHooks() {
                 : '';
         try {
           const res = await origFetch.call(this, input, mergedInit);
+          try {
+            assertSafeSa7Response(url, res);
+          } catch (guardError) {
+            // Drain nothing; release the socket before surfacing the guard error.
+            void res.body?.cancel().catch(() => {});
+            throw guardError;
+          }
           tracker.attempts.push({
             url,
             status: res.status,
@@ -70,6 +135,11 @@ function initNetworkHooks() {
       if (axios && axios.interceptors) {
         axios.interceptors.request.use((reqConfig) => {
           reqConfig.__sa7StartedAt = Date.now();
+          const currentMax = Number(reqConfig.maxContentLength);
+          reqConfig.maxContentLength =
+            Number.isFinite(currentMax) && currentMax > 0
+              ? Math.min(currentMax, MAX_SAFE_RESPONSE_BYTES)
+              : MAX_SAFE_RESPONSE_BYTES;
           const tracker = sa7NetworkStorage.getStore();
           if (tracker && tracker.signal && !reqConfig.signal) {
             reqConfig.signal = tracker.signal;
@@ -176,4 +246,6 @@ module.exports = {
   sa7NetworkStorage,
   createTracker,
   classifyEmptyResult,
+  assertSafeSa7Response,
+  MAX_SAFE_RESPONSE_BYTES,
 };

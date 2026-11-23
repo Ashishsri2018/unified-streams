@@ -233,3 +233,21 @@ intentionally omits providers whose manifest entry has `disabled: true`, matchin
 the updater's `raw.disabled !== false` filter.
 
 Status: accepted; the runtime updater is the source of truth once it succeeds.
+
+### HDHub4u download redirects can exceed SA7 worker memory
+
+The SA7 `hdhub4u` provider follows hubcloud `/drive/t3dl.php?id=...` links that
+redirect to direct R2 `.mkv` downloads (observed 2.4 GB for `Steps` 2026,
+`tt14413964`). The upstream extractor calls `fetch(...).text()` on those
+responses, so the entire file is buffered in memory and the worker is killed.
+This crashed the Railway deployment because `sa7:hdhub4u` is active there; the
+Beamup instance does not run the SA7 copy.
+
+`src/fleets/sa7/lib/tracker.js` now rejects binary/archive content types,
+media/archive redirect paths, and responses over 16 MiB before a provider can
+read the body, and caps axios response bodies at the same limit. Guard errors
+are recorded as failed network attempts so the provider skips the link instead
+of aborting the request.
+
+Status: mitigated. Keep the guard when refreshing the SA7 vendored snapshot;
+the provider updater will overwrite `hdhub4u.js` but not this lib file.

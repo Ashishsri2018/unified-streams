@@ -105,3 +105,9 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Railway deactivated providers activated on Beamup:** All deactivated providers on Railway (dual-fleet backup copies and zero-yield providers `kurage`, `puretoons`, `toonstream`, `lyrin`, `novus`, `vyranel`, `kethrax`, `dramacool`, `eonMovies`, `gokuHD`, `kickAssAnime`, `rareanimes`) are active on Beamup as backup.
 - **Docs & audit:** Updated `architecture.md`, `config/provider-audit.csv` notes for 4KHDHub, HDHub4u, and NetMirror, and created `scratchpad.md` tracking the full allocation matrix.
 - **Verification:** Updated `tests/features/disabledProviders.test.ts` to assert `4khdhub` on SA7, `soryn` on Nuvio, and `hdhub4u` on Vega are enabled on Beamup.
+
+## SA7 HDHub4u memory guard (Nov 23 2026)
+- **Railway crash:** `GET /stream/movie/tt14413964.json` ("Steps", 2026) returned 502 after ~15s and restarted the container. Fleet isolation put the fault in SA7; provider sweep isolated `hdhub4u`.
+- **Root cause:** The HDHub4u extractor follows hubcloud `/drive/t3dl.php?id=...` redirects to signed R2 `.mkv` files and calls `fetch(...).text()`. Observed bodies of 2,427,569,820 bytes (plus ~847 MB and ~1.08 GB variants); buffering killed the worker. Railway runs `sa7:hdhub4u`, while Beamup does not, explaining the instance difference.
+- **Fix:** Added a response guard to `src/fleets/sa7/lib/tracker.js` that rejects binary/archive content types, media/archive redirect paths, and payloads over 16 MiB before the body is read; axios requests get a matching `maxContentLength`. Blocked links are recorded as failed attempts.
+- **Verification:** Reproduced the 2.4 GB response inside the Railway container. Running the patched tracker against the live `hdhub4u` path returned 14 streams in 6.5s with no restart (main `startedAt` unchanged). Added `tests/features/sa7NetworkGuard.test.ts` (6 tests); full feature suite 259 tests pass. No deploy or push.
