@@ -97,6 +97,7 @@ jobs:
           GRAMCINEMA_TOKEN: ${{ secrets.GRAMCINEMA_TOKEN }}
           KARTOONS_TOKEN: ${{ secrets.KARTOONS_TOKEN }}
           PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: |
           set -e
           BEAMUP_HOST="${BEAMUP_REMOTE#*@}"
@@ -112,6 +113,7 @@ jobs:
           [ -n "$GRAMCINEMA_TOKEN" ] && CONFIG_PAIRS+=("GRAMCINEMA_TOKEN=$(printf '%q' "$GRAMCINEMA_TOKEN")")
           [ -n "$KARTOONS_TOKEN" ] && CONFIG_PAIRS+=("KARTOONS_TOKEN=$(printf '%q' "$KARTOONS_TOKEN")")
           [ -n "$PUBLIC_BASE_URL" ] && CONFIG_PAIRS+=("PUBLIC_BASE_URL=$(printf '%q' "$PUBLIC_BASE_URL")")
+          [ -n "$ADMIN_TOKEN" ] && CONFIG_PAIRS+=("ADMIN_TOKEN=$(printf '%q' "$ADMIN_TOKEN")")
           if [ ${#CONFIG_PAIRS[@]} -gt 0 ]; then
             set +e
             output=$(ssh "dokku@$BEAMUP_HOST" "config:set $APP ${CONFIG_PAIRS[*]}" 2>&1)
@@ -171,6 +173,7 @@ jobs:
           FEBBOX_UI_COOKIE: ${{ secrets.FEBBOX_UI_COOKIE }}
           GRAMCINEMA_TOKEN: ${{ secrets.GRAMCINEMA_TOKEN }}
           KARTOONS_TOKEN: ${{ secrets.KARTOONS_TOKEN }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: |
           set -e
           if [ -z "$RAILWAY_TOKEN" ]; then
@@ -194,6 +197,9 @@ jobs:
           fi
           if [ -n "$KARTOONS_TOKEN" ]; then
             railway variable set "KARTOONS_TOKEN=$KARTOONS_TOKEN" --service "$RAILWAY_SERVICE" --skip-deploys || true
+          fi
+          if [ -n "$ADMIN_TOKEN" ]; then
+            railway variable set "ADMIN_TOKEN=$ADMIN_TOKEN" --service "$RAILWAY_SERVICE" --skip-deploys || true
           fi
 
       - name: Deploy to Railway
