@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isProviderEnabled, selectEnabledProviders } from '../../src/core/policy.js';
+import { isProviderEnabled, selectEnabledProviders, findDepartedProviderIds } from '../../src/core/policy.js';
 import { CircuitBreaker, clampTimeout } from '../../src/core/concurrency.js';
 import { deriveFleetEnv, loadAppEnv } from '../../src/core/env.js';
 
@@ -17,6 +17,26 @@ describe('provider policy and concurrency', () => {
     expect(
       selectEnabledProviders(entries, { enabled: [], disabled: ['b'] }, (entry) => entry.id),
     ).toEqual([{ id: 'a' }, { id: 'c' }]);
+  });
+
+  it('detects configured providers that vanished from the upstream manifest', () => {
+    const previous = ['sylphera', 'kethrax', 'novus'];
+    const current = ['dexter', 'kethrax', 'novus'];
+    expect(
+      findDepartedProviderIds(previous, current, {
+        enabled: [],
+        disabled: ['sylphera', 'novus', 'torrentio'],
+      }),
+    ).toEqual(['sylphera']);
+  });
+
+  it('ignores providers that were never configured or never existed', () => {
+    expect(
+      findDepartedProviderIds(['sylphera', 'torrentio'], ['dexter'], {
+        enabled: ['novus'],
+        disabled: [],
+      }),
+    ).toEqual([]);
   });
 
   it('circuit breaker transitions between closed, open, and half-open', () => {

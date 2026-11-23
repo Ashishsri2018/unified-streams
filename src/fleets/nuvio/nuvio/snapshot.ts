@@ -9,6 +9,7 @@ import type {
   NuvioScraperEntry,
   NuvioSnapshot,
 } from "../types.js";
+import { findDepartedProviderIds } from "../../../core/policy.js";
 import { computeSnapshotSha, CodebergClient } from "../source/codeberg.js";
 import { mapLimit, mapLimitSettled, randomInt } from "../util/concurrency.js";
 import {
@@ -174,6 +175,7 @@ export class SnapshotManager {
         sha: targetSha,
         fetchedAt: Date.now(),
         scrapers,
+        providerIds: data.manifest.scrapers.map((entry) => entry.id),
       };
       await this.writeState(targetSha, snapshot.fetchedAt);
       this.activate(snapshot, "network");
@@ -220,6 +222,7 @@ export class SnapshotManager {
     snapshot: NuvioSnapshot,
     source: SnapshotSource,
   ): NuvioSnapshot {
+    this.warnDepartedProviders(this.snapshot, snapshot, source);
     this.snapshot = snapshot;
     this.lastError = null;
     this.logger.info("nuvio_snapshot_activated", {
@@ -229,6 +232,29 @@ export class SnapshotManager {
       fetchedAt: new Date(snapshot.fetchedAt).toISOString(),
     });
     return snapshot;
+  }
+
+  private warnDepartedProviders(
+    previous: NuvioSnapshot | null,
+    next: NuvioSnapshot,
+    source: SnapshotSource,
+  ): void {
+    if (!previous) return;
+    const departed = findDepartedProviderIds(
+      previous.providerIds ?? [],
+      next.providerIds,
+      {
+        enabled: this.config.enabledScrapers,
+        disabled: this.config.disabledScrapers,
+      },
+    );
+    if (departed.length === 0) return;
+    this.logger.warn("nuvio_providers_missing", {
+      providers: departed,
+      previousSha: previous.sha,
+      sha: next.sha,
+      source,
+    });
   }
 
   private isFresh(fetchedAt: number): boolean {
@@ -423,7 +449,12 @@ export class SnapshotManager {
         sha,
         scrapers: scrapers.length,
       });
-      return { sha, fetchedAt, scrapers };
+      return {
+        sha,
+        fetchedAt,
+        scrapers,
+        providerIds: manifest.scrapers.map((entry) => entry.id),
+      };
     } catch (error) {
       this.logger.warn("nuvio_snapshot_disk_load_failed", {
         sha,

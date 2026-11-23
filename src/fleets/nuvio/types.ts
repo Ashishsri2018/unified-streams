@@ -107,6 +107,8 @@ export interface NuvioSnapshot {
   sha: string;
   fetchedAt: number;
   scrapers: LoadedScraper[];
+  /** All manifest scraper IDs, including ones filtered out by policy. */
+  providerIds: string[];
 }
 
 export interface HealthReport {

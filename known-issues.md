@@ -269,3 +269,25 @@ support is enabled later, add a byte/size limit to the cURL helper options (or
 stream and cancel the body) before buffering.
 
 Status: latent; the native path is guarded.
+
+### Missing-provider warnings only fire on manifest transitions
+
+All fleets compare the outgoing manifest's provider IDs with the new manifest
+and warn for configured IDs (enabled or disabled) that disappeared. This
+catches upstream renames, e.g. `sylphera` being renamed, so
+`config/providers.json` can be reconciled:
+
+- Nuvio: `nuvio_providers_missing` from `SnapshotManager.activate`.
+- Vega: `provider_missing` from `Updater.handleFullUpdate`, using the previous
+  active snapshot's `manifest.json` (falling back to `state.providers` keys).
+- SA7: `[providers] configured provider(s) missing from manifest: ...` from
+  `buildRegistry`/`reloadProviders`.
+
+Limitations: the warning needs a previous manifest in the same process. A cold
+start where the cached/bundled snapshot already reflects the rename (and no
+older manifest is loaded first) will not warn. SA7 and Nuvio compare in-memory
+manifests, so a rename that happened before the process started is invisible to
+them; Vega can use the previously installed manifest directory.
+
+Status: accepted; covers the live refresh/update path used by deploys with a
+warm disk or bundled snapshot.

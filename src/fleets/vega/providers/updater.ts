@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { AppConfig } from "../config.js";
 import {
+  findDepartedProviderIds,
   isProviderEnabled,
   selectEnabledProviders,
   type ProviderSelection,
@@ -762,6 +763,19 @@ export class Updater {
       throw new Error("manifest.json has no enabled providers");
     }
 
+    let previousProviderIds = await this.readManifestProviderIds(
+      previousActive?.rootDir,
+    );
+    if (previousProviderIds.length === 0) {
+      previousProviderIds = Object.keys(state.providers);
+    }
+    this.warnMissingProviders(
+      previousProviderIds,
+      data.entries,
+      target,
+      previousActive?.sha ?? state.activeSha,
+    );
+
     const staging = path.join(
       this.providerRoot,
       `${target.sha}.tmp-${randomInt(0, 0x7fffffff).toString(36)}`,
@@ -953,6 +967,43 @@ export class Updater {
         await removeDir(staging).catch(() => undefined);
       }
     }
+  }
+
+  private async readManifestProviderIds(
+    rootDir: string | null | undefined,
+  ): Promise<string[]> {
+    if (!rootDir) return [];
+    try {
+      const entries = parseManifest(
+        await fs.readFile(path.join(rootDir, "manifest.json")),
+      );
+      return entries.map((entry) => entry.value);
+    } catch {
+      return [];
+    }
+  }
+
+  private warnMissingProviders(
+    previousIds: string[],
+    entries: UpstreamProviderEntry[],
+    target: TargetSnapshot,
+    previousSha: string | null,
+  ): void {
+    if (previousIds.length === 0) return;
+    const departed = findDepartedProviderIds(
+      previousIds,
+      entries.map((entry) => entry.value),
+      {
+        enabled: this.config.enabledProviders,
+        disabled: this.config.disabledProviders,
+      },
+    );
+    if (departed.length === 0) return;
+    this.logger.warn("provider_missing", {
+      providers: departed,
+      previousSha,
+      sha: target.sha,
+    });
   }
 
   private async stageProvider(

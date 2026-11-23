@@ -100,6 +100,51 @@ describe('fleet health and manifest normalization', () => {
       expect(result).toBe(existingSnapshot);
       expect(mockClient.resolveHead).not.toHaveBeenCalled();
     });
+
+    it('warns when a configured provider disappears after a snapshot refresh', () => {
+      const mockConfig = {
+        updateIntervalHours: 20,
+        downloadConcurrency: 2,
+        pinnedSha: null,
+        enabledScrapers: [],
+        disabledScrapers: ['sylphera', 'torrentio'],
+      } as unknown as AppConfig;
+
+      const mockLogger = {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      };
+
+      const manager = new SnapshotManager(mockConfig, mockLogger, {} as CodebergClient);
+      const previous = {
+        sha: 'old-sha',
+        fetchedAt: 1,
+        scrapers: [],
+        providerIds: ['sylphera', 'kethrax'],
+      } as unknown as NuvioSnapshot;
+      (manager as unknown as { snapshot: NuvioSnapshot }).snapshot = previous;
+
+      const next = {
+        sha: 'new-sha',
+        fetchedAt: 2,
+        scrapers: [],
+        providerIds: ['dexter', 'kethrax'],
+      } as unknown as NuvioSnapshot;
+      (
+        manager as unknown as {
+          activate: (snapshot: NuvioSnapshot, source: string) => NuvioSnapshot;
+        }
+      ).activate(next, 'network');
+
+      expect(mockLogger.warn).toHaveBeenCalledWith('nuvio_providers_missing', {
+        providers: ['sylphera'],
+        previousSha: 'old-sha',
+        sha: 'new-sha',
+        source: 'network',
+      });
+    });
   });
 
   describe('aggregateFleetProviders status reflection', () => {

@@ -121,3 +121,16 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Risk:** Nuvio's provider `fetch` wrapper (`src/fleets/nuvio/nuvio/loader.ts`) had no response-size or content-type limit, so a provider following a hubcloud/R2 download redirect could buffer multi-GB media with `.text()` and kill the worker. The Beamup `nuvio:qyrvaen` HDHub4u copy was the most exposed path; its `skipSizeCheck: true` option is not implemented by this loader.
 - **Fix:** Exported `guardProviderResponse` and `createProviderFetch` from the Nuvio loader with the same 16 MiB / binary / media-path rules as SA7. Known oversized/binary responses are rejected before reading; chunked bodies are capped with a wrapping `TransformStream` and overflow is recorded as a failed network attempt. Normal HTML/JSON responses and response URL metadata are preserved.
 - **Tests:** Added `tests/features/nuvioResponseGuard.test.ts` (9 tests) covering oversized headers, binary types, media redirects, chunked/under-reported bodies, pass-through, and tracker integration. Recorded the latent Vega cURL buffering caveat in `known-issues.md`. Not committed or deployed.
+
+## Nuvio missing-provider warning (Nov 23 2026)
+- **Problem:** A configured provider ID that upstream renames (e.g. `sylphera`) silently stops matching, so the renamed provider becomes enabled while the stale deny entry in `config/providers.json` is treated as inert.
+- **Fix:** Added `findDepartedProviderIds` to `src/core/policy.ts`, comparing the previous manifest's IDs with the new manifest and returning configured IDs that vanished. `NuvioSnapshot` now carries `providerIds` (all manifest IDs, including policy-filtered ones), and `SnapshotManager.activate` logs `nuvio_providers_missing` with the departed IDs, previous/new SHA, and snapshot source.
+- **Behavior:** Only configured IDs that actually existed in the previous manifest warn, so cross-fleet hard-disabled IDs absent from Nuvio (torrentio, youtube, mxplayer, etc.) do not produce persistent noise.
+- **Tests:** Added policy-helper cases in `tests/features/core.test.ts` and a `SnapshotManager.activate` warn regression in `tests/features/fleetHealthAndStatus.test.ts`. Lint, typecheck, and the three touched test files pass.
+- **Docs:** Recorded the cold-start/scope caveat in `known-issues.md`. SA7/Vega not covered yet.
+
+## Missing-provider warnings for SA7 and Vega (Nov 23 2026)
+- **SA7:** `src/fleets/sa7/providers.js` now tracks the previous manifest's provider IDs across `buildRegistry`/`reloadProviders` and logs `[providers] configured provider(s) missing from manifest: ...` for configured IDs that vanished. Uses `corePolicy.findDepartedProviderIds` when available, with a plain-JS fallback.
+- **Vega:** `src/fleets/vega/providers/updater.ts` reads the previous active snapshot's `manifest.json` IDs (falling back to `state.providers` keys) and logs `provider_missing` with the departed configured IDs, previous/new SHA during `handleFullUpdate`.
+- **Tests:** Added `tests/features/sa7MissingProviders.test.ts`; full suite 274 tests pass, lint/typecheck clean.
+- **Docs:** Updated the missing-provider caveat in `known-issues.md` to cover all three fleets and their cold-start limitations.

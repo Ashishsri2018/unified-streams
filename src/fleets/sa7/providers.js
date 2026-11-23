@@ -22,7 +22,28 @@ function isProviderEnabled(id, selection) {
   return enabled.length === 0 || enabled.includes(key);
 }
 
+function findDepartedProviderIds(previousIds, currentIds, selection) {
+  if (corePolicy && typeof corePolicy.findDepartedProviderIds === 'function') {
+    return corePolicy.findDepartedProviderIds(previousIds, currentIds, selection);
+  }
+  const current = new Set(
+    (currentIds || []).map((id) => String(id).trim().toLowerCase()).filter(Boolean),
+  );
+  const configured = new Set(
+    [...(selection.enabled || []), ...(selection.disabled || [])]
+      .map((id) => String(id).trim().toLowerCase())
+      .filter((id) => id && id !== '*'),
+  );
+  const departed = new Set();
+  for (const raw of previousIds || []) {
+    const id = String(raw).trim().toLowerCase();
+    if (id && configured.has(id) && !current.has(id)) departed.add(id);
+  }
+  return [...departed].sort();
+}
+
 let registry = null;
+let manifestProviderIds = null;
 
 // Torrent providers stay vendored so the daily sync keeps them updated, but
 // they are never loaded or queried. The vendored manifest has no source-type field.
@@ -64,6 +85,20 @@ function buildRegistry() {
     enabled: config.enabledProviders || [],
     disabled: [...DISABLED_PROVIDER_IDS, ...(config.disabledProviders || [])],
   };
+  const manifestIds = (manifest.providers || [])
+    .map((provider) => (provider && typeof provider.id === 'string' ? provider.id : ''))
+    .filter(Boolean);
+
+  if (manifestProviderIds) {
+    const departed = findDepartedProviderIds(manifestProviderIds, manifestIds, selection);
+    if (departed.length > 0) {
+      console.warn(
+        `[providers] configured provider(s) missing from manifest: ${departed.join(', ')}`
+      );
+    }
+  }
+  manifestProviderIds = manifestIds;
+
   const entries = (manifest.providers || []).filter((p) => {
     if (p.enabled === false) return false;
     return isProviderEnabled(p.id, selection);
