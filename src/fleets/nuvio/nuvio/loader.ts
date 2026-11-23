@@ -29,7 +29,135 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function createProviderFetch(timeoutMs: number): typeof fetch {
+export const MAX_PROVIDER_RESPONSE_BYTES = 16 * 1024 * 1024;
+const BINARY_PROVIDER_CONTENT_TYPE =
+  /^(?:video|audio|image|font)\/|(?:octet-stream|zip|rar|7z|gzip|x-tar|pdf)/i;
+const TEXTUAL_PROVIDER_CONTENT_TYPE =
+  /^(?:text\/|application\/(?:json|xml|javascript|ecmascript|x-www-form-urlencoded|ld\+json|rss\+xml|atom\+xml|xhtml\+xml|graphql))/i;
+const MEDIA_OR_ARCHIVE_PATH =
+  /\.(?:mkv|mp4|m4v|avi|mov|webm|flv|wmv|mpe?g|m2ts|zip|rar|7z|tar|gz|tgz|bz2|xz|zst|iso|mp3|aac|flac|wav|m4a|opus)$/i;
+
+export class ProviderResponseLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProviderResponseLimitError";
+  }
+}
+
+export interface ProviderResponseGuardOptions {
+  maxBytes?: number;
+  onOverflow?: (error: ProviderResponseLimitError) => void;
+}
+
+function safeUrlHost(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return "unknown";
+  }
+}
+
+function safeUrlPath(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).pathname;
+  } catch {
+    return "";
+  }
+}
+
+function isBinaryContentType(contentType: string): boolean {
+  const normalized = contentType.split(";")[0].trim().toLowerCase();
+  if (!normalized || TEXTUAL_PROVIDER_CONTENT_TYPE.test(normalized)) return false;
+  return BINARY_PROVIDER_CONTENT_TYPE.test(normalized);
+}
+
+/**
+ * Scrapers should only parse HTML/JSON. Refuse direct media/archive downloads
+ * and oversized bodies before a provider can buffer them with .text()/.json().
+ */
+export function guardProviderResponse(
+  response: Response,
+  requestedUrl: string,
+  options: ProviderResponseGuardOptions = {},
+): Response {
+  const maxBytes = Math.max(1, options.maxBytes ?? MAX_PROVIDER_RESPONSE_BYTES);
+  const contentType = response.headers.get("content-type") || "";
+  const rawLength = response.headers.get("content-length");
+  const contentLength = rawLength == null || rawLength === "" ? NaN : Number(rawLength);
+  const finalUrl = response.url || requestedUrl || "";
+  const host = safeUrlHost(finalUrl);
+
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    void response.body?.cancel().catch(() => undefined);
+    throw new ProviderResponseLimitError(
+      `blocked oversized response (${contentLength} bytes, ${contentType || "unknown type"}) from ${host}`,
+    );
+  }
+  if (isBinaryContentType(contentType)) {
+    void response.body?.cancel().catch(() => undefined);
+    throw new ProviderResponseLimitError(`blocked binary response (${contentType}) from ${host}`);
+  }
+  const isMediaPath =
+    MEDIA_OR_ARCHIVE_PATH.test(safeUrlPath(finalUrl)) ||
+    MEDIA_OR_ARCHIVE_PATH.test(safeUrlPath(requestedUrl));
+  if (isMediaPath) {
+    void response.body?.cancel().catch(() => undefined);
+    throw new ProviderResponseLimitError(`blocked media/archive response from ${host}`);
+  }
+
+  if (
+    !response.body ||
+    !response.ok ||
+    response.status === 204 ||
+    response.status === 205 ||
+    response.status === 304
+  ) {
+    return response;
+  }
+
+  let total = 0;
+  let overflowed = false;
+  const limitedBody = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        total += chunk.byteLength;
+        if (total > maxBytes) {
+          if (!overflowed) {
+            overflowed = true;
+            const error = new ProviderResponseLimitError(
+              `blocked oversized response (>${maxBytes} bytes) from ${host}`,
+            );
+            try {
+              options.onOverflow?.(error);
+            } catch {
+              // Never let a telemetry callback mask the stream error.
+            }
+            controller.error(error);
+          }
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+
+  const guarded = new Response(limitedBody, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+  Object.defineProperties(guarded, {
+    url: { value: finalUrl, configurable: true },
+    redirected: { value: response.redirected, configurable: true },
+    type: { value: response.type, configurable: true },
+  });
+  return guarded;
+}
+
+export function createProviderFetch(
+  timeoutMs: number,
+  fetchImpl: typeof fetch = nativeFetch,
+): typeof fetch {
   return (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
     const context = scraperNetworkStorage.getStore();
     const tracker = context?.tracker;
@@ -41,7 +169,20 @@ function createProviderFetch(timeoutMs: number): typeof fetch {
     if (context?.signal) signals.push(context.signal);
     const signal = signals.length > 1 ? AbortSignal.any(signals) : timeoutSignal;
     try {
-      const response = await nativeFetch(input, { ...init, signal });
+      const response = await fetchImpl(input, { ...init, signal });
+      const guarded = guardProviderResponse(response, url, {
+        onOverflow: (error) => {
+          if (tracker) {
+            tracker.record({
+              url,
+              ok: false,
+              isTimeout: false,
+              error: error.message,
+              durationMs: Date.now() - startedAt,
+            });
+          }
+        },
+      });
       if (tracker) {
         tracker.record({
           url,
@@ -51,7 +192,7 @@ function createProviderFetch(timeoutMs: number): typeof fetch {
           durationMs: Date.now() - startedAt,
         });
       }
-      return response;
+      return guarded;
     } catch (error) {
       if (tracker) {
         const isTimeout =

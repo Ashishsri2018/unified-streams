@@ -249,5 +249,23 @@ read the body, and caps axios response bodies at the same limit. Guard errors
 are recorded as failed network attempts so the provider skips the link instead
 of aborting the request.
 
+`src/fleets/nuvio/nuvio/loader.ts` applies the same 16 MiB / binary / media-path
+guard to Nuvio provider fetches, including a streaming abort for chunked bodies
+with no usable `content-length`. This covers the Beamup `nuvio:qyrvaen`
+(HDHub4u) copy, whose provider passes `skipSizeCheck: true`; that option is a
+different runtime's convention and was previously ignored here.
+
 Status: mitigated. Keep the guard when refreshing the SA7 vendored snapshot;
 the provider updater will overwrite `hdhub4u.js` but not this lib file.
+
+### Vega cURL transport buffers before enforcing the response cap
+
+`HttpTransport.curlRequest` calls `response.buffer()`
+(`src/fleets/vega/providers/sdk/http.ts:486`) and only checks
+`maxResponseBytes` after the whole body is already in memory. `curl-cffi-node`
+is not a dependency, so `getCurlApi()` fails and the transport falls back to the
+native fetch path, which streams and aborts at 32 MiB (`http.ts:573`). If cURL
+support is enabled later, add a byte/size limit to the cURL helper options (or
+stream and cancel the body) before buffering.
+
+Status: latent; the native path is guarded.
