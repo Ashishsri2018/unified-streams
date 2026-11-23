@@ -12,6 +12,7 @@ import {
 } from './core/env.js';
 import { ensureFleetDirs } from './core/fleetBootstrap.js';
 import { GatewayStreamCache } from './core/cache.js';
+import { createProviderOverridesStore } from './core/providerOverrides.js';
 import { WorkerClient } from './core/workerClient.js';
 import { MetadataResolver } from './core/metadata.js';
 import { createGatewayApp } from './addon/app.js';
@@ -59,7 +60,10 @@ function loadSa7Factory(): (env: NodeJS.ProcessEnv) => FleetInstance {
   return sa7.createSa7Handlers;
 }
 
-async function startFleets(env: AppEnv): Promise<() => Promise<void>> {
+async function startFleets(
+  env: AppEnv,
+  overrides: { getFleet(fleet: Fleet): Record<string, boolean>; getVersion(): number },
+): Promise<() => Promise<void>> {
   const createSa7 = loadSa7Factory();
   const servers: http.Server[] = [];
   const disposers: Array<() => Promise<void>> = [];
@@ -72,7 +76,13 @@ async function startFleets(env: AppEnv): Promise<() => Promise<void>> {
           ? env.NUVIO_INTERNAL_URL
           : env.VEGA_INTERNAL_URL;
     const port = portFromUrl(configuredUrl, FLEET_PORTS[fleet]);
-    const fleetEnv = deriveFleetEnv(env, fleet, port);
+    const fleetEnv = deriveFleetEnv(
+      env,
+      fleet,
+      port,
+      overrides.getFleet(fleet),
+      overrides.getVersion(),
+    );
     const instance: FleetInstance =
       fleet === 'sa7'
         ? createSa7(fleetEnv)
@@ -147,7 +157,13 @@ async function main(): Promise<void> {
     updateOnStart: env.UPDATE_ON_START,
   });
 
-  const stopFleets = await startFleets(env);
+  const overridesStore = createProviderOverridesStore({
+    dataDir: env.DATA_DIR,
+    onWarning: (message) => logger.warn('provider_overrides_invalid', { error: message }),
+  });
+  overridesStore.load();
+
+  const stopFleets = await startFleets(env, overridesStore);
   scheduler.start();
 
   const metadataResolver = new MetadataResolver(env.CINEMETA_URL, env.TMDB_API_KEY, env.JIKAN_URL, {
@@ -165,7 +181,20 @@ async function main(): Promise<void> {
     cache,
     workers,
     addonVersion: env.ADDON_VERSION,
-    policyVersion: '1.0.0',
+    policyVersion: String(overridesStore.getVersion()),
+    getPolicyVersion: () => String(overridesStore.getVersion()),
+    adminToken: env.ADMIN_TOKEN,
+    overridesStore,
+    adminSettings: {
+      instanceProfile: env.INSTANCE_PROFILE,
+      backendTimeoutMs: env.BACKEND_TIMEOUT_MS,
+      globalDeadlineMs: env.GLOBAL_DEADLINE_MS,
+      searchTimeoutMs: env.SEARCH_TIMEOUT_MS,
+      scraperConcurrency: env.SCRAPER_CONCURRENCY,
+      sa7Concurrency: env.SA7_CONCURRENCY,
+      circuitFailureThreshold: env.CIRCUIT_FAILURE_THRESHOLD,
+      circuitCooldownMs: env.CIRCUIT_COOLDOWN_MS,
+    },
     gitCommit: env.GIT_COMMIT,
     publicBaseUrl: env.PUBLIC_BASE_URL,
     hasTmdb: Boolean(env.TMDB_API_KEY),

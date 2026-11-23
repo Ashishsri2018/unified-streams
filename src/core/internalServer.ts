@@ -17,6 +17,47 @@ export interface FleetHandlers {
     res: http.ServerResponse,
     requestId: string,
   ): unknown;
+  providers?(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    requestId: string,
+  ): unknown;
+  selectProviders?(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    requestId: string,
+    body: unknown,
+  ): unknown;
+}
+
+const MAX_INTERNAL_BODY_BYTES = 64 * 1024;
+
+function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_INTERNAL_BODY_BYTES) {
+        reject(new Error('request body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (chunks.length === 0) {
+        resolve(null);
+        return;
+      }
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8')));
+      } catch {
+        reject(new Error('invalid JSON body'));
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 export interface FleetInstance {
@@ -88,7 +129,9 @@ export function createInternalServer(host: string, instance: FleetInstance): htt
 
     if (
       req.method === 'HEAD' &&
-      (pathname === '/internal/health' || pathname.startsWith('/internal/stream/'))
+      (pathname === '/internal/health' ||
+        pathname === '/internal/providers' ||
+        pathname.startsWith('/internal/stream/'))
     ) {
       const headers: Record<string, string> = {
         'content-type': 'application/json; charset=utf-8',
@@ -105,6 +148,23 @@ export function createInternalServer(host: string, instance: FleetInstance): htt
       }
       if (pathname.startsWith('/internal/stream/')) {
         return await handlers.stream(req, res, pathname, requestId);
+      }
+      if (pathname === '/internal/providers' && req.method === 'GET' && handlers.providers) {
+        return await handlers.providers(req, res, requestId);
+      }
+      if (
+        pathname === '/internal/providers/selection' &&
+        req.method === 'POST' &&
+        handlers.selectProviders
+      ) {
+        let body: unknown;
+        try {
+          body = await readJsonBody(req);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return safeSendJson(res, 400, { ok: false, error: message }, requestId);
+        }
+        return await handlers.selectProviders(req, res, requestId, body);
       }
       if (pathname === '/internal/reload' && req.method === 'POST') {
         return await handlers.reload(req, res, requestId);

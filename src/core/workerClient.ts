@@ -1,4 +1,10 @@
-import { INTERNAL_HEADERS, InternalStreamResponse, ForwardedMetadata } from './contract.js';
+import {
+  INTERNAL_HEADERS,
+  InternalStreamResponse,
+  ForwardedMetadata,
+  ProviderCatalogResponse,
+  ProviderSelectionResponse,
+} from './contract.js';
 import { WORKER_DEADLINE_MARGIN_MS } from './env.js';
 import { WorkerHealth } from './telemetry.js';
 import { StremioStream } from '../addon/filters.js';
@@ -123,6 +129,64 @@ export class WorkerClient {
         fleet: this.fleet,
         durationMs,
       };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async getProviders(timeoutMs = 5000): Promise<ProviderCatalogResponse | { error: string }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${this.baseUrl}/internal/providers`, {
+        signal: controller.signal,
+        headers: this.buildHeaders(),
+      });
+      if (!res.ok) {
+        return { error: `Provider catalog failed with status ${res.status}` };
+      }
+      return (await res.json()) as ProviderCatalogResponse;
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async setProviderSelection(
+    overrides: Record<string, boolean>,
+    version: number,
+    timeoutMs = 10000,
+  ): Promise<ProviderSelectionResponse> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${this.baseUrl}/internal/providers/selection`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          ...this.buildHeaders(),
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ overrides, version }),
+      });
+      const body = (await res.json().catch(() => ({}))) as Partial<ProviderSelectionResponse>;
+      if (!res.ok) {
+        return {
+          ok: false,
+          version,
+          error: typeof body.error === 'string' ? body.error : `Selection failed with status ${res.status}`,
+        };
+      }
+      return {
+        ok: body.ok !== false,
+        version: typeof body.version === 'number' ? body.version : version,
+        ...(body.applied ? { applied: body.applied } : {}),
+        ...(body.errors ? { errors: body.errors } : {}),
+        ...(body.error ? { error: body.error } : {}),
+      };
+    } catch (err) {
+      return { ok: false, version, error: err instanceof Error ? err.message : String(err) };
     } finally {
       clearTimeout(timer);
     }

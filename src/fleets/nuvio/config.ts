@@ -87,6 +87,8 @@ const schema = z.object({
   SCRAPER_SETTINGS_JSON: optionalString,
   ENABLED_SCRAPERS: envList,
   DISABLED_SCRAPERS: envList,
+  RUNTIME_OVERRIDES_JSON: optionalString,
+  SELECTION_VERSION: envInt(0, 0, Number.MAX_SAFE_INTEGER),
   PROXY_ENABLED: envBool(true),
   CINEMETA_URL: z.string().url().default("https://v3-cinemeta.strem.io"),
   TMDB_URL: z.string().url().default("https://api.themoviedb.org/3"),
@@ -128,6 +130,21 @@ function parseScraperSettings(
   return result;
 }
 
+function parseOverrides(raw: string | null): Record<string, boolean> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return {};
+    const result: Record<string, boolean> = {};
+    for (const [id, enabled] of Object.entries(parsed)) {
+      if (typeof enabled === "boolean") result[id] = enabled;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -163,6 +180,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     scraperSettings: parseScraperSettings(value.SCRAPER_SETTINGS_JSON),
     enabledScrapers: Array.from(new Set(value.ENABLED_SCRAPERS.map((id) => id.toLowerCase()))),
     disabledScrapers: Array.from(new Set(value.DISABLED_SCRAPERS.map((id) => id.toLowerCase()))),
+    runtimeOverrides: parseOverrides(value.RUNTIME_OVERRIDES_JSON),
+    selectionVersion: value.SELECTION_VERSION,
     proxyEnabled: value.PROXY_ENABLED,
     cinemetaUrl: trimTrailingSlash(value.CINEMETA_URL),
     tmdbUrl: trimTrailingSlash(value.TMDB_URL),

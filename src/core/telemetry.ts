@@ -102,6 +102,7 @@ export interface GatewayHealth {
   addon: string;
   version: string;
   commit: string;
+  policyVersion: string;
   startedAt: string;
   uptimeSec: number;
   checkedAt: string;

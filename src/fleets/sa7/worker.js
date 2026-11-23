@@ -5,7 +5,12 @@ require('./lib/cheerio-hook');
 const fs = require('node:fs');
 const http = require('node:http');
 const config = require('./config');
-const { getRegistry, reloadProviders } = require('./providers');
+const {
+  getRegistry,
+  reloadProviders,
+  getCatalog,
+  applyRuntimeSelection,
+} = require('./providers');
 const { collectStreams, getRuntimeStats } = require('./streams');
 const { parseContentId, toContentId } = require('./content-id');
 const cinemeta = require('./cinemeta');
@@ -160,11 +165,86 @@ function createSa7Handlers(fleetEnv = process.env) {
     }
   }
 
+  function handleProviders(req, res, requestId) {
+    try {
+      const payload = getCatalog();
+      res.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        ...(requestId ? { 'x-request-id': requestId } : {}),
+      });
+      res.end(JSON.stringify(payload));
+    } catch (err) {
+      res.writeHead(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ ok: false, error: err.message }));
+    }
+  }
+
+  function handleSelectProviders(req, res, requestId, body) {
+    const overrides =
+      body && typeof body === 'object' && body.overrides && typeof body.overrides === 'object'
+        ? body.overrides
+        : {};
+    const version =
+      body && typeof body === 'object' && typeof body.version === 'number'
+        ? body.version
+        : Number(config.selectionVersion || 0);
+    try {
+      const catalog = applyRuntimeSelection(overrides, version);
+      res.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        ...(requestId ? { 'x-request-id': requestId } : {}),
+      });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          version: catalog.version,
+          applied: catalog.providers.filter((provider) => provider.enabled).map((provider) => provider.id),
+        }),
+      );
+    } catch (err) {
+      res.writeHead(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ ok: false, version, error: err.message }));
+    }
+  }
+
   return {
     port,
     internalToken: fleetEnv.INTERNAL_TOKEN || '',
-    handlers: { health: handleHealth, stream: handleStream, reload: handleReload },
+    handlers: {
+      health: handleHealth,
+      stream: handleStream,
+      reload: handleReload,
+      providers: handleProviders,
+      selectProviders: handleSelectProviders,
+    },
   };
+}
+
+async function readJsonBody(req, limit = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new Error('request body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      try {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve(text ? JSON.parse(text) : {});
+      } catch {
+        reject(new Error('invalid JSON body'));
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 module.exports = { createSa7Handlers };
@@ -189,6 +269,19 @@ if (require.main === module) {
     }
     if (pathname === '/internal/health') return instance.handlers.health(req, res, requestId);
     if (pathname.startsWith('/internal/stream/')) return instance.handlers.stream(req, res, pathname, requestId);
+    if (pathname === '/internal/providers' && req.method === 'GET') {
+      return instance.handlers.providers(req, res, requestId);
+    }
+    if (pathname === '/internal/providers/selection' && req.method === 'POST') {
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch (error) {
+        res.writeHead(413, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        return res.end(JSON.stringify({ error: error.message }));
+      }
+      return instance.handlers.selectProviders(req, res, requestId, body);
+    }
     if (pathname === '/internal/reload' && req.method === 'POST') return instance.handlers.reload(req, res, requestId);
     res.writeHead(404, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ error: 'Not Found' }));

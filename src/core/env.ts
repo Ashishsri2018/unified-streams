@@ -53,6 +53,7 @@ export const EnvSchema = z.object({
   NUVIO_INTERNAL_URL: z.string().default('http://127.0.0.1:7002'),
   VEGA_INTERNAL_URL: z.string().default('http://127.0.0.1:7003'),
   PUBLIC_BASE_URL: z.string().optional(),
+  ADMIN_TOKEN: z.string().optional(),
   TMDB_API_KEY: z.string().optional(),
   PROVIDER_SETTINGS_JSON: z.string().optional(),
   SCRAPER_SETTINGS_JSON: z.string().optional(),
@@ -141,7 +142,7 @@ export function deriveMalResolveBudgetMs(env: AppEnv): number {
 // These classes are disabled for every fleet and every instance regardless of
 // the selected provider policy. Only an explicit policy change to this list
 // can re-enable them.
-const HARD_DISABLED_PROVIDERS = [
+export const HARD_DISABLED_PROVIDERS = [
   'torrentio',
   'internetarchive',
   'youtube',
@@ -294,6 +295,8 @@ export function deriveFleetEnv(
   env: AppEnv,
   fleet: Fleet,
   port: number,
+  runtimeOverrides: Record<string, boolean> = {},
+  selectionVersion = 0,
 ): Record<string, string> {
   // The gateway aborts a worker fetch at BACKEND_TIMEOUT_MS. Workers must finish
   // (and return partial results) before that hard cutoff, so keep a safety margin.
@@ -336,6 +339,9 @@ export function deriveFleetEnv(
     BREAKER_COOLDOWN_MS: String(env.CIRCUIT_COOLDOWN_MS),
     INTERNAL_TOKEN: env.INTERNAL_TOKEN || '',
     PROVIDER_SETTINGS_JSON: fleetSettings,
+    RUNTIME_OVERRIDES_JSON: JSON.stringify(runtimeOverrides),
+    HARD_DISABLED_PROVIDERS: JSON.stringify(HARD_DISABLED_PROVIDERS),
+    SELECTION_VERSION: String(selectionVersion),
   };
 
   if (env.TMDB_API_KEY) {

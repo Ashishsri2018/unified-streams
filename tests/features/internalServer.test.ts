@@ -23,6 +23,14 @@ describe('shared internal fleet server', () => {
           calls.push('reload');
           sendJson(res, 200, { ok: true });
         },
+        providers: (_req, res, _requestId) => {
+          calls.push('providers');
+          sendJson(res, 200, { fleet: 'test', version: 1, providers: [] });
+        },
+        selectProviders: (_req, res, _requestId, body) => {
+          calls.push(`select:${JSON.stringify(body)}`);
+          sendJson(res, 200, { ok: true, version: 2 });
+        },
       },
     };
   }
@@ -76,6 +84,23 @@ describe('shared internal fleet server', () => {
       'stream:/internal/stream/movie/tt123.json:req-1',
       'reload',
     ]);
+  });
+
+  it('routes provider catalog and selection with parsed JSON', async () => {
+    const port = await start('');
+
+    const catalog = await fetch(`http://127.0.0.1:${port}/internal/providers`);
+    expect(catalog.status).toBe(200);
+    expect(await catalog.json()).toEqual({ fleet: 'test', version: 1, providers: [] });
+
+    const selection = await fetch(`http://127.0.0.1:${port}/internal/providers/selection`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ overrides: { alpha: false }, version: 2 }),
+    });
+    expect(selection.status).toBe(200);
+    expect(await selection.json()).toEqual({ ok: true, version: 2 });
+    expect(calls).toEqual(['providers', 'select:{"overrides":{"alpha":false},"version":2}']);
   });
 
   it('handles HEAD without invoking handlers and OPTIONS/404 directly', async () => {

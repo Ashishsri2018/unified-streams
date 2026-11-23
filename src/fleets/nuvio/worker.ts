@@ -144,6 +144,56 @@ export function createNuvioHandlers(fleetEnv: NodeJS.ProcessEnv): FleetInstance 
     );
   }
 
+  function handleProviders(
+    _req: http.IncomingMessage,
+    res: http.ServerResponse,
+    requestId: string,
+  ): void {
+    sendJson(res, 200, snapshots.getCatalog(), requestId);
+  }
+
+  async function handleSelectProviders(
+    _req: http.IncomingMessage,
+    res: http.ServerResponse,
+    requestId: string,
+    body: unknown,
+  ): Promise<void> {
+    const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    const rawOverrides =
+      record.overrides && typeof record.overrides === "object" && !Array.isArray(record.overrides)
+        ? (record.overrides as Record<string, unknown>)
+        : {};
+    const overrides: Record<string, boolean> = {};
+    for (const [id, enabled] of Object.entries(rawOverrides)) {
+      if (typeof enabled === "boolean") overrides[id] = enabled;
+    }
+    const version = typeof record.version === "number" ? record.version : snapshots.getCatalog().version;
+    try {
+      const catalog = await snapshots.applySelection(overrides, version);
+      sendJson(
+        res,
+        200,
+        {
+          ok: true,
+          version: catalog.version,
+          applied: catalog.providers.filter((provider) => provider.enabled).map((provider) => provider.id),
+        },
+        requestId,
+      );
+    } catch (error) {
+      sendJson(
+        res,
+        500,
+        {
+          ok: false,
+          version,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        requestId,
+      );
+    }
+  }
+
   async function handleReload(req: http.IncomingMessage, res: http.ServerResponse, requestId: string): Promise<void> {
     let refreshed: Awaited<ReturnType<typeof snapshots.refresh>> = null;
     try {
@@ -169,6 +219,12 @@ export function createNuvioHandlers(fleetEnv: NodeJS.ProcessEnv): FleetInstance 
   return {
     port,
     internalToken: fleetEnv.INTERNAL_TOKEN || '',
-    handlers: { health: handleHealth, stream: handleStream, reload: handleReload },
+    handlers: {
+      health: handleHealth,
+      stream: handleStream,
+      reload: handleReload,
+      providers: handleProviders,
+      selectProviders: handleSelectProviders,
+    },
   };
 }

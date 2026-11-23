@@ -9,7 +9,13 @@ import type {
   NuvioScraperEntry,
   NuvioSnapshot,
 } from "../types.js";
-import { findDepartedProviderIds } from "../../../core/policy.js";
+import {
+  findDepartedProviderIds,
+  isProviderEnabledWithOverrides,
+  normalizeProviderOverrides,
+} from "../../../core/policy.js";
+import { HARD_DISABLED_PROVIDERS } from "../../../core/env.js";
+import type { ProviderCatalogResponse } from "../../../core/contract.js";
 import { computeSnapshotSha, CodebergClient } from "../source/codeberg.js";
 import { mapLimit, mapLimitSettled, randomInt } from "../util/concurrency.js";
 import {
@@ -21,7 +27,7 @@ import {
   writeJsonAtomic,
 } from "../util/fs.js";
 import { loadScraper, logScraperFailure } from "./loader.js";
-import { parseNuvioManifest, selectScrapers } from "./manifest.js";
+import { parseNuvioManifest } from "./manifest.js";
 
 const MAX_PROVIDER_BYTES = 2 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
@@ -63,12 +69,135 @@ export class SnapshotManager {
   private inflight: Promise<NuvioSnapshot | null> | null = null;
   private lastError: string | null = null;
   private refreshing = false;
+  private selectionVersion: number;
+  private selectionChain: Promise<void> = Promise.resolve();
+  private readonly loadErrors = new Map<string, string>();
 
   constructor(
     private readonly config: AppConfig,
     private readonly logger: LoggerLike,
     private readonly client: CodebergClient,
-  ) {}
+  ) {
+    this.selectionVersion = config.selectionVersion;
+  }
+
+  private isEnabled(id: string): boolean {
+    return isProviderEnabledWithOverrides(
+      id,
+      {
+        enabled: this.config.enabledScrapers,
+        disabled: this.config.disabledScrapers,
+      },
+      this.config.runtimeOverrides,
+      HARD_DISABLED_PROVIDERS,
+    );
+  }
+
+  private enabledEntries(entries: NuvioScraperEntry[]): NuvioScraperEntry[] {
+    return entries.filter((entry) => entry.enabled && this.isEnabled(entry.id));
+  }
+
+  getCatalog(): ProviderCatalogResponse {
+    const snapshot = this.snapshot;
+    const loaded = new Set(
+      (snapshot?.scrapers ?? []).map((scraper) => scraper.entry.id.toLowerCase()),
+    );
+    const entries = snapshot?.entries ?? [];
+    const known = new Set(entries.map((entry) => entry.id.toLowerCase()));
+    const hard = new Set(HARD_DISABLED_PROVIDERS.map((id) => id.toLowerCase()));
+    const providers = entries.map((entry) => {
+      const key = entry.id.toLowerCase();
+      return {
+        id: entry.id,
+        name: entry.name || entry.id,
+        types: entry.supportedTypes,
+        enabled: entry.enabled && this.isEnabled(entry.id),
+        loaded: loaded.has(key),
+        locked: hard.has(key),
+        missing: false,
+        lastError: this.loadErrors.get(key) ?? null,
+      };
+    });
+    for (const rawId of Object.keys(this.config.runtimeOverrides)) {
+      if (rawId === "*") continue;
+      const key = rawId.toLowerCase();
+      if (known.has(key)) continue;
+      providers.push({
+        id: rawId,
+        name: rawId,
+        types: ["movie", "tv"],
+        enabled: false,
+        loaded: false,
+        locked: hard.has(key),
+        missing: true,
+        lastError: "provider not present in snapshot",
+      });
+    }
+    return {
+      fleet: "nuvio",
+      version: this.selectionVersion,
+      providers,
+    };
+  }
+
+  async applySelection(
+    overrides: Record<string, boolean>,
+    version: number,
+  ): Promise<ProviderCatalogResponse> {
+    const run = this.selectionChain.then(() => this.applySelectionInternal(overrides, version));
+    this.selectionChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private async applySelectionInternal(
+    overrides: Record<string, boolean>,
+    version: number,
+  ): Promise<ProviderCatalogResponse> {
+    const normalized = Object.fromEntries(normalizeProviderOverrides(overrides));
+    this.config.runtimeOverrides = normalized;
+    this.config.selectionVersion = version;
+    this.selectionVersion = version;
+
+    const snapshot = this.snapshot;
+    if (!snapshot) return this.getCatalog();
+
+    const desired = this.enabledEntries(snapshot.entries);
+    const desiredIds = new Set(desired.map((entry) => entry.id.toLowerCase()));
+    const current = new Map(snapshot.scrapers.map((scraper) => [scraper.entry.id.toLowerCase(), scraper]));
+    const next = snapshot.scrapers.filter((scraper) => desiredIds.has(scraper.entry.id.toLowerCase()));
+
+    for (const entry of desired) {
+      const key = entry.id.toLowerCase();
+      if (current.has(key)) continue;
+      this.loadErrors.delete(key);
+      try {
+        const code = await fs.readFile(path.join(snapshot.dir, entry.filename), "utf8");
+        const scraper = await loadScraper({
+          entry,
+          code,
+          tmdbApiKey: this.config.tmdbApiKey,
+          envSettings: this.config.scraperSettings[entry.id] ?? {},
+          fetchTimeoutMs: this.config.httpTimeoutMs,
+        });
+        next.push(scraper);
+      } catch (error) {
+        const message = errorMessage(error);
+        this.loadErrors.set(key, message);
+        logScraperFailure(this.logger, entry, new Error(message));
+      }
+    }
+
+    this.snapshot = { ...snapshot, scrapers: next };
+    this.logger.info("nuvio_selection_applied", {
+      version,
+      enabled: next.length,
+      total: snapshot.entries.length,
+    });
+    return this.getCatalog();
+  }
 
   getSnapshot(): NuvioSnapshot | null {
     return this.snapshot;
@@ -175,6 +304,8 @@ export class SnapshotManager {
         sha: targetSha,
         fetchedAt: Date.now(),
         scrapers,
+        entries: data.manifest.scrapers,
+        dir: this.snapshotDir(targetSha),
         providerIds: data.manifest.scrapers.map((entry) => entry.id),
       };
       await this.writeState(targetSha, snapshot.fetchedAt);
@@ -268,7 +399,7 @@ export class SnapshotManager {
     }
     const manifest = parseNuvioManifest(manifestBytes);
     const entries = manifest.scrapers;
-    if (selectScrapers(manifest, this.config.disabledScrapers, this.config.enabledScrapers).length === 0) {
+    if (this.enabledEntries(entries).length === 0) {
       throw new Error("manifest.json has no enabled scrapers");
     }
 
@@ -321,11 +452,8 @@ export class SnapshotManager {
   }
 
   private async evaluateSnapshot(data: SnapshotData): Promise<LoadedScraper[]> {
-    const compileEntries = selectScrapers(
-      data.manifest,
-      this.config.disabledScrapers,
-      this.config.enabledScrapers,
-    );
+    this.loadErrors.clear();
+    const compileEntries = this.enabledEntries(data.manifest.scrapers);
     const results = await mapLimit<SnapshotData["entries"][number], LoadResult>(
       compileEntries,
       LOAD_CONCURRENCY,
@@ -453,6 +581,8 @@ export class SnapshotManager {
         sha,
         fetchedAt,
         scrapers,
+        entries: manifest.scrapers,
+        dir,
         providerIds: manifest.scrapers.map((entry) => entry.id),
       };
     } catch (error) {

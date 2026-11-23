@@ -7,7 +7,9 @@ import { nativeFetch } from './util/nativeFetch.js';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { applyForwardedImdb, parseStreamId } from './addon/parseId.js';
-import { isProviderEnabled } from '../../core/policy.js';
+import { isProviderEnabledWithOverrides } from '../../core/policy.js';
+import { HARD_DISABLED_PROVIDERS } from '../../core/env.js';
+import { ProviderSelectionController } from './providers/selection.js';
 import { sendJson, type FleetInstance } from '../../core/internalServer.js';
 import type { StremioStream } from './types.js';
 
@@ -21,6 +23,7 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
   config.streamPartialCacheTtlMs = 0;
 
   const logger = createLogger(config.logLevel);
+  const selectionController = new ProviderSelectionController(config, logger);
 
   let cinemeta: CinemetaClient | null = null;
   let pipeline: StreamPipeline | null = null;
@@ -125,12 +128,13 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
       (pipelineMetrics?.providerStats || []).map((s) => [s.id.toLowerCase(), s]),
     );
 
-    const selection = {
-      enabled: config.enabledProviders,
-      disabled: config.disabledProviders,
-    };
     const activeProviders = registryProviders.filter((bundle) =>
-      isProviderEnabled(bundle.entry.value, selection),
+      isProviderEnabledWithOverrides(
+        bundle.entry.value,
+        { enabled: config.enabledProviders, disabled: config.disabledProviders },
+        config.runtimeOverrides,
+        HARD_DISABLED_PROVIDERS,
+      ),
     );
 
     const stats = activeProviders.map((bundle) => {
@@ -221,10 +225,67 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
     return sendJson(res, 200, { ok: true, reloadedAt: new Date().toISOString() }, requestId);
   }
 
+  function handleProviders(
+    _req: http.IncomingMessage,
+    res: http.ServerResponse,
+    requestId: string,
+  ): void {
+    sendJson(res, 200, selectionController.getCatalog(runtime?.registry?.getActiveSnapshot() ?? null), requestId);
+  }
+
+  async function handleSelectProviders(
+    _req: http.IncomingMessage,
+    res: http.ServerResponse,
+    requestId: string,
+    body: unknown,
+  ): Promise<void> {
+    const snapshot = runtime?.registry?.getActiveSnapshot() ?? null;
+    if (!snapshot) {
+      return sendJson(res, 200, { ok: false, version: config.selectionVersion, error: 'snapshot unavailable' }, requestId);
+    }
+    const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+    const rawOverrides =
+      record.overrides && typeof record.overrides === 'object' && !Array.isArray(record.overrides)
+        ? (record.overrides as Record<string, unknown>)
+        : {};
+    const overrides: Record<string, boolean> = {};
+    for (const [id, enabled] of Object.entries(rawOverrides)) {
+      if (typeof enabled === 'boolean') overrides[id] = enabled;
+    }
+    const version = typeof record.version === 'number' ? record.version : config.selectionVersion;
+    try {
+      const result = await selectionController.apply(snapshot, overrides, version);
+      runtime?.registry?.activate(result.snapshot);
+      sendJson(
+        res,
+        200,
+        {
+          ok: true,
+          version: result.catalog.version,
+          applied: result.catalog.providers.filter((provider) => provider.enabled).map((provider) => provider.id),
+        },
+        requestId,
+      );
+    } catch (error) {
+      sendJson(
+        res,
+        500,
+        { ok: false, version, error: error instanceof Error ? error.message : String(error) },
+        requestId,
+      );
+    }
+  }
+
   return {
     port,
     internalToken: fleetEnv.INTERNAL_TOKEN || '',
-    handlers: { health: handleHealth, stream: handleStream, reload: handleReload },
+    handlers: {
+      health: handleHealth,
+      stream: handleStream,
+      reload: handleReload,
+      providers: handleProviders,
+      selectProviders: handleSelectProviders,
+    },
     dispose: async () => {
       pipeline?.dispose();
       if (runtime) await runtime.dispose();

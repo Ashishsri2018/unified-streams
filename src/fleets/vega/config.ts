@@ -17,6 +17,8 @@ export interface AppConfig {
   updateConcurrency: number;
   enabledProviders: string[];
   disabledProviders: string[];
+  runtimeOverrides: Record<string, boolean>;
+  selectionVersion: number;
   httpTimeoutMs: number;
   searchConcurrency: number;
   searchTimeoutMs: number;
@@ -119,6 +121,8 @@ const schema = z.object({
   UPDATE_CONCURRENCY: envInt(8, 1, 32),
   ENABLED_PROVIDERS: envList,
   DISABLED_PROVIDERS: envList,
+  RUNTIME_OVERRIDES_JSON: optionalString,
+  SELECTION_VERSION: envInt(0, 0, Number.MAX_SAFE_INTEGER),
   HTTP_TIMEOUT_MS: envInt(15000, 1000, 120000),
   SEARCH_CONCURRENCY: envInt(30, 1, 60),
   SEARCH_TIMEOUT_MS: envInt(10000, 1000, 120000),
@@ -149,6 +153,21 @@ export class ConfigError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ConfigError";
+  }
+}
+
+function parseRuntimeOverrides(raw: string | null): Record<string, boolean> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const result: Record<string, boolean> = {};
+    for (const [id, enabled] of Object.entries(parsed)) {
+      if (typeof enabled === "boolean") result[id] = enabled;
+    }
+    return result;
+  } catch {
+    return {};
   }
 }
 
@@ -210,6 +229,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     disabledProviders: Array.from(
       new Set(value.DISABLED_PROVIDERS.map((provider) => provider.toLowerCase())),
     ),
+    runtimeOverrides: parseRuntimeOverrides(value.RUNTIME_OVERRIDES_JSON),
+    selectionVersion: value.SELECTION_VERSION,
     httpTimeoutMs: value.HTTP_TIMEOUT_MS,
     searchConcurrency: value.SEARCH_CONCURRENCY,
     searchTimeoutMs: value.SEARCH_TIMEOUT_MS,

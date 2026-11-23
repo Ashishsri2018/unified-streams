@@ -4,6 +4,7 @@ import { StreamHandlerContext, handleStreamRoute } from './stream.js';
 import { handleHealth, handleStats } from './health.js';
 import { handleStatusPage } from './status.js';
 import { handleProvidersPage } from './providers.js';
+import { createAdminRouter } from './admin.js';
 import { handleConfigure, getPublicBaseUrl } from './configure.js';
 import { buildManifest } from './manifest.js';
 import { handleLogoPng, handleLogoSvg, handleFavicon } from './logo.js';
@@ -51,6 +52,7 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
       configure: '/configure',
       health: '/health',
       providers: '/providers',
+      ...(ctx.adminToken ? { admin: '/admin' } : {}),
     });
   };
   app.get('/', handleRoot);
@@ -100,6 +102,15 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
 
   app.get('/providers', (req, res) => handleProvidersPage(req, res, ctx.publicBaseUrl));
   app.head('/providers', (req, res) => handleProvidersPage(req, res, ctx.publicBaseUrl));
+
+  // Provider admin is unavailable unless both a token and override store exist.
+  if (ctx.adminToken && ctx.overridesStore) {
+    app.use('/admin', createAdminRouter(ctx));
+  } else {
+    app.all('/admin*', (_req: Request, res: Response) => {
+      res.status(404).end();
+    });
+  }
 
   // Branding asset routes
   const logoPng = asyncRoute((req, res) => handleLogoPng(req, res));

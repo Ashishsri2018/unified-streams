@@ -205,6 +205,7 @@ export interface ProviderSnapshot {
   rootDir: string;
   urls: UrlsSnapshot;
   bundles: Map<string, ProviderBundle>;
+  entries?: UpstreamProviderEntry[];
   createdAt: number;
 }
 

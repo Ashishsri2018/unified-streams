@@ -3,10 +3,11 @@ import path from "node:path";
 import type { AppConfig } from "../config.js";
 import {
   findDepartedProviderIds,
-  isProviderEnabled,
-  selectEnabledProviders,
+  isProviderEnabledWithOverrides,
+  type ProviderOverrides,
   type ProviderSelection,
 } from "../../../core/policy.js";
+import { HARD_DISABLED_PROVIDERS } from "../../../core/env.js";
 import type {
   HealthProviderStatus,
   HealthReport,
@@ -110,9 +111,11 @@ export function installFailureSummary(
   entries: ReadonlyArray<UpstreamProviderEntry>,
   selection: ProviderSelection,
   loadedCount: number,
+  overrides: ProviderOverrides = {},
+  hardDisabled: readonly string[] = [],
 ): string | null {
   const enabledCount = entries.filter((entry) =>
-    isProviderEnabled(entry.value, selection),
+    isProviderEnabledWithOverrides(entry.value, selection, overrides, hardDisabled),
   ).length;
   if (enabledCount <= loadedCount) return null;
   return `${enabledCount - loadedCount}/${enabledCount} provider(s) failed to install`;
@@ -139,7 +142,7 @@ function providerSourceDir(entry: UpstreamProviderEntry): string {
   return segments.join("/");
 }
 
-function parseManifest(bytes: Buffer): UpstreamProviderEntry[] {
+export function parseManifest(bytes: Buffer): UpstreamProviderEntry[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripBom(bytes.toString("utf8")));
@@ -261,6 +264,18 @@ export class Updater {
       options.config.providerSource,
     );
     this.lockPath = path.join(this.providerRoot, "update.lock");
+  }
+
+  private isEnabled(id: string): boolean {
+    return isProviderEnabledWithOverrides(
+      id,
+      {
+        enabled: this.config.enabledProviders,
+        disabled: this.config.disabledProviders,
+      },
+      this.config.runtimeOverrides,
+      HARD_DISABLED_PROVIDERS,
+    );
   }
 
   async bootstrap(timeoutMs = 60_000): Promise<void> {
@@ -520,17 +535,13 @@ export class Updater {
     startedAt: number,
   ): Promise<UpdateSummary> {
     const state = this.stateStore.get();
-    const selection = {
-      enabled: this.config.enabledProviders,
-      disabled: this.config.disabledProviders,
-    };
     const pendingValues = Object.entries(state.providers)
       .filter(
         ([, entry]) => entry.status === "pending" || entry.sha !== target.sha,
       )
       .map(([value]) => value)
       .filter((value) => active.bundles.has(value) || state.providers[value]?.status === "pending")
-      .filter((value) => isProviderEnabled(value, selection));
+      .filter((value) => this.isEnabled(value));
 
     if (pendingValues.length === 0) {
       const now = nowIso();
@@ -667,6 +678,7 @@ export class Updater {
         rootDir: active.rootDir,
         urls: active.urls,
         bundles: newBundles,
+        entries,
         createdAt: Date.now(),
       };
       this.registry.activate(snapshot);
@@ -816,7 +828,7 @@ export class Updater {
       const loaded = new Map<string, ProviderBundle>();
       const loadFailures = new Map<string, string>();
       for (const result of successes) {
-        if (!isProviderEnabled(result.entry.value, selection)) continue;
+        if (!this.isEnabled(result.entry.value)) continue;
         try {
           const bundle = await loadProviderBundle(
             result.entry,
@@ -838,7 +850,7 @@ export class Updater {
           continue;
         }
         const old = previousBundles.get(entry.value);
-        if (old && isProviderEnabled(entry.value, selection)) bundles.set(entry.value, old);
+        if (old && this.isEnabled(entry.value)) bundles.set(entry.value, old);
       }
       const retired = uniqueSorted(
         Array.from(previousBundles.keys()).filter((value) => !enabledValues.has(value)),
@@ -893,6 +905,7 @@ export class Updater {
         rootDir: finalDir,
         urls: mergedUrls,
         bundles,
+        entries: data.entries,
         createdAt: Date.now(),
       };
 
@@ -941,6 +954,8 @@ export class Updater {
           data.entries,
           selection,
           loaded.size,
+          this.config.runtimeOverrides,
+          HARD_DISABLED_PROVIDERS,
         );
         draft.nextCheck = isoAfter(this.computeNextCheckMs());
       });
@@ -1121,11 +1136,7 @@ export class Updater {
       if (entries.length === 0) return null;
 
       const bundles = new Map<string, ProviderBundle>();
-      const enabledEntries = selectEnabledProviders(
-        entries,
-        { enabled: this.config.enabledProviders, disabled: this.config.disabledProviders },
-        (entry) => entry.value,
-      );
+      const enabledEntries = entries.filter((entry) => this.isEnabled(entry.value));
       for (const entry of enabledEntries) {
         const bundle = await loadProviderBundle(
           entry,
@@ -1139,6 +1150,7 @@ export class Updater {
           rootDir: dir,
           urls,
           bundles,
+          entries,
           createdAt: Date.now(),
         },
         entries,

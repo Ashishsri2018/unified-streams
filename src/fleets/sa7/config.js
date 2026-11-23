@@ -26,6 +26,37 @@ function envList(env, primary, secondary) {
     .filter(Boolean);
 }
 
+function envJsonObject(env, name) {
+  const raw = env[name];
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const result = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === 'boolean') result[key] = value;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function envJsonList(env, name) {
+  const raw = env[name];
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((value) => typeof value === 'string')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 function createConfig(env = process.env) {
   return {
     host: env.HOST || '0.0.0.0',
@@ -53,6 +84,9 @@ function createConfig(env = process.env) {
     providerConcurrency: envInt(env, 'PROVIDER_CONCURRENCY', 30, 1),
     enabledProviders: envList(env, 'ENABLED_PROVIDERS', 'SA7_ENABLED_PROVIDERS'),
     disabledProviders: envList(env, 'DISABLED_PROVIDERS', 'SA7_DISABLED_PROVIDERS'),
+    runtimeOverrides: envJsonObject(env, 'RUNTIME_OVERRIDES_JSON'),
+    hardDisabledProviders: envJsonList(env, 'HARD_DISABLED_PROVIDERS'),
+    selectionVersion: Number(env.SELECTION_VERSION || 0) || 0,
     cinemetaUrl: (env.CINEMETA_URL || 'https://v3-cinemeta.strem.io').replace(/\/$/, ''),
     tmdbUrl: (env.TMDB_URL || 'https://api.themoviedb.org/3').replace(/\/$/, ''),
     tmdbApiKey: env.TMDB_API_KEY || '',

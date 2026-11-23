@@ -9,12 +9,25 @@ import { logger } from '../core/logger.js';
 import type { WorkerSnapshot } from '../core/telemetry.js';
 import type { MetadataResolver } from '../core/metadata.js';
 import type { ForwardedMetadata } from '../core/contract.js';
+import type { ProviderOverridesStore } from '../core/providerOverrides.js';
+
+export interface AdminRuntimeSettings {
+  instanceProfile: string;
+  backendTimeoutMs: number;
+  globalDeadlineMs: number;
+  searchTimeoutMs: number;
+  scraperConcurrency: number;
+  sa7Concurrency: number;
+  circuitFailureThreshold: number;
+  circuitCooldownMs: number;
+}
 
 export interface StreamHandlerContext {
   cache: GatewayStreamCache<{ streams: StremioStream[] }>;
   workers: Record<'sa7' | 'nuvio' | 'vega', WorkerClient>;
   addonVersion: string;
   policyVersion: string;
+  getPolicyVersion?: () => string;
   gitCommit?: string;
   publicBaseUrl?: string;
   hasTmdb?: boolean;
@@ -25,6 +38,9 @@ export interface StreamHandlerContext {
   scheduler?: {
     getStatus(fleet: 'sa7' | 'nuvio' | 'vega'): WorkerSnapshot;
   };
+  adminToken?: string;
+  overridesStore?: ProviderOverridesStore;
+  adminSettings?: AdminRuntimeSettings;
 }
 
 function sanitizeRequestId(value: unknown): string {
@@ -150,7 +166,8 @@ export async function handleStreamRoute(
     : forwardedMeta?.tmdbId && forwardedMeta.tmdbId > 0
       ? `tmdb:${forwardedMeta.tmdbId}${idSuffix}`
       : rawId;
-  const cacheKey = `${rawConfig}:${rawType}:${canonicalId}:${ctx.policyVersion}:${ctx.addonVersion}`;
+  const policyVersion = ctx.getPolicyVersion?.() ?? ctx.policyVersion;
+  const cacheKey = `${rawConfig}:${rawType}:${canonicalId}:${policyVersion}:${ctx.addonVersion}`;
 
   try {
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {

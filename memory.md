@@ -134,3 +134,11 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Vega:** `src/fleets/vega/providers/updater.ts` reads the previous active snapshot's `manifest.json` IDs (falling back to `state.providers` keys) and logs `provider_missing` with the departed configured IDs, previous/new SHA during `handleFullUpdate`.
 - **Tests:** Added `tests/features/sa7MissingProviders.test.ts`; full suite 274 tests pass, lint/typecheck clean.
 - **Docs:** Updated the missing-provider caveat in `known-issues.md` to cover all three fleets and their cold-start limitations.
+
+## Runtime provider admin (Nov 23 2026)
+- **Core:** Added `src/core/providerOverrides.ts` (Zod file schema, atomic store, versioning) and extended `src/core/policy.ts` with hard-disable/override precedence. `src/core/env.ts` exports `HARD_DISABLED_PROVIDERS`, accepts `ADMIN_TOKEN`, and derives `RUNTIME_OVERRIDES_JSON`, `HARD_DISABLED_PROVIDERS`, and `SELECTION_VERSION` per worker. Gateway cache key now uses the live policy version.
+- **Internal contract:** Added `GET /internal/providers` and `POST /internal/providers/selection` to `internalServer`, `WorkerClient`, and each fleet. SA7 retains its direct-worker route table too.
+- **Fleets:** SA7/Nuvio/Vega expose provider catalogs and apply full override maps in place. SA7 reloads its registry; Nuvio loads/unloads scrapers; Vega retains all manifest entries and lazily loads/unloads bundles. Snapshot updates now carry manifest entries so later toggles do not need a re-download.
+- **Admin:** Added `/admin`, `/admin/login`, `/admin/logout`, `/admin/api/catalog`, and `/admin/api/providers/toggle` in `src/addon/admin*.ts`, gated by `ADMIN_TOKEN`; successful toggles persist, clear the gateway cache, and apply without a restart.
+- **Docs/config:** Added `ADMIN_TOKEN` to `config/defaults.env` and `.env.example`; updated `architecture.md` and `known-issues.md`.
+- **Verification:** `npm run lint`, `npm run typecheck`, and `npm run test:feature` pass (281 tests). Added provider policy/persistence and admin gateway coverage. Not committed or deployed.

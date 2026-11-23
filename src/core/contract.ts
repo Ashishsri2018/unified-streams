@@ -14,6 +14,31 @@ export interface InternalReloadResponse {
   reloadedAt: string;
 }
 
+export interface ProviderCatalogEntry {
+  id: string;
+  name: string;
+  types: string[];
+  enabled: boolean;
+  loaded: boolean;
+  locked: boolean;
+  missing: boolean;
+  lastError: string | null;
+}
+
+export interface ProviderCatalogResponse {
+  fleet: string;
+  version: number;
+  providers: ProviderCatalogEntry[];
+}
+
+export interface ProviderSelectionResponse {
+  ok: boolean;
+  version: number;
+  applied?: string[];
+  errors?: Record<string, string>;
+  error?: string;
+}
+
 export type InternalHealthResponse = WorkerHealth;
 
 export interface ForwardedMetadata {

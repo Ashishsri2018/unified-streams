@@ -107,6 +107,10 @@ export interface NuvioSnapshot {
   sha: string;
   fetchedAt: number;
   scrapers: LoadedScraper[];
+  /** All manifest entries, including ones filtered out by policy. */
+  entries: NuvioScraperEntry[];
+  /** Directory containing manifest.json and provider files. */
+  dir: string;
   /** All manifest scraper IDs, including ones filtered out by policy. */
   providerIds: string[];
 }
@@ -149,6 +153,8 @@ export interface AppConfig {
   scraperSettings: Record<string, Record<string, unknown>>;
   enabledScrapers: string[];
   disabledScrapers: string[];
+  runtimeOverrides: Record<string, boolean>;
+  selectionVersion: number;
   proxyEnabled: boolean;
   cinemetaUrl: string;
   tmdbUrl: string;

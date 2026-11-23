@@ -291,3 +291,11 @@ them; Vega can use the previously installed manifest directory.
 
 Status: accepted; covers the live refresh/update path used by deploys with a
 warm disk or bundled snapshot.
+
+## Runtime provider admin limitations (Nov 23 2026)
+
+- **Enablement requires `ADMIN_TOKEN`.** An empty or unset token keeps `/admin*` at 404. The panel is not rate limited per `AGENTS.md`; the token must still be long and random, and the login cookie is an HMAC-derived session (`HttpOnly`, `SameSite=Strict`) rather than the raw token.
+- **Manifest-disabled providers stay disabled.** SA7/Nuvio/Vega treat upstream `enabled: false` as unavailable, so a runtime override cannot load a provider whose manifest entry is disabled.
+- **Lazy load is best effort.** Enabling a provider loads its bundle from the active snapshot; a load failure is reported in the catalog (`lastError`) and does not fail the toggle. Disabling drops the bundle from the active snapshot but the underlying module cache for that snapshot is only fully released when the snapshot is replaced or the worker restarts.
+- **Gateway fan-out failures still return HTTP 200 with empty streams.** Admin catalog/selection endpoints can return 502/503 when a worker or its catalog is unavailable.
+- **Timeouts remain deploy-time.** The panel shows the effective values but does not change them. Runtime timeout edits would need the same versioned push/persist flow plus bounded Zod validation.

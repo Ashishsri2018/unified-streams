@@ -192,6 +192,7 @@ export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: nu
     addon: 'Unified Streams',
     version: ctx.addonVersion,
     commit: ctx.gitCommit || 'development',
+    policyVersion: ctx.getPolicyVersion?.() ?? ctx.policyVersion,
     startedAt: new Date(startedAt).toISOString(),
     uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
     checkedAt: new Date().toISOString(),

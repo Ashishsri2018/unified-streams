@@ -44,10 +44,61 @@ function findDepartedProviderIds(previousIds, currentIds, selection) {
 
 let registry = null;
 let manifestProviderIds = null;
+const loadErrors = new Map();
 
 // Torrent providers stay vendored so the daily sync keeps them updated, but
 // they are never loaded or queried. The vendored manifest has no source-type field.
 const DISABLED_PROVIDER_IDS = new Set(['torrentio']);
+
+function normalizeOverrideMap(input) {
+  const result = {};
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return result;
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value !== 'boolean') continue;
+    const id = String(key).trim().toLowerCase();
+    if (id) result[id] = value;
+  }
+  return result;
+}
+
+function hardDisabledSet() {
+  const set = new Set(DISABLED_PROVIDER_IDS);
+  for (const id of config.hardDisabledProviders || []) {
+    set.add(String(id).trim().toLowerCase());
+  }
+  return set;
+}
+
+function baselineSelection() {
+  return {
+    enabled: config.enabledProviders || [],
+    disabled: [...DISABLED_PROVIDER_IDS, ...(config.disabledProviders || [])],
+  };
+}
+
+function overrideFor(id) {
+  const overrides = config.runtimeOverrides || {};
+  const key = String(id).trim().toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(overrides, key)) return overrides[key];
+  for (const [rawId, value] of Object.entries(overrides)) {
+    if (String(rawId).trim().toLowerCase() === key) return value;
+  }
+  if (Object.prototype.hasOwnProperty.call(overrides, '*')) return overrides['*'];
+  return undefined;
+}
+
+function effectiveEnabled(id) {
+  const key = String(id).trim().toLowerCase();
+  if (hardDisabledSet().has(key)) return false;
+  const override = overrideFor(id);
+  if (override !== undefined) return override;
+  return isProviderEnabled(id, baselineSelection());
+}
+
+function manifestEntries() {
+  const manifest = JSON.parse(fs.readFileSync(config.providerManifest, 'utf8'));
+  return Array.isArray(manifest.providers) ? manifest.providers : [];
+}
 
 function loadProvider(entry) {
   const file = path.join(config.providerDir, path.basename(entry.filename));
@@ -80,12 +131,9 @@ function clearProviderModuleCache(dir) {
 }
 
 function buildRegistry() {
-  const manifest = JSON.parse(fs.readFileSync(config.providerManifest, 'utf8'));
-  const selection = {
-    enabled: config.enabledProviders || [],
-    disabled: [...DISABLED_PROVIDER_IDS, ...(config.disabledProviders || [])],
-  };
-  const manifestIds = (manifest.providers || [])
+  const providers = manifestEntries();
+  const selection = baselineSelection();
+  const manifestIds = providers
     .map((provider) => (provider && typeof provider.id === 'string' ? provider.id : ''))
     .filter(Boolean);
 
@@ -99,18 +147,20 @@ function buildRegistry() {
   }
   manifestProviderIds = manifestIds;
 
-  const entries = (manifest.providers || []).filter((p) => {
+  const entries = providers.filter((p) => {
     if (p.enabled === false) return false;
-    return isProviderEnabled(p.id, selection);
+    return effectiveEnabled(p.id);
   });
 
   const next = [];
+  loadErrors.clear();
   for (const entry of entries) {
     try {
       const provider = loadProvider(entry);
       provider.order = next.length;
       next.push(provider);
     } catch (err) {
+      loadErrors.set(String(entry.id).toLowerCase(), err.message);
       console.warn(`[providers] skipped ${entry.id}: ${err.message}`);
     }
   }
@@ -140,4 +190,46 @@ function providersFor(mediaType) {
   return getRegistry().filter((p) => p.types.some((t) => wanted.includes(t)));
 }
 
-module.exports = { DISABLED_PROVIDER_IDS, getRegistry, providersFor, reloadProviders };
+function getCatalog() {
+  const loaded = new Set(getRegistry().map((provider) => String(provider.id).toLowerCase()));
+  const hard = hardDisabledSet();
+  const providers = manifestEntries().map((entry) => {
+    const id = typeof entry.id === 'string' ? entry.id : '';
+    const key = id.toLowerCase();
+    const available = entry.enabled !== false;
+    return {
+      id,
+      name: entry.name || id,
+      types: Array.isArray(entry.supportedTypes) ? entry.supportedTypes : ['movie', 'tv'],
+      enabled: available && effectiveEnabled(id),
+      loaded: loaded.has(key),
+      locked: hard.has(key),
+      missing: false,
+      lastError: loadErrors.get(key) || null,
+    };
+  });
+  return {
+    fleet: 'sa7',
+    version: Number(config.selectionVersion || 0),
+    providers,
+  };
+}
+
+function applyRuntimeSelection(overrides, version) {
+  config.runtimeOverrides = normalizeOverrideMap(overrides);
+  if (typeof version === 'number' && Number.isFinite(version)) {
+    config.selectionVersion = version;
+  }
+  clearProviderModuleCache(config.providerDir);
+  registry = buildRegistry();
+  return getCatalog();
+}
+
+module.exports = {
+  DISABLED_PROVIDER_IDS,
+  getRegistry,
+  providersFor,
+  reloadProviders,
+  getCatalog,
+  applyRuntimeSelection,
+};

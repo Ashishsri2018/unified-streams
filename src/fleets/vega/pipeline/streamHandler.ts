@@ -19,7 +19,8 @@ import type {
 } from "../types.js";
 import { contentIdOf, requestLogFields } from "../addon/parseId.js";
 import { IMDB_ID_PATTERN } from "../../../core/contentId.js";
-import { isProviderEnabled } from "../../../core/policy.js";
+import { isProviderEnabledWithOverrides } from "../../../core/policy.js";
+import { HARD_DISABLED_PROVIDERS } from "../../../core/env.js";
 import { ProviderTelemetry } from "../../../core/providerTelemetry.js";
 import { TtlCache } from "../util/cache.js";
 import {
@@ -837,13 +838,21 @@ export class StreamPipeline implements StreamHandlerApi {
   }
 
   private async runRequest(ctx: InternalContext, snapshot: ProviderSnapshot): Promise<void> {
-    const selection = {
-      enabled: this.config.enabledProviders,
-      disabled: this.config.disabledProviders,
-    };
     const bundles = Array.from(snapshot.bundles.values()).filter((bundle) => {
       const value = bundle.entry.value.toLowerCase();
-      if (!isProviderEnabled(value, selection)) return false;
+      if (
+        !isProviderEnabledWithOverrides(
+          value,
+          {
+            enabled: this.config.enabledProviders,
+            disabled: this.config.disabledProviders,
+          },
+          this.config.runtimeOverrides,
+          HARD_DISABLED_PROVIDERS,
+        )
+      ) {
+        return false;
+      }
       if (ctx.info.disabledProviders.has(value)) return false;
       if (ctx.info.providers && ctx.info.providers.size > 0) {
         return ctx.info.providers.has(value);
