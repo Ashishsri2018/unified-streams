@@ -1,7 +1,13 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchCodebergHead, fetchGitHubHead } from '../../src/core/updater/fetchers.js';
+import { logger } from '../../src/core/logger.js';
 
 describe('updater fetchers', () => {
+  beforeEach(() => {
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -105,13 +111,53 @@ describe('updater fetchers', () => {
       expect(head?.etag).toBe('W/"gh-etag"');
     });
 
-    it('returns null when GitHub API fails', async () => {
-      vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+    it('returns null when GitHub API fails without retrying permanent statuses', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
         return new Response('404', { status: 404 });
       });
 
       const head = await fetchGitHubHead('test/repo', 'main');
       expect(head).toBeNull();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+        'updater.head.failed',
+        expect.objectContaining({ repo: 'test/repo', status: 404 }),
+      );
+    });
+
+    it('retries transient GitHub failures in-run and logs the HTTP status', async () => {
+      const mockSha = 'aaaabbbbccccddddeeeeffff0000111122223333';
+      let calls = 0;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        calls += 1;
+        if (calls === 1) return new Response('bad gateway', { status: 502 });
+        return new Response(JSON.stringify({ sha: mockSha }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      });
+
+      const head = await fetchGitHubHead('test/repo', 'main');
+      expect(head?.sha).toBe(mockSha);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+        'updater.head.retry',
+        expect.objectContaining({ repo: 'test/repo', status: 502, attempt: 1 }),
+      );
+    });
+
+    it('returns null after exhausting retries for transient GitHub failures', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        return new Response('rate limited', { status: 429 });
+      });
+
+      const head = await fetchGitHubHead('test/repo', 'main');
+      expect(head).toBeNull();
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+        'updater.head.failed',
+        expect.objectContaining({ repo: 'test/repo', status: 429, attempts: 3 }),
+      );
     });
   });
 });

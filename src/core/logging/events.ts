@@ -47,6 +47,8 @@ export type EventFamily =
   // Updater events
   | 'updater.started'
   | 'updater.head.resolved'
+  | 'updater.head.retry'
+  | 'updater.head.failed'
   | 'updater.download.completed'
   | 'updater.retry'
   | 'updater.failed'
