@@ -51,4 +51,21 @@ describe('SA7 provider module resolution', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('resolves crypto-js and exposes it as a global for snapshot directories', () => {
+    require('../../src/fleets/sa7/lib/cheerio-hook.js');
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sa7-crypto-'));
+    try {
+      const providerPath = path.join(dir, 'provider.js');
+      fs.writeFileSync(providerPath, "module.exports = require('crypto-js');\n");
+      const providerRequire = createRequire(providerPath);
+      const direct = providerRequire('crypto-js');
+
+      expect(typeof direct.enc.Base64.parse).toBe('function');
+      expect((globalThis as unknown as Record<string, unknown>).CryptoJS).toBe(direct);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
