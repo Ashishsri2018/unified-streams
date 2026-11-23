@@ -57,7 +57,8 @@ td.row-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .login { max-width: 420px; margin: 12vh auto 0; }
 .login input { width: 100%; margin: 12px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0a121f; color: var(--text); font: inherit; }
 .login button { width: 100%; }
-.status { min-height: 20px; color: var(--muted); font-size: 12px; }`;
+.status { min-height: 20px; color: var(--muted); font-size: 12px; }
+.empty { color: var(--muted); }`;
 }
 
 function pageShell(options: {
@@ -146,6 +147,43 @@ function pill(kind, text) {
   return '<span class="pill ' + kind + '">' + esc(text) + '</span>';
 }
 
+function num(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toLocaleString() : "—";
+}
+
+function pct(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return (n <= 1 ? n * 100 : n).toFixed(1) + "%";
+}
+
+function ms(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n).toLocaleString() + " ms" : "—";
+}
+
+function statCell(stat, field, formatter) {
+  return '<td>' + (stat ? formatter(stat[field]) : "—") + '</td>';
+}
+
+function collectStats(health, target) {
+  function add(component, stat) {
+    if (!stat || !stat.id) return;
+    target.set(String(component) + ":" + String(stat.id).toLowerCase(), stat);
+  }
+  if (health && health.providers && Array.isArray(health.providers.stats)) {
+    for (const stat of health.providers.stats) add(stat.component, stat);
+  }
+  if (health && health.fleets) {
+    for (const [fleetKey, fleetVal] of Object.entries(health.fleets)) {
+      if (fleetVal && fleetVal.providers && Array.isArray(fleetVal.providers.stats)) {
+        for (const stat of fleetVal.providers.stats) add(fleetKey, stat);
+      }
+    }
+  }
+}
+
 function setStatus(message, isError) {
   statusLine.textContent = message || "";
   statusLine.style.color = isError ? "var(--bad)" : "var(--muted)";
@@ -159,10 +197,10 @@ function applySearch() {
   }
 }
 
-function render(fleets, version) {
+function render(fleets, version, stats) {
   versionLabel.textContent = "policy v" + version;
   if (!Array.isArray(fleets) || fleets.length === 0) {
-    providerRows.innerHTML = '<tr><td colspan="6" class="muted">No fleets responded.</td></tr>';
+    providerRows.innerHTML = '<tr><td colspan="16" class="muted">No fleets responded.</td></tr>';
     countLabel.textContent = "";
     duplicatesLine.textContent = "";
     return;
@@ -182,32 +220,48 @@ function render(fleets, version) {
   let total = 0;
   for (const fleet of fleets) {
     if (fleet.error) {
-      rows.push('<tr><td colspan="6"><div class="error-line">' + esc(fleet.fleet + ": " + fleet.error) + '</div></td></tr>');
+      rows.push('<tr><td colspan="16"><div class="error-line">' + esc(fleet.fleet + ": " + fleet.error) + '</div></td></tr>');
       continue;
     }
     const providers = Array.isArray(fleet.providers) ? fleet.providers : [];
     if (providers.length === 0) {
-      rows.push('<tr><td colspan="6" class="muted">' + esc(fleet.fleet) + ' reported no providers.</td></tr>');
+      rows.push('<tr><td colspan="16" class="muted">' + esc(fleet.fleet) + ' reported no providers.</td></tr>');
       continue;
     }
     for (const provider of providers) {
       total += 1;
+      const stat = stats.get(String(fleet.fleet) + ":" + String(provider.id).toLowerCase());
       const loaded = provider.loaded ? pill("on", "loaded") : pill("off", "unloaded");
       const selection = provider.enabled ? pill("on", "on") : pill("off", "off");
-      const locked = provider.locked ? " " + pill("locked", "locked") : "";
+      const locked = provider.locked ? ' <span class="pill locked" title="Hard-disabled by policy">&#128274;</span>' : "";
       const missing = provider.missing ? " " + pill("locked", "missing") : "";
       const error = provider.lastError ? '<div class="warn">' + esc(provider.lastError) + '</div>' : '';
       const disabled = provider.locked ? " disabled" : "";
+      const nameMatchesId = String(provider.name || "").toLowerCase() === String(provider.id || "").toLowerCase();
+      const idLine = nameMatchesId ? "" : '<div class="provider-id">' + esc(provider.id) + '</div>';
+      const state = stat ? (stat.state || "closed") : "";
+      const stateClass = state === "open" ? "error" : state === "half-open" ? "degraded" : "ok";
+      const stateCell = stat ? '<td class="' + stateClass + '">' + esc(state) + '</td>' : '<td class="muted">—</td>';
       const action = provider.enabled
         ? '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="false"' + disabled + '>Disable</button>'
         : '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="true"' + disabled + '>Enable</button>';
       const reset = '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="reset"' + disabled + '>Reset</button>';
       rows.push('<tr data-search="' + esc((fleet.fleet + " " + provider.id + " " + provider.name).toLowerCase()) + '">'
-        + '<td class="mono">' + esc(fleet.fleet) + ' <span class="muted">v' + esc(fleet.version) + '</span></td>'
-        + '<td class="provider-cell"><div class="provider-name">' + esc(provider.name) + '</div><div class="provider-id">' + esc(provider.id) + '</div>' + error + '</td>'
+        + '<td class="mono">' + esc(fleet.fleet) + '</td>'
+        + '<td class="provider-cell"><div class="provider-name">' + esc(provider.name) + '</div>' + idLine + error + '</td>'
         + '<td>' + esc((provider.types || []).join(", ")) + '</td>'
         + '<td>' + selection + locked + missing + '</td>'
         + '<td>' + loaded + '</td>'
+        + stateCell
+        + statCell(stat, "calls", num)
+        + statCell(stat, "ok", num)
+        + statCell(stat, "empty", num)
+        + statCell(stat, "errors", num)
+        + statCell(stat, "timeouts", num)
+        + statCell(stat, "responseRate", pct)
+        + statCell(stat, "yieldRate", pct)
+        + statCell(stat, "avgMs", ms)
+        + '<td class="muted">' + esc((stat && stat.lastError) || "—") + '</td>'
         + '<td class="row-actions">' + action + reset + '</td>'
         + '</tr>');
     }
@@ -220,11 +274,20 @@ function render(fleets, version) {
 async function load() {
   setStatus("Loading catalog...");
   try {
-    const response = await fetch("/admin/api/catalog", { cache: "no-store" });
+    const [response, healthResponse] = await Promise.all([
+      fetch("/admin/api/catalog", { cache: "no-store" }),
+      fetch("/health", { cache: "no-store" }).catch(() => null)
+    ]);
     const data = await response.json();
     if (response.status === 401) { window.location.href = "/admin"; return; }
     if (!response.ok) throw new Error(data && data.error ? data.error : "HTTP " + response.status);
-    render(data.fleets, data.version);
+    const stats = new Map();
+    if (healthResponse && healthResponse.ok) {
+      try {
+        collectStats(await healthResponse.json(), stats);
+      } catch {}
+    }
+    render(data.fleets, data.version, stats);
     setStatus("Loaded.");
   } catch (error) {
     setStatus("Catalog request failed: " + (error && error.message ? error.message : String(error)), true);
@@ -298,9 +361,9 @@ setInterval(load, 30000);`;
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Fleet</th><th>Provider</th><th>Types</th><th>Selection</th><th>Bundle</th><th>Actions</th></tr>
+        <tr><th>Fleet</th><th>Provider</th><th>Types</th><th>Selection</th><th>Bundle</th><th>State</th><th>Calls</th><th>OK</th><th>Empty</th><th>Errors</th><th>Timeouts</th><th>Response</th><th>Yield</th><th>Avg ms</th><th>Last error</th><th>Actions</th></tr>
       </thead>
-      <tbody id="provider-rows"><tr><td colspan="6" class="muted">Loading provider catalog...</td></tr></tbody>
+      <tbody id="provider-rows"><tr><td colspan="16" class="muted">Loading provider catalog...</td></tr></tbody>
     </table>
   </div>
 </section>
