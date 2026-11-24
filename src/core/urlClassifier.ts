@@ -214,4 +214,75 @@ export function normalizeStreamKey(rawUrl: string): string {
   }
 }
 
-export const canonicalizeStreamKey = normalizeStreamKey;
+// Query params that only carry signed-URL auth and never select the underlying
+// resource. They are removed from the dedupe key only; the stream URL returned
+// to clients is left untouched so playback keeps its valid signature.
+const VOLATILE_SIGNATURE_PARAMS = new Set([
+  'Signature',
+  'KeyName',
+  'Expires',
+  'Policy',
+  'Key-Pair-Id',
+  'X-Amz-Algorithm',
+  'X-Amz-Credential',
+  'X-Amz-Date',
+  'X-Amz-Expires',
+  'X-Amz-SignedHeaders',
+  'X-Amz-Signature',
+  'X-Amz-Security-Token',
+]);
+
+// Goldenkite/warmsquare style token: `s1.<timestamp>.<n>.<hash>`.
+const SIGNED_TOKEN_PATTERN = /^s\d+\.\d+\.\d+\.[A-Za-z0-9_-]+$/;
+
+function isVolatileSignatureParam(name: string, value: string, params: URLSearchParams): boolean {
+  if (VOLATILE_SIGNATURE_PARAMS.has(name)) return true;
+  // febbox signatures: `sign` is only treated as volatile alongside its
+  // companion timestamp/client marker, never on its own.
+  if (name === 'sign') return params.has('t') || params.has('client') || params.has('KEY7');
+  if (name === 't' && params.has('sign')) return true;
+  // `s` is only a token when it matches the signed-token shape; otherwise it is
+  // preserved (it can be a selector elsewhere).
+  if (name === 's' && SIGNED_TOKEN_PATTERN.test(value)) return true;
+  return false;
+}
+
+/**
+ * Dedupe key for gateway merging. Unlike `normalizeStreamKey`, this drops
+ * rotated signed-URL parameters so re-signed copies of the same file collapse.
+ * Params that select a rendition or track (`quality`, `q`, `url`, `token`, ...)
+ * are preserved, and the original URL is never modified.
+ */
+export function canonicalizeStreamKey(rawUrl: string): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  if (/^magnet:\?/i.test(trimmed)) {
+    const match = trimmed.match(/xt=urn:btih:([a-zA-Z0-9]+)/i);
+    return match ? `magnet:${match[1]!.toLowerCase()}` : trimmed.toLowerCase();
+  }
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    const port = parsed.port ? `:${parsed.port}` : '';
+    let pathname = parsed.pathname;
+    if (pathname.length > 1 && pathname.endsWith('/')) {
+      pathname = pathname.slice(0, -1);
+    }
+
+    const kept: Array<[string, string]> = [];
+    for (const [name, value] of parsed.searchParams) {
+      if (!isVolatileSignatureParam(name, value, parsed.searchParams)) {
+        kept.push([name, value]);
+      }
+    }
+    kept.sort((a, b) => (a[0] === b[0] ? (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) : a[0] < b[0] ? -1 : 1));
+    const search =
+      kept.length > 0
+        ? `?${kept.map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`).join('&')}`
+        : '';
+
+    return `${parsed.protocol}//${host}${port}${pathname}${search}`;
+  } catch {
+    return trimmed.toLowerCase();
+  }
+}

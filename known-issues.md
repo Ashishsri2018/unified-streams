@@ -119,8 +119,45 @@ removes fragments and trailing slashes, but intentionally preserves
 `parsed.search`. Signed CDN URLs that differ only by rotated query tokens are
 therefore treated as distinct streams and can duplicate across fleets.
 
-Status: unresolved by design; stripping query strings would collapse legitimate
-distinct URLs that use query parameters for resource selection.
+Status: partially fixed (2026-11-24). `canonicalizeStreamKey` now strips rotated
+signing params from the dedupe key only; `normalizeStreamKey` and the returned
+stream URL are unchanged. Params that select content are preserved.
+
+Update (2026-11-24): confirmed live on Railway; duplicates come from provider
+fan-out, not a duplicated gateway query (each fleet worker is called once per
+request and identical in-flight requests are coalesced).
+
+- `Castle` (SA7) iterates every language track in `castle.js` (`getStreams`) and
+  calls `getVideoV1` per track. When two tracks resolve to the same video, the
+  same path is emitted twice. For `tt0816692` it returned
+  `img1.hscow.com/hls_mps/7047.../720/index_287.m3u8` as both English and Hindi,
+  with `Expires` one second apart.
+- `VidRock` (Vega) returned a true duplicate for `VisionQuest` S1E1
+  (`tt23112594:1:1`): identical title (`... 1080p ... Hindi Dub ... VidRock`),
+  identical path, only `Expires`/`Signature` rotated (`...2418` vs `...2419`).
+- Cross-provider same-file duplicates: `Castle`/`VidRock`/`Tyvrel` on
+  `img1.hscow.com`; `MultiStream`/`1Flex`/`Rynara` on `goldenkite`/`warmsquare`.
+- `Esvyl` shares one `dash-hls-bridge...workers.dev/` base across many entries,
+  but the `url=` targets different DASH IDs (audio tracks), so those are not
+  duplicates.
+- `ShowBox` shares one `hls.shegu.net/40022144.m3u8` path across 4K/1080p/720p/360p
+  labels with a different `sign` per quality. Verified distinct renditions: the
+  URL carries `quality=4K|1080p|720p|360p`, so stripping `sign`/`t` keeps them
+  separate.
+
+Implemented mitigation (2026-11-24) in `canonicalizeStreamKey`
+(`src/core/urlClassifier.ts`): the dedupe key drops only recognized signing
+params — CloudFront (`Expires`, `Signature`, `KeyName`, `Policy`,
+`Key-Pair-Id`), AWS SigV4 (`X-Amz-*`), febbox `sign`/`t` (when a companion
+marker is present), and goldenkite-style `s` tokens matching
+`s<n>.<ts>.<n>.<hash>`. All other params (e.g. `quality`, `q`, `url`, `token`)
+are preserved and sorted. The URL sent to clients is never modified; the
+surviving duplicate keeps its own valid signature.
+
+Remaining gaps: generic `token`/`t`/`s` values that do not match these schemes
+are left intact, so some rotated-token duplicates (e.g. JWT `?token=` URLs) still
+survive. The underlying provider fan-out (Castle per-language, VidRock per-track)
+still emits duplicates; the gateway now collapses the identical-path copies.
 
 ### One invalid filter field resets the entire user config (2026-11-20)
 

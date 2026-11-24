@@ -185,3 +185,9 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Tracking:** Added `src/core/providerChanges.ts` for baseline/current version diffing. SA7, Nuvio, and Vega capture a per-process baseline and attach `version`, `isNew`, `updated`, and `previousVersion` to catalog entries. SA7 prewarms its registry so the bundled snapshot is the baseline before the updater runs.
 - **Admin UI:** Added badge CSS and version metadata rendering in `src/addon/adminHtml.ts`; missing providers still use the existing warning-only path with no rename matching.
 - **Tests:** Added `tests/features/providerChanges.test.ts`, `adminBadges.test.ts`, `sa7ProviderChanges.test.ts`, and `vegaProviderChanges.test.ts`. `npm run lint`, `npm run typecheck`, and `npm run test:feature` (300 tests) pass. Not committed or deployed.
+
+## Signed-URL duplicate dedupe (Nov 24 2026)
+- **Symptom:** same provider returned two links to the same file (e.g. VidRock `VisionQuest` S1E1, Castle `tt0816692`), and cross-provider copies on `hscow`/`goldenkite`/`warmsquare` survived because the dedupe key kept the full query string.
+- **Cause:** `canonicalizeStreamKey` (alias of `normalizeStreamKey`) preserved `parsed.search`, so rotated `Expires`/`Signature`/`sign`/`s` tokens produced distinct keys. Provider fan-out (Castle per-language, VidRock per-track) emits the duplicates.
+- **Fix:** `canonicalizeStreamKey` in `src/core/urlClassifier.ts` now drops recognized signing params (CloudFront, AWS SigV4, febbox `sign`/`t`, goldenkite `s`) from the key only and sorts the rest. Selector params (`quality`, `q`, `url`, `token`) are preserved; `normalizeStreamKey` and the returned URL are unchanged.
+- **Verification:** live VisionQuest payload 207 -> 196 unique (11 collapsed) while ShowBox 4K/1080p/720p/360p stay distinct. `npm run lint`, `npm run typecheck`, `npm run test:feature` (302 tests) pass. Not deployed.

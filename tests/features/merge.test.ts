@@ -42,6 +42,59 @@ describe('classifier and merger', () => {
     expect(key2).toBe('https://cdn.example.com/dir');
   });
 
+  it('drops rotated signing params from the dedupe key but keeps selectors', () => {
+    // CloudFront re-signed copies of the same file collapse.
+    expect(
+      canonicalizeStreamKey('https://cdn.example.com/v.m3u8?Expires=1&KeyName=Signature&Signature=abc'),
+    ).toBe(
+      canonicalizeStreamKey('https://cdn.example.com/v.m3u8?Expires=2&KeyName=Signature&Signature=def'),
+    );
+
+    // febbox: sign/t rotate but quality selects a distinct rendition.
+    expect(
+      canonicalizeStreamKey('https://hls.test/1.m3u8?sign=a&t=1&client=febbox&quality=1080p'),
+    ).toBe(canonicalizeStreamKey('https://hls.test/1.m3u8?sign=b&t=2&client=febbox&quality=1080p'));
+    expect(
+      canonicalizeStreamKey('https://hls.test/1.m3u8?sign=a&t=1&client=febbox&quality=1080p'),
+    ).not.toBe(canonicalizeStreamKey('https://hls.test/1.m3u8?sign=b&t=2&client=febbox&quality=720p'));
+
+    // Goldenkite-style `s` tokens are dropped, but `q` selectors are preserved.
+    expect(
+      canonicalizeStreamKey('https://cdn.test/a/master.m3u8?s=s1.111.4.aaa'),
+    ).toBe(canonicalizeStreamKey('https://cdn.test/a/master.m3u8?s=s1.222.4.bbb'));
+    expect(
+      canonicalizeStreamKey('https://cdn.test/video.m3u8?q=english'),
+    ).not.toBe(canonicalizeStreamKey('https://cdn.test/video.m3u8?q=german'));
+  });
+
+  it('keeps the surviving signed URL intact when deduplicating', () => {
+    const defaultFilters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: null,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+    const first = 'https://cdn.test/v.m3u8?Expires=1&KeyName=Signature&Signature=abc';
+    const second = 'https://cdn.test/v.m3u8?Expires=2&KeyName=Signature&Signature=def';
+
+    const merged = mergeAndFilterStreams(
+      [
+        { fleet: 'vega', streams: [{ title: 'A', quality: '1080p', url: first }] },
+        { fleet: 'sa7', streams: [{ title: 'B', quality: '1080p', url: second }] },
+      ],
+      defaultFilters,
+      10,
+    );
+
+    expect(merged).toHaveLength(1);
+    // The returned URL keeps its own signature; nothing is stripped for playback.
+    expect(merged[0].url).toBe(first);
+  });
+
   it('merges, deduplicates, and sorts direct before external links', () => {
     const defaultFilters: StreamFilterConfig = {
       minRes: null,
