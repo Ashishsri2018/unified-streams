@@ -61,6 +61,22 @@ describe('fleet health and manifest normalization', () => {
       expect(parsed.scrapers[1].id).toBe('esvyl');
       expect(parsed.scrapers[1].filename).toBe('providers/esvyl.js');
     });
+
+    it('dedupes repeated scraper ids and keeps the first entry', () => {
+      const manifestJson = JSON.stringify({
+        name: 'Eclipsia',
+        version: '12.5.0',
+        scrapers: [
+          { id: 'svartok', name: 'Svartok', filename: 'providers/svartok.js' },
+          { id: 'svartok', name: 'Svartok duplicate', filename: 'providers/svartok-alt.js' },
+          { id: 'solunix', name: 'Solunix', filename: 'providers/solunix.js' },
+        ],
+      });
+
+      const parsed = parseNuvioManifest(Buffer.from(manifestJson, 'utf8'));
+      expect(parsed.scrapers.map((scraper) => scraper.id)).toEqual(['svartok', 'solunix']);
+      expect(parsed.scrapers[0].filename).toBe('providers/svartok.js');
+    });
   });
 
   describe('Nuvio SnapshotManager.ensure stale-while-revalidate', () => {

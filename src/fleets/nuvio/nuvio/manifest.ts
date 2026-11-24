@@ -68,8 +68,9 @@ export function parseNuvioManifest(bytes: Buffer): NuvioManifest {
     if (!SAFE_ID.test(id)) {
       throw new ManifestError("manifest.json contains a scraper with an invalid id");
     }
+    // Upstream manifests occasionally repeat a scraper id; tolerate it and keep the first entry.
     if (seen.has(id)) {
-      throw new ManifestError(`manifest.json contains duplicate scraper ${id}`);
+      continue;
     }
     seen.add(id);
 

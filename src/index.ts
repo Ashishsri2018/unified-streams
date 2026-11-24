@@ -140,7 +140,7 @@ async function main(): Promise<void> {
   const cache = new GatewayStreamCache<{ streams: StremioStream[] }>({
     fullTtlMs: env.CACHE_TTL_MS,
     partialTtlMs: env.CACHE_PARTIAL_TTL_MS,
-    maxEntries: 5000,
+    maxEntries: 100,
   });
 
   const workers = {

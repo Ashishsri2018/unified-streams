@@ -71,6 +71,13 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Caveat:** absolute-numbered providers that use a fixed `Season 1` label are filtered for later-season requests (documented in `known-issues.md`).
 - **Verification:** `npm run lint`, `npm run typecheck`, and `npm run test:feature` (42 files / 252 tests) pass. No deploy or push.
 
+## Recent sessions (Nov 24 2026)
+- **Railway memory investigation:** Used `railway ssh` + the V8 inspector against production. Idle RSS was ~270–320 MB while the live JS heap was only ~52 MB; `smaps` attributed ~152 MB to retained glibc `[heap]`. Railway lacks the VPS `LD_PRELOAD` `malloc_trim` helper, so native high-water memory is never returned. Peak RSS reached ~596 MB with 5 concurrent requests (38 s global deadline, 40-way fan-out, 60 active providers).
+- **Gateway cache cap:** Reduced `GatewayStreamCache` `maxEntries` from 5000 to 100 in `src/index.ts` to bound retained merged-stream arrays.
+- **Nuvio manifest dedupe:** `parseNuvioManifest` now skips repeated scraper ids (keeping the first entry) instead of throwing, so the upstream duplicate `svartok` no longer fails every snapshot reload. Added a regression test.
+- Updater retry policy left unchanged: at most 3 retries then stop, already covered by the existing scheduler test.
+- Local lint, typecheck, and 46 feature files / 284 tests pass; no deploy or push.
+
 ## Key Decisions & Conventions
 - TypeScript strict mode, zero `any`; all stream failures return `{ "streams": [] }` with HTTP 200.
 - Explicit `GET`/`HEAD`/`OPTIONS`; `HEAD` never triggers provider fan-out; `/subtitles*` is always 404.
