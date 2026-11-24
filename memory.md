@@ -191,3 +191,9 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Cause:** `canonicalizeStreamKey` (alias of `normalizeStreamKey`) preserved `parsed.search`, so rotated `Expires`/`Signature`/`sign`/`s` tokens produced distinct keys. Provider fan-out (Castle per-language, VidRock per-track) emits the duplicates.
 - **Fix:** `canonicalizeStreamKey` in `src/core/urlClassifier.ts` now drops recognized signing params (CloudFront, AWS SigV4, febbox `sign`/`t`, goldenkite `s`) from the key only and sorts the rest. Selector params (`quality`, `q`, `url`, `token`) are preserved; `normalizeStreamKey` and the returned URL are unchanged.
 - **Verification:** live VisionQuest payload 207 -> 196 unique (11 collapsed) while ShowBox 4K/1080p/720p/360p stay distinct. `npm run lint`, `npm run typecheck`, `npm run test:feature` (302 tests) pass. Not deployed.
+
+## Gateway UA injection for Vidlink (Nov 24 2026)
+- **Symptom:** Vidlink/Haylox MP4s on `bcdn.hakunaymatata.com` return HTTP 428 for browser-style UAs; the provider emits no headers, so Nuvio fell back to its default Mozilla UA.
+- **Fix:** `src/addon/merge.ts` injects `behaviorHints.proxyHeaders.request['User-Agent'] = 'okhttp/4.12.0'` (and `notWebReady`) for direct streams on `bcdn.hakunaymatata.com` when no UA is present. Scoped by host; the URL is unchanged.
+- **Limits:** only clients honoring `proxyHeaders` benefit (Nuvio does); VixSrc 403 is a Cloudflare challenge and is unaffected.
+- **Verification:** `npm run lint`, `npm run typecheck`, `npm run test:feature` (304 tests) pass. Not deployed.

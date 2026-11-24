@@ -95,6 +95,73 @@ describe('classifier and merger', () => {
     expect(merged[0].url).toBe(first);
   });
 
+  it('injects a non-browser UA for the Vidlink/Haylox host when none is present', () => {
+    const defaultFilters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: null,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+    const url = 'https://bcdn.hakunaymatata.com/resource/abc.mp4?sign=x&t=1';
+
+    const merged = mergeAndFilterStreams(
+      [{ fleet: 'nuvio', streams: [{ name: 'Vidlink', title: '720p', quality: '720p', url }] }],
+      defaultFilters,
+      10,
+    );
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].url).toBe(url);
+    expect(merged[0].behaviorHints?.proxyHeaders?.request?.['User-Agent']).toBe('okhttp/4.12.0');
+    expect(merged[0].behaviorHints?.notWebReady).toBe(true);
+  });
+
+  it('preserves a provider UA and leaves other hosts untouched', () => {
+    const defaultFilters: StreamFilterConfig = {
+      minRes: null,
+      maxRes: null,
+      includeUnknownRes: true,
+      maxSizeGB: null,
+      includeUnknownSize: true,
+      subtitleMode: 'all',
+      subtitleLangs: [],
+      includeUnknownSubtitleLang: true,
+    };
+
+    const merged = mergeAndFilterStreams(
+      [
+        {
+          fleet: 'nuvio',
+          streams: [
+            {
+              name: 'Vidlink',
+              quality: '720p',
+              url: 'https://bcdn.hakunaymatata.com/resource/abc.mp4',
+              behaviorHints: { proxyHeaders: { request: { 'User-Agent': 'Custom/1.0' } } },
+            },
+            {
+              name: 'Other',
+              quality: '720p',
+              url: 'https://cdn.example.com/video.mp4',
+            },
+          ],
+        },
+      ],
+      defaultFilters,
+      10,
+    );
+
+    const sensitive = merged.find((s) => s.url?.includes('hakunaymatata'));
+    expect(sensitive?.behaviorHints?.proxyHeaders?.request?.['User-Agent']).toBe('Custom/1.0');
+
+    const other = merged.find((s) => s.url?.includes('cdn.example.com'));
+    expect(other?.behaviorHints?.proxyHeaders).toBeUndefined();
+  });
+
   it('merges, deduplicates, and sorts direct before external links', () => {
     const defaultFilters: StreamFilterConfig = {
       minRes: null,

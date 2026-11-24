@@ -17,6 +17,45 @@ function fleetPriority(fleet: string): number {
   return FLEET_PRIORITY[fleet] ?? 3;
 }
 
+// Vidlink/Haylox MP4s on this host return HTTP 428 for browser-style UAs
+// (`Mozilla/5.0 ...`) and 200/206 for non-browser UAs. The provider emits no
+// headers, so fill in a non-browser UA at the gateway when none is present.
+// Keep this host-scoped: many CDNs require a browser UA.
+const UA_SENSITIVE_HOSTS = new Set(['bcdn.hakunaymatata.com']);
+const NON_BROWSER_USER_AGENT = 'okhttp/4.12.0';
+
+function hasUserAgentHeader(headers: Record<string, string>): boolean {
+  return Object.keys(headers).some((name) => name.toLowerCase() === 'user-agent');
+}
+
+function applyUaSensitiveHeaders(
+  primaryUrl: string,
+  behaviorHints: NonNullable<StremioStream['behaviorHints']>,
+): NonNullable<StremioStream['behaviorHints']> {
+  let host: string;
+  try {
+    host = new URL(primaryUrl).hostname.toLowerCase();
+  } catch {
+    return behaviorHints;
+  }
+  if (!UA_SENSITIVE_HOSTS.has(host)) return behaviorHints;
+
+  const proxyHeaders = behaviorHints.proxyHeaders;
+  const existing = proxyHeaders?.request;
+  const request: Record<string, string> =
+    existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : {};
+  if (hasUserAgentHeader(request)) return behaviorHints;
+
+  return {
+    ...behaviorHints,
+    proxyHeaders: {
+      ...(proxyHeaders ?? {}),
+      request: { ...request, 'User-Agent': NON_BROWSER_USER_AGENT },
+    },
+    notWebReady: true,
+  };
+}
+
 function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStream | null {
   const primaryUrl = stream.url || stream.externalUrl;
   if (!primaryUrl && !stream.infoHash) return null;
@@ -69,12 +108,14 @@ function normalizeStreamItem(stream: StremioStream, fleet: string): StremioStrea
     title = title.slice(3).trim();
   }
 
+  const directHints = primaryUrl ? applyUaSensitiveHeaders(primaryUrl, behaviorHints) : behaviorHints;
+
   const cleanStream: StremioStream = {
     ...stream,
     name,
     title,
     url: primaryUrl,
-    behaviorHints,
+    behaviorHints: directHints,
   };
   if (drm) cleanStream.drm = drm;
   else delete cleanStream.drm;

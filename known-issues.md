@@ -35,17 +35,20 @@ triggers the 428. libmpv receives no UA override and should send a non-Mozilla
 UA, so this specific MP4 should play there; the libmpv failure seen in the same
 session was the `vixsrc.to` 403 below.
 
-Status: unresolved; no patch applied. Possible fixes:
+Status: mitigated at the gateway (2026-11-24). `src/addon/merge.ts` now injects
+`behaviorHints.proxyHeaders.request['User-Agent'] = 'okhttp/4.12.0'` (and sets
+`notWebReady`) for direct streams on `bcdn.hakunaymatata.com` when no UA is
+already present. The stream URL is left unchanged.
 
-- In `haylox.js`, attach a non-browser `User-Agent` (e.g. `okhttp/4.12.0` or
-  `ExoPlayerLib/2.19.1`) for `bcdn.hakunaymatata.com` `.mp4` streams so
-  `mapStreams` forwards it as `proxyHeaders.request`.
-- Or in Nuvio, retry a 428 media response with a non-Mozilla UA.
+Limitations:
 
-Caveat if the provider file is patched on a deployed instance: the nuvio
-snapshot updater replaces `/data/nuvio/<sha>/providers/*.js` from upstream every
-20-24h, so a runtime-only edit is lost on refresh. Patch the addon mapping or
-the client for a durable fix.
+- Only clients that honor `proxyHeaders.request` benefit. Nuvio does; Stremio
+  web/desktop may ignore it.
+- Scoped to `bcdn.hakunaymatata.com`; other hosts keep their own headers so
+  browser-UA CDNs are not broken.
+- A provider-level fix in `haylox.js` is still preferable, but the Nuvio snapshot
+  updater replaces provider files every 20-24h, so the gateway injection is the
+  durable path.
 
 ### VixSrc playlists return HTTP 403 (Cloudflare challenge) (2026-11-19)
 

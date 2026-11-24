@@ -14,7 +14,10 @@ export interface StremioStream {
   description?: string;
   behaviorHints?: {
     bingeGroup?: string;
-    proxyHeaders?: Record<string, string>;
+    proxyHeaders?: {
+      request?: Record<string, string>;
+      response?: Record<string, string>;
+    };
     notWebReady?: boolean;
     [key: string]: unknown;
   };
