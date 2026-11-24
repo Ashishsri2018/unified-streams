@@ -23,6 +23,10 @@ export interface ProviderCatalogEntry {
   locked: boolean;
   missing: boolean;
   lastError: string | null;
+  version: string;
+  isNew: boolean;
+  updated: boolean;
+  previousVersion: string | null;
 }
 
 export interface ProviderCatalogResponse {

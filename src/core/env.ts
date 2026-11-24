@@ -8,6 +8,11 @@ export const DEFAULT_ANIMEAPI_URL = 'https://animeapi.my.id';
 export const DEFAULT_KITSU_URL = 'https://kitsu.io/api/edge';
 export const DEFAULT_TVMAZE_URL = 'https://api.tvmaze.com';
 
+const OptionalUrl = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().url().optional(),
+);
+
 export const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(7000),
   DATA_DIR: z.string().default('/data'),
@@ -71,6 +76,8 @@ export const EnvSchema = z.object({
   INTERNAL_TOKEN: z.string().optional(),
   CLOUDFLARE_LOG_ENDPOINT: z.string().optional(),
   CLOUDFLARE_LOG_TOKEN: z.string().optional(),
+  CLOUDFLARE_SETTINGS_ENDPOINT: OptionalUrl,
+  CLOUDFLARE_SETTINGS_TOKEN: z.string().optional(),
   ADDON_VERSION: z.string().default('1.0.0'),
   GIT_COMMIT: z.string().default('development'),
 });

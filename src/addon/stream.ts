@@ -10,6 +10,7 @@ import type { WorkerSnapshot } from '../core/telemetry.js';
 import type { MetadataResolver } from '../core/metadata.js';
 import type { ForwardedMetadata } from '../core/contract.js';
 import type { ProviderOverridesStore } from '../core/providerOverrides.js';
+import type { RemoteSettingsClient } from '../core/remoteSettings.js';
 
 export interface AdminRuntimeSettings {
   instanceProfile: string;
@@ -40,6 +41,7 @@ export interface StreamHandlerContext {
   };
   adminToken?: string;
   overridesStore?: ProviderOverridesStore;
+  remoteSettings?: RemoteSettingsClient;
   adminSettings?: AdminRuntimeSettings;
 }
 

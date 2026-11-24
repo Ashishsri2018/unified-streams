@@ -171,3 +171,17 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Root cause:** Vega's `StreamPipeline.clearCaches()` called `telemetry.reset()` and is wired to `registry.onActivate`. Every admin selection apply re-activates a snapshot, wiping all cumulative provider counters and breaker state. SA7 and Nuvio never reset telemetry on selection, so only Vega went to zero.
 - **Fix:** `clearCaches()` now clears search/mapping/stream caches and bumps the generation only; provider telemetry is reset only in `dispose()`. Toggling providers preserves call/ok/empty/error counters, matching SA7/Nuvio.
 - **Tests:** Added a regression in `tests/features/vegaTelemetry.test.ts` that executes one request, triggers a registry activation, and asserts `calls`/`ok` are still 1. `npm run lint`, `npm run typecheck`, and the telemetry suite pass.
+
+
+## Cloudflare D1 provider settings backup (Nov 24 2026)
+- **Storage decision:** use the existing Cloudflare ingest Worker and D1 database, not R2, for admin provider overrides. R2 remains log-archive-only. Added `app_settings` via `cloudflare/migrations/0002_settings.sql` and authenticated `GET/PUT /v1/settings` with a 64 KiB limit.
+- **Gateway:** added `src/core/remoteSettings.ts`, `CLOUDFLARE_SETTINGS_ENDPOINT` / `CLOUDFLARE_SETTINGS_TOKEN`, and startup precedence `remote -> DATA_DIR/provider-overrides.json -> empty defaults`. Remote load failures log and fall back instead of failing startup.
+- **Admin:** added `POST /admin/api/providers/save` and a `Save to Cloudflare` button. Toggles still write locally first; the button uploads the current snapshot explicitly. Remote saves are serialized with toggles.
+- **Docs:** added `docs/provider-policy-simplification.md` covering the planned 3-tier policy, duplicate map, Railway/Beamup allocation, and remote persistence. The policy schema migration itself is not applied yet.
+- **Verification:** `npm run lint`, `npm run typecheck`, and `npm run test:feature` (293 tests) pass. Not committed or deployed.
+
+## Admin new/updated provider badges (Nov 24 2026)
+- **Behavior:** `/admin` now shows a `new` badge for provider IDs first seen after startup and an `updated vX -> vY` badge when an existing ID changes version. Badges are informational and do not auto-enable providers, so admin-disabled overrides persist across version bumps.
+- **Tracking:** Added `src/core/providerChanges.ts` for baseline/current version diffing. SA7, Nuvio, and Vega capture a per-process baseline and attach `version`, `isNew`, `updated`, and `previousVersion` to catalog entries. SA7 prewarms its registry so the bundled snapshot is the baseline before the updater runs.
+- **Admin UI:** Added badge CSS and version metadata rendering in `src/addon/adminHtml.ts`; missing providers still use the existing warning-only path with no rename matching.
+- **Tests:** Added `tests/features/providerChanges.test.ts`, `adminBadges.test.ts`, `sa7ProviderChanges.test.ts`, and `vegaProviderChanges.test.ts`. `npm run lint`, `npm run typecheck`, and `npm run test:feature` (300 tests) pass. Not committed or deployed.

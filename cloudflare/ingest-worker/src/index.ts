@@ -4,6 +4,15 @@ interface Env {
   AUTH_TOKEN?: string;
 }
 
+const SETTINGS_KEY = 'provider_overrides';
+const MAX_SETTINGS_BYTES = 64 * 1024;
+
+interface SettingsRow {
+  value_json: string;
+  version: number;
+  updated_at: string;
+}
+
 interface RawLogEvent {
   id?: string;
   ts: string;
@@ -34,6 +43,60 @@ export default {
     const authHeader = req.headers.get('authorization') || '';
     if (authHeader !== `Bearer ${env.AUTH_TOKEN}`) {
       return new Response('Unauthorized', { status: 401 });
+    }
+
+    if (url.pathname === '/v1/settings' && req.method === 'GET') {
+      try {
+        const row = await env.DB
+          .prepare('SELECT value_json, version, updated_at FROM app_settings WHERE key = ?')
+          .bind(SETTINGS_KEY)
+          .first<SettingsRow>();
+        if (!row) return Response.json({ settings: null });
+        return Response.json({
+          settings: JSON.parse(row.value_json),
+          version: row.version,
+          updatedAt: row.updated_at,
+        });
+      } catch (err) {
+        return new Response(String(err), { status: 500 });
+      }
+    }
+
+    if (url.pathname === '/v1/settings' && req.method === 'PUT') {
+      try {
+        const rawBody = await req.text();
+        if (rawBody.length > MAX_SETTINGS_BYTES) {
+          return new Response('Payload too large', { status: 413 });
+        }
+        const body = JSON.parse(rawBody) as { settings?: unknown };
+        if (!body || typeof body !== 'object' || typeof body.settings !== 'object' || body.settings === null || Array.isArray(body.settings)) {
+          return new Response('Invalid settings payload', { status: 400 });
+        }
+        const valueJson = JSON.stringify(body.settings);
+        if (valueJson.length > MAX_SETTINGS_BYTES) {
+          return new Response('Payload too large', { status: 413 });
+        }
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          `INSERT INTO app_settings (key, value_json, version, updated_at)
+           VALUES (?, ?, 1, ?)
+           ON CONFLICT(key) DO UPDATE SET
+             value_json = excluded.value_json,
+             version = app_settings.version + 1,
+             updated_at = excluded.updated_at`
+        ).bind(SETTINGS_KEY, valueJson, now).run();
+        const row = await env.DB
+          .prepare('SELECT version, updated_at FROM app_settings WHERE key = ?')
+          .bind(SETTINGS_KEY)
+          .first<{ version: number; updated_at: string }>();
+        return Response.json({
+          ok: true,
+          version: row?.version ?? 1,
+          updatedAt: row?.updated_at ?? now,
+        });
+      } catch (err) {
+        return new Response(String(err), { status: 500 });
+      }
     }
 
     if (url.pathname === '/v1/logs' && req.method === 'POST') {

@@ -8,6 +8,7 @@ export interface AdminPageOptions {
   scriptNonce: string;
   settings: AdminRuntimeSettings | undefined;
   version: number;
+  remoteBackupEnabled: boolean;
 }
 
 export interface AdminLoginOptions {
@@ -39,12 +40,16 @@ function baseCss(): string {
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .section-head h2 { margin: 0; }
 .provider-name { font-weight: 650; }
-.provider-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); }
+.provider-name .pill { margin-left: 6px; vertical-align: middle; }
+.provider-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.provider-id, .provider-version { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); }
 td.provider-cell { white-space: normal; min-width: 180px; }
 .pill { display: inline-flex; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid var(--line); white-space: nowrap; }
 .on { color: #bbf7d0; border-color: #166534; background: #052e16; }
 .off { color: #fecdd3; border-color: #7f1d1d; background: #2a0a10; }
 .locked { color: #fde68a; border-color: #78350f; background: #2b1a05; }
+.new { color: #bfdbfe; border-color: #1d4ed8; background: #0b1e3a; }
+.updated { color: #ddd6fe; border-color: #6d28d9; background: #1e1035; }
 .warn { color: #fecdd3; font-size: 12px; word-break: break-word; }
 td.row-actions { text-align: right; white-space: nowrap; }
 td.row-actions button { padding: 6px 12px; font-size: 12px; }
@@ -145,6 +150,23 @@ function esc(value) {
 
 function pill(kind, text) {
   return '<span class="pill ' + kind + '">' + esc(text) + '</span>';
+}
+
+function formatVersion(value) {
+  const text = String(value || "");
+  return text && !/^v/i.test(text) ? "v" + text : text;
+}
+
+function providerBadges(provider) {
+  const badges = [];
+  if (provider.isNew) badges.push(pill("new", "new"));
+  if (provider.updated) {
+    const from = formatVersion(provider.previousVersion);
+    const to = formatVersion(provider.version);
+    const detail = from && to ? " " + from + " \u2192 " + to : to ? " " + to : from ? " from " + from : "";
+    badges.push(pill("updated", "updated" + detail));
+  }
+  return badges.join(" ");
 }
 
 function num(value) {
@@ -264,7 +286,11 @@ function render(fleets, version, stats) {
       const error = provider.lastError ? '<div class="warn">' + esc(provider.lastError) + '</div>' : '';
       const disabled = provider.locked ? " disabled" : "";
       const nameMatchesId = String(provider.name || "").toLowerCase() === String(provider.id || "").toLowerCase();
-      const idLine = nameMatchesId ? "" : '<div class="provider-id">' + esc(provider.id) + '</div>';
+      const badges = providerBadges(provider);
+      const meta = [];
+      if (!nameMatchesId) meta.push('<span class="provider-id">' + esc(provider.id) + '</span>');
+      if (provider.version) meta.push('<span class="provider-version">' + esc(formatVersion(provider.version)) + '</span>');
+      const metaLine = meta.length ? '<div class="provider-meta">' + meta.join(" ") + '</div>' : "";
       const state = stat ? (stat.state || "closed") : "";
       const stateClass = state === "open" ? "error" : state === "half-open" ? "degraded" : "ok";
       const stateCell = stat ? '<td class="' + stateClass + '">' + esc(state) + '</td>' : '<td class="muted">—</td>';
@@ -274,7 +300,7 @@ function render(fleets, version, stats) {
       const reset = '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="reset"' + disabled + '>Reset</button>';
       rows.push('<tr data-search="' + esc((fleet.fleet + " " + provider.id + " " + provider.name).toLowerCase()) + '">'
         + '<td class="mono">' + esc(fleet.fleet) + '</td>'
-        + '<td class="provider-cell"><div class="provider-name">' + esc(provider.name) + '</div>' + idLine + error + '</td>'
+        + '<td class="provider-cell"><div class="provider-name">' + esc(provider.name) + (badges ? " " + badges : "") + '</div>' + metaLine + error + '</td>'
         + '<td>' + esc((provider.types || []).join(", ")) + '</td>'
         + '<td>' + selection + locked + missing + '</td>'
         + '<td>' + loaded + '</td>'
@@ -348,7 +374,25 @@ providerRows.addEventListener("click", (event) => {
 });
 
 searchInput.addEventListener("input", applySearch);
+async function saveToCloudflare() {
+  const button = document.getElementById("save-remote");
+  setStatus("Saving overrides to Cloudflare...");
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch("/admin/api/providers/save", { method: "POST" });
+    const data = await response.json();
+    if (response.status === 401) { window.location.href = "/admin"; return; }
+    if (!response.ok || !data.ok) throw new Error(data && data.error ? data.error : "HTTP " + response.status);
+    setStatus("Saved to Cloudflare (remote v" + data.remoteVersion + ").");
+  } catch (error) {
+    setStatus("Cloudflare save failed: " + (error && error.message ? error.message : String(error)), true);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 document.getElementById("refresh").addEventListener("click", () => void load());
+document.getElementById("save-remote").addEventListener("click", () => void saveToCloudflare());
 document.getElementById("logout").addEventListener("click", async () => {
   await fetch("/admin/logout", { method: "POST" });
   window.location.href = "/admin";
@@ -374,6 +418,7 @@ setInterval(load, 30000);`;
     <span class="badge"><span class="dot"></span><span id="policy-version">policy v${options.version}</span></span>
     <a class="button" href="${escapeHtml(options.configureUrl)}">Configure</a>
     <button type="button" id="refresh">Refresh</button>
+    <button type="button" id="save-remote"${options.remoteBackupEnabled ? '' : ' disabled title="Set CLOUDFLARE_SETTINGS_ENDPOINT to enable remote backup"'}>Save to Cloudflare</button>
     <button type="button" id="logout">Sign out</button>
   </div>
 </header>
@@ -414,7 +459,7 @@ setInterval(load, 30000);`;
     <div class="setting"><span>System available</span><strong id="mem-sys-available">—</strong></div>
   </div>
 </section>
-<p class="footer">Locked providers are hard-disabled by policy. Overrides are stored in DATA_DIR/provider-overrides.json.</p>`,
+<p class="footer">Locked providers are hard-disabled by policy. Overrides are stored in DATA_DIR/provider-overrides.json. Use Save to Cloudflare to restore them after a deploy on hosts without a persistent disk; remote settings take precedence when present at startup.</p>`,
     scripts,
   });
 }

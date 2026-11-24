@@ -16,6 +16,11 @@ import {
 } from "../../../core/policy.js";
 import { HARD_DISABLED_PROVIDERS } from "../../../core/env.js";
 import type { ProviderCatalogResponse } from "../../../core/contract.js";
+import {
+  computeProviderChanges,
+  type ProviderChangeMap,
+  type ProviderVersion,
+} from "../../../core/providerChanges.js";
 import { computeSnapshotSha, CodebergClient } from "../source/codeberg.js";
 import { mapLimit, mapLimitSettled, randomInt } from "../util/concurrency.js";
 import {
@@ -72,6 +77,8 @@ export class SnapshotManager {
   private selectionVersion: number;
   private selectionChain: Promise<void> = Promise.resolve();
   private readonly loadErrors = new Map<string, string>();
+  private baselineVersions: ProviderVersion[] | null = null;
+  private providerChanges: ProviderChangeMap = {};
 
   constructor(
     private readonly config: AppConfig,
@@ -107,6 +114,7 @@ export class SnapshotManager {
     const hard = new Set(HARD_DISABLED_PROVIDERS.map((id) => id.toLowerCase()));
     const providers = entries.map((entry) => {
       const key = entry.id.toLowerCase();
+      const change = this.providerChanges[key];
       return {
         id: entry.id,
         name: entry.name || entry.id,
@@ -116,6 +124,10 @@ export class SnapshotManager {
         locked: hard.has(key),
         missing: false,
         lastError: this.loadErrors.get(key) ?? null,
+        version: entry.version || "",
+        isNew: change?.isNew ?? false,
+        updated: change?.updated ?? false,
+        previousVersion: change?.previousVersion ?? null,
       };
     });
     for (const rawId of Object.keys(this.config.runtimeOverrides)) {
@@ -131,6 +143,10 @@ export class SnapshotManager {
         locked: hard.has(key),
         missing: true,
         lastError: "provider not present in snapshot",
+        version: "",
+        isNew: false,
+        updated: false,
+        previousVersion: null,
       });
     }
     return {
@@ -355,6 +371,7 @@ export class SnapshotManager {
     source: SnapshotSource,
   ): NuvioSnapshot {
     this.warnDepartedProviders(this.snapshot, snapshot, source);
+    this.updateProviderChanges(snapshot.entries ?? []);
     this.snapshot = snapshot;
     this.lastError = null;
     this.logger.info("nuvio_snapshot_activated", {
@@ -364,6 +381,19 @@ export class SnapshotManager {
       fetchedAt: new Date(snapshot.fetchedAt).toISOString(),
     });
     return snapshot;
+  }
+
+  private updateProviderChanges(entries: NuvioScraperEntry[]): void {
+    const versions = entries.map((entry) => ({
+      id: entry.id,
+      version: entry.version,
+    }));
+    if (!this.baselineVersions || this.baselineVersions.length === 0) {
+      this.baselineVersions = versions;
+      this.providerChanges = {};
+      return;
+    }
+    this.providerChanges = computeProviderChanges(this.baselineVersions, versions);
   }
 
   private warnDepartedProviders(

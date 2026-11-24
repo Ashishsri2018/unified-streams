@@ -32,6 +32,19 @@ export interface ProviderOverridesFile {
   fleets: Record<FleetName, Record<string, boolean>>;
 }
 
+export function parseProviderOverrides(raw: unknown): ProviderOverridesFile {
+  const parsed = ProviderOverridesFileSchema.parse(raw);
+  return {
+    version: parsed.version,
+    ...(parsed.updatedAt ? { updatedAt: parsed.updatedAt } : {}),
+    fleets: {
+      sa7: normalizeFleetOverrides(parsed.fleets.sa7),
+      nuvio: normalizeFleetOverrides(parsed.fleets.nuvio),
+      vega: normalizeFleetOverrides(parsed.fleets.vega),
+    },
+  };
+}
+
 export interface ProviderOverridesStoreOptions {
   filePath: string;
   onWarning?: (message: string) => void;
@@ -88,16 +101,7 @@ export class ProviderOverridesStore {
     }
     try {
       const raw = JSON.parse(fs.readFileSync(this.filePath, 'utf-8')) as unknown;
-      const parsed = ProviderOverridesFileSchema.parse(raw);
-      this.state = {
-        version: parsed.version,
-        ...(parsed.updatedAt ? { updatedAt: parsed.updatedAt } : {}),
-        fleets: {
-          sa7: normalizeFleetOverrides(parsed.fleets.sa7),
-          nuvio: normalizeFleetOverrides(parsed.fleets.nuvio),
-          vega: normalizeFleetOverrides(parsed.fleets.vega),
-        },
-      };
+      this.state = parseProviderOverrides(raw);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.onWarning?.(`provider overrides ignored: ${message}`);

@@ -12,7 +12,8 @@ import {
 } from './core/env.js';
 import { ensureFleetDirs } from './core/fleetBootstrap.js';
 import { GatewayStreamCache } from './core/cache.js';
-import { createProviderOverridesStore } from './core/providerOverrides.js';
+import { createProviderOverridesStore, parseProviderOverrides } from './core/providerOverrides.js';
+import { RemoteSettingsClient } from './core/remoteSettings.js';
 import { WorkerClient } from './core/workerClient.js';
 import { MetadataResolver } from './core/metadata.js';
 import { createGatewayApp } from './addon/app.js';
@@ -163,6 +164,25 @@ async function main(): Promise<void> {
   });
   overridesStore.load();
 
+  const remoteSettings = new RemoteSettingsClient({
+    endpoint: env.CLOUDFLARE_SETTINGS_ENDPOINT,
+    token: env.CLOUDFLARE_SETTINGS_TOKEN,
+  });
+  if (remoteSettings.isConfigured()) {
+    try {
+      const remote = await remoteSettings.load();
+      if (remote) {
+        const remoteOverrides = parseProviderOverrides(remote);
+        overridesStore.replace(remoteOverrides);
+        logger.info('provider_overrides.remote_loaded', { version: remoteOverrides.version });
+      }
+    } catch (error) {
+      logger.warn('provider_overrides.remote_load_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   const stopFleets = await startFleets(env, overridesStore);
   scheduler.start();
 
@@ -185,6 +205,7 @@ async function main(): Promise<void> {
     getPolicyVersion: () => String(overridesStore.getVersion()),
     adminToken: env.ADMIN_TOKEN,
     overridesStore,
+    remoteSettings,
     adminSettings: {
       instanceProfile: env.INSTANCE_PROFILE,
       backendTimeoutMs: env.BACKEND_TIMEOUT_MS,

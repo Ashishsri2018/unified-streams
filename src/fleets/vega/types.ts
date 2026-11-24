@@ -1,4 +1,5 @@
 import type { AxiosInstance } from "axios";
+import type { ProviderChangeMap } from "../../core/providerChanges.js";
 import type { AppConfig } from "./config.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -206,6 +207,7 @@ export interface ProviderSnapshot {
   urls: UrlsSnapshot;
   bundles: Map<string, ProviderBundle>;
   entries?: UpstreamProviderEntry[];
+  changes?: ProviderChangeMap;
   createdAt: number;
 }
 

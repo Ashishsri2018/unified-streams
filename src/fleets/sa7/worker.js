@@ -22,6 +22,12 @@ function createSa7Handlers(fleetEnv = process.env) {
   const port = Number(fleetEnv.PORT || 7001);
   const startedAt = Date.now();
 
+  try {
+    getRegistry();
+  } catch (err) {
+    console.warn(`[providers] initial load failed: ${err.message}`);
+  }
+
   function readSnapshotInfo() {
     const fallback = {
       sha: fleetEnv.SA7_SNAPSHOT_SHA || 'bundled',

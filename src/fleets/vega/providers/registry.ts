@@ -1,3 +1,8 @@
+import {
+  computeProviderChanges,
+  type ProviderChangeMap,
+  type ProviderVersion,
+} from "../../../core/providerChanges.js";
 import type {
   LoggerLike,
   ProviderBundle,
@@ -5,6 +10,7 @@ import type {
   ProviderRegistryApi,
   ProviderSnapshot,
   SnapshotLease,
+  UpstreamProviderEntry,
 } from "../types.js";
 import { unloadProviderModules } from "./loader.js";
 
@@ -26,6 +32,8 @@ export class ProviderRegistry implements ProviderRegistryApi {
   private active: ProviderSnapshot | null = null;
   private previous: ProviderSnapshot | null = null;
   private disposed = false;
+  private baselineVersions: ProviderVersion[] | null = null;
+  private providerChanges: ProviderChangeMap = {};
 
   constructor(options: {
     context: ProviderContextLike;
@@ -92,6 +100,9 @@ export class ProviderRegistry implements ProviderRegistryApi {
     const oldActive = this.active;
     const oldPrevious = this.previous;
 
+    this.updateProviderChanges(snapshot.entries ?? []);
+    snapshot.changes = this.providerChanges;
+
     this.active = snapshot;
     this.previous = oldActive;
     const meta = this.ensureMeta(snapshot);
@@ -115,6 +126,19 @@ export class ProviderRegistry implements ProviderRegistryApi {
 
   previousSnapshot(): ProviderSnapshot | null {
     return this.previous;
+  }
+
+  private updateProviderChanges(entries: UpstreamProviderEntry[]): void {
+    const versions = entries.map((entry) => ({
+      id: entry.value,
+      version: entry.version,
+    }));
+    if (!this.baselineVersions || this.baselineVersions.length === 0) {
+      this.baselineVersions = versions;
+      this.providerChanges = {};
+      return;
+    }
+    this.providerChanges = computeProviderChanges(this.baselineVersions, versions);
   }
 
   async dispose(): Promise<void> {

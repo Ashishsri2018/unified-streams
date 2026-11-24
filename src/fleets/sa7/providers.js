@@ -11,6 +11,41 @@ try {
   corePolicy = null;
 }
 
+let coreChanges = null;
+try {
+  coreChanges = require(path.resolve(process.cwd(), 'dist/core/providerChanges.js'));
+} catch {
+  coreChanges = null;
+}
+
+function computeProviderChanges(baseline, current) {
+  if (coreChanges && typeof coreChanges.computeProviderChanges === 'function') {
+    return coreChanges.computeProviderChanges(baseline, current);
+  }
+  const changes = {};
+  if (!Array.isArray(baseline) || baseline.length === 0) return changes;
+  const previous = new Map();
+  for (const entry of baseline) {
+    const id = String((entry && entry.id) || '').trim().toLowerCase();
+    if (!id) continue;
+    previous.set(id, String((entry && entry.version) || '').trim());
+  }
+  for (const entry of current) {
+    const id = String((entry && entry.id) || '').trim().toLowerCase();
+    if (!id) continue;
+    const version = String((entry && entry.version) || '').trim();
+    if (!previous.has(id)) {
+      changes[id] = { isNew: true, updated: false, previousVersion: null };
+      continue;
+    }
+    const previousVersion = previous.get(id);
+    if (previousVersion !== version) {
+      changes[id] = { isNew: false, updated: true, previousVersion };
+    }
+  }
+  return changes;
+}
+
 function isProviderEnabled(id, selection) {
   if (corePolicy && typeof corePolicy.isProviderEnabled === 'function') {
     return corePolicy.isProviderEnabled(id, selection);
@@ -44,6 +79,8 @@ function findDepartedProviderIds(previousIds, currentIds, selection) {
 
 let registry = null;
 let manifestProviderIds = null;
+let baselineVersions = null;
+let providerChanges = {};
 const loadErrors = new Map();
 
 // Torrent providers stay vendored so the daily sync keeps them updated, but
@@ -147,6 +184,19 @@ function buildRegistry() {
   }
   manifestProviderIds = manifestIds;
 
+  const versions = providers
+    .map((provider) => ({
+      id: provider && typeof provider.id === 'string' ? provider.id : '',
+      version: provider && provider.version ? String(provider.version) : '',
+    }))
+    .filter((provider) => provider.id);
+  if (!baselineVersions || baselineVersions.length === 0) {
+    baselineVersions = versions;
+    providerChanges = {};
+  } else {
+    providerChanges = computeProviderChanges(baselineVersions, versions);
+  }
+
   const entries = providers.filter((p) => {
     if (p.enabled === false) return false;
     return effectiveEnabled(p.id);
@@ -197,6 +247,7 @@ function getCatalog() {
     const id = typeof entry.id === 'string' ? entry.id : '';
     const key = id.toLowerCase();
     const available = entry.enabled !== false;
+    const change = providerChanges[key];
     return {
       id,
       name: entry.name || id,
@@ -206,6 +257,10 @@ function getCatalog() {
       locked: hard.has(key),
       missing: false,
       lastError: loadErrors.get(key) || null,
+      version: entry.version ? String(entry.version) : '',
+      isNew: Boolean(change && change.isNew),
+      updated: Boolean(change && change.updated),
+      previousVersion: change && change.previousVersion != null ? change.previousVersion : null,
     };
   });
   return {

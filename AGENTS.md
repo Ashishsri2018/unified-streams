@@ -21,7 +21,7 @@ npm run verify       # CI only: policy -> icon -> lint -> typecheck -> all tests
 
 ## Configuration and provider policy
 - Env load order: `config/defaults.env` -> `config/instances/$INSTANCE_PROFILE.env` -> process env. `INSTANCE_PROFILE=generic` locally; `beamup` and `railway` intentionally use different provider sets and timeout budgets.
-- Provider availability is canonical in `config/providers.json` (fleet allow/deny plus `instances.<profile>`). `src/core/env.ts` derives worker-scoped env from it. Runtime `*_ENABLED_*` / `*_DISABLED_*` env vars are per-run overrides, not the source of truth.
+- Provider availability is canonical in `config/providers.json` (fleet allow/deny plus `instances.<profile>`). `src/core/env.ts` derives worker-scoped env from it. Runtime `*_ENABLED_*` / `*_DISABLED_*` env vars are per-run overrides, not the source of truth. Admin overrides persist in `DATA_DIR/provider-overrides.json`; with `CLOUDFLARE_SETTINGS_ENDPOINT` configured, startup prefers the D1 snapshot saved from `/admin` and falls back to the local file.
 - `torrentio`, `internetarchive`, `youtube`, `brellor`, `durbinlive`, `livetgtv`, `bdix-cf`, `bdix-df`, `bdix-fh`, `jyniq` (Wikimedia), and `mxplayer` are hard-disabled in both `src/core/env.ts` and `scripts/check-provider-policy.mjs`; keep both lists in sync.
 - `config/provider-audit.csv` is local-only and gitignored. Keep it aligned when replacing providers; `npm run policy:check` warns about IDs absent from the audit when the file is present.
 - The audit is one row per website: fleet columns hold `|`-separated provider IDs, `*_active` flags reflect default policy, and `disable_reason` uses fleet-prefixed tokens.

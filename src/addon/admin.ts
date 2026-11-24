@@ -165,6 +165,7 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
         scriptNonce: nonce,
         settings: ctx.adminSettings,
         version: overrides.getVersion(),
+        remoteBackupEnabled: Boolean(ctx.remoteSettings?.isConfigured()),
       }),
     );
   });
@@ -272,6 +273,42 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
       });
     },
   );
+
+  router.post('/api/providers/save', async (req, res) => {
+    if (!sameOrigin(req)) {
+      logger.warn('admin.origin_rejected', {
+        origin: req.header('origin')?.slice(0, 200),
+        host: req.header('host'),
+        forwardedHost: req.header('x-forwarded-host'),
+        route: 'save',
+      });
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    const remote = ctx.remoteSettings;
+    if (!remote || !remote.isConfigured()) {
+      res.status(503).json({ error: 'Cloudflare settings backup is not configured' });
+      return;
+    }
+
+    await serialize(async () => {
+      try {
+        const saved = await remote.save(overrides.get());
+        logger.info('admin.provider_overrides_saved', {
+          version: overrides.getVersion(),
+          remoteVersion: saved.version,
+        });
+        res.status(200).json({
+          ok: true,
+          remoteVersion: saved.version,
+          ...(saved.updatedAt ? { remoteUpdatedAt: saved.updatedAt } : {}),
+        });
+      } catch (error) {
+        logger.error('admin.provider_overrides_save_failed', error);
+        res.status(502).json({ ok: false, error: 'Failed to save overrides to Cloudflare' });
+      }
+    });
+  });
 
   return router;
 }

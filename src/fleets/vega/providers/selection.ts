@@ -55,6 +55,7 @@ export class ProviderSelectionController {
     const known = new Set(entries.map((entry) => entry.value.toLowerCase()));
     const providers = entries.map((entry) => {
       const key = entry.value.toLowerCase();
+      const change = snapshot?.changes?.[key];
       return {
         id: entry.value,
         name: entry.display_name || entry.value,
@@ -64,6 +65,10 @@ export class ProviderSelectionController {
         locked: HARD_DISABLED.has(key),
         missing: false,
         lastError: this.loadErrors.get(key) ?? null,
+        version: entry.version || "",
+        isNew: change?.isNew ?? false,
+        updated: change?.updated ?? false,
+        previousVersion: change?.previousVersion ?? null,
       };
     });
     for (const rawId of Object.keys(this.config.runtimeOverrides)) {
@@ -79,6 +84,10 @@ export class ProviderSelectionController {
         locked: HARD_DISABLED.has(key),
         missing: true,
         lastError: "provider not present in snapshot",
+        version: "",
+        isNew: false,
+        updated: false,
+        previousVersion: null,
       });
     }
     return {

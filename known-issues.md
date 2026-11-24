@@ -292,6 +292,33 @@ them; Vega can use the previously installed manifest directory.
 Status: accepted; covers the live refresh/update path used by deploys with a
 warm disk or bundled snapshot.
 
+### Provider new/updated badges are per-process (2026-11-24)
+
+The `new` and `updated vX -> vY` badges in `/admin` compare provider versions
+against the first snapshot activated in the current worker process. They reset on
+restart and are not stored in D1 or `DATA_DIR`. If the first snapshot has no
+entries, the next usable snapshot becomes the baseline and is not marked `new`.
+A rename that happened before the process started remains visible only through
+the missing-provider warning above.
+
+Status: accepted; badges are informational and do not affect enablement.
+
+## Cloudflare settings backup requires a D1 migration (Nov 24 2026)
+
+The `/admin` `Save to Cloudflare` action and startup remote load use the
+`app_settings` table added by
+`cloudflare/migrations/0002_settings.sql`. Deploying the Worker alone does not
+create the table. Until the migration is applied with `wrangler d1 execute`, the
+Worker returns HTTP 500 for `/v1/settings`; the gateway logs a warning and falls
+back to `DATA_DIR/provider-overrides.json`.
+
+The remote snapshot is one global document. Multiple writable instances sharing
+one D1 database will overwrite each other on Save (last write wins). Remote
+settings take precedence over the local file at startup whenever a row exists,
+including version 0.
+
+Status: accepted; apply the migration and use one writer.
+
 ## Runtime provider admin limitations (Nov 23 2026)
 
 - **Enablement requires `ADMIN_TOKEN`.** An empty or unset token keeps `/admin*` at 404. The panel is not rate limited per `AGENTS.md`; the token must still be long and random, and the login cookie is an HMAC-derived session (`HttpOnly`, `SameSite=Strict`) rather than the raw token.
