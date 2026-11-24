@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import v8 from 'node:v8';
 import {
   GatewayHealth,
   HealthStatus,
@@ -10,6 +11,7 @@ import {
 } from '../core/telemetry.js';
 import { StreamHandlerContext } from './stream.js';
 import { logger } from '../core/logger.js';
+import { readSystemMemory } from '../core/systemMemory.js';
 
 function normalizeLastError(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
@@ -185,6 +187,9 @@ export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: nu
 
   const cacheStats = ctx.cache.getStats();
   const queueMetrics = logger.getQueueMetrics();
+  const mem = process.memoryUsage();
+  const heapLimitBytes = v8.getHeapStatistics().heap_size_limit;
+  const maxRssKb = process.resourceUsage().maxRSS;
 
   return {
     ok: status === 'ok',
@@ -218,6 +223,16 @@ export async function buildHealthReport(ctx: StreamHandlerContext, startedAt: nu
       cacheMisses: cacheStats.misses,
       emptyResults: cacheStats.emptySkips,
       deadlineHits,
+    },
+    memory: {
+      rssBytes: mem.rss,
+      heapTotalBytes: mem.heapTotal,
+      heapUsedBytes: mem.heapUsed,
+      externalBytes: mem.external,
+      arrayBuffersBytes: mem.arrayBuffers,
+      heapLimitBytes,
+      peakRssBytes: maxRssKb > 0 ? maxRssKb * 1024 : null,
+      system: readSystemMemory(),
     },
   };
 }

@@ -1,4 +1,5 @@
 import { CacheStats } from './cache.js';
+import type { SystemMemory } from './systemMemory.js';
 
 export type HealthStatus = 'ok' | 'degraded' | 'error';
 export type CircuitState = 'closed' | 'open' | 'half-open';
@@ -131,6 +132,16 @@ export interface GatewayHealth {
     cacheMisses: number;
     emptyResults: number;
     deadlineHits: number;
+  };
+  memory: {
+    rssBytes: number;
+    heapTotalBytes: number;
+    heapUsedBytes: number;
+    externalBytes: number;
+    arrayBuffersBytes: number;
+    heapLimitBytes: number;
+    peakRssBytes: number | null;
+    system: SystemMemory;
   };
 }
 

@@ -174,6 +174,7 @@ describe('provider admin gateway', () => {
     const authed = await request(app).get('/admin').set('Cookie', cookie);
     expect(authed.status).toBe(200);
     expect(authed.text).toContain('Provider admin');
+    expect(authed.text).toContain('Process memory');
   });
 
   it('toggles a provider, persists it, and rejects locked providers', async () => {

@@ -163,6 +163,32 @@ function ms(value) {
   return Number.isFinite(n) ? Math.round(n).toLocaleString() + " ms" : "—";
 }
 
+function bytes(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return "—";
+  const mb = n / (1024 * 1024);
+  return mb >= 1024 ? (mb / 1024).toFixed(2) + " GB" : mb.toFixed(1) + " MB";
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function renderMemory(health) {
+  const memory = health && health.memory ? health.memory : null;
+  setText("mem-rss", memory ? bytes(memory.rssBytes) : "—");
+  setText("mem-peak", memory ? bytes(memory.peakRssBytes) : "—");
+  setText("mem-heap-used", memory ? bytes(memory.heapUsedBytes) : "—");
+  setText("mem-heap-total", memory ? bytes(memory.heapTotalBytes) : "—");
+  setText("mem-heap-limit", memory ? bytes(memory.heapLimitBytes) : "—");
+  setText("mem-external", memory ? bytes(memory.externalBytes) : "—");
+  const system = memory && memory.system ? memory.system : null;
+  setText("mem-sys-used", system ? bytes(system.usedBytes) : "—");
+  setText("mem-sys-total", system ? bytes(system.totalBytes) : "—");
+  setText("mem-sys-available", system ? bytes(system.availableBytes) : "—");
+}
+
 function statCell(stat, field, formatter) {
   return '<td>' + (stat ? formatter(stat[field]) : "—") + '</td>';
 }
@@ -282,12 +308,15 @@ async function load() {
     if (response.status === 401) { window.location.href = "/admin"; return; }
     if (!response.ok) throw new Error(data && data.error ? data.error : "HTTP " + response.status);
     const stats = new Map();
+    let health = null;
     if (healthResponse && healthResponse.ok) {
       try {
-        collectStats(await healthResponse.json(), stats);
+        health = await healthResponse.json();
+        collectStats(health, stats);
       } catch {}
     }
     render(data.fleets, data.version, stats);
+    renderMemory(health);
     setStatus("Loaded.");
   } catch (error) {
     setStatus("Catalog request failed: " + (error && error.message ? error.message : String(error)), true);
@@ -370,6 +399,20 @@ setInterval(load, 30000);`;
 <section class="section">
   <div class="section-head"><h2>Runtime settings</h2><span class="muted">read-only</span></div>
   ${settingsHtml}
+</section>
+<section class="section">
+  <div class="section-head"><h2>Process memory</h2><span class="muted">gateway + fleets</span></div>
+  <div class="settings">
+    <div class="setting"><span>RSS now</span><strong id="mem-rss">—</strong></div>
+    <div class="setting"><span>Peak RSS</span><strong id="mem-peak">—</strong></div>
+    <div class="setting"><span>Heap used</span><strong id="mem-heap-used">—</strong></div>
+    <div class="setting"><span>Heap total</span><strong id="mem-heap-total">—</strong></div>
+    <div class="setting"><span>Heap limit</span><strong id="mem-heap-limit">—</strong></div>
+    <div class="setting"><span>External</span><strong id="mem-external">—</strong></div>
+    <div class="setting"><span>System used</span><strong id="mem-sys-used">—</strong></div>
+    <div class="setting"><span>System total</span><strong id="mem-sys-total">—</strong></div>
+    <div class="setting"><span>System available</span><strong id="mem-sys-available">—</strong></div>
+  </div>
 </section>
 <p class="footer">Locked providers are hard-disabled by policy. Overrides are stored in DATA_DIR/provider-overrides.json.</p>`,
     scripts,

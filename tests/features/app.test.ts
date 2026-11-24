@@ -380,6 +380,10 @@ describe('gateway HTTP endpoints and contract', () => {
     expect(res.body.providers.stats[0]).toHaveProperty('yieldRate', 0.6);
     expect(Array.isArray(res.body.components)).toBe(true);
     expect(res.body.components.length).toBe(3);
+    expect(res.body.memory.rssBytes).toBeGreaterThan(0);
+    expect(res.body.memory.heapLimitBytes).toBeGreaterThan(0);
+    expect(res.body.memory.system.usedBytes).toBeGreaterThan(0);
+    expect(typeof res.body.memory.system.source).toBe('string');
   });
 
   it('OPTIONS returns 204 with allow headers', async () => {
