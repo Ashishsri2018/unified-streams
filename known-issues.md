@@ -73,6 +73,48 @@ Those headers are not enough: Cloudflare requires a `cf_clearance` cookie from a
 solved challenge. Playback needs a WebView/resolver that produces and reuses
 those cookies, or a different source. Status: unresolved.
 
+### Rynara/Vidy signed playlists are IP-bound and return HTTP 403 (2026-11-24)
+
+Rynara (`rynara`, Vidy, e.g. `moon.goldenkite.top` / `sun2.warmsquare.top`)
+emits HLS URLs with a signed `?s=s1.<epoch>.4.<hash>` token. Fetching such a URL
+from a normal client returns `403 Forbidden` from the origin (openresty via
+Cloudflare, not a Cloudflare challenge).
+
+Verified over `railway ssh` from the deployment's egress (`152.55.181.249`) and
+from a different local IP, same URL and headers:
+
+| Source | Headers | Result |
+| --- | --- | --- |
+| Railway egress | `Referer: https://www.vidy.st/` | 200 (`#EXTM3U`) |
+| Railway egress | `Referer` + `Origin` + browser UA | 200 |
+| Railway egress | `Origin` only / none | 403 |
+| Local IP | `Referer` + `Origin` + browser UA | 403 |
+| Local IP | `Referer` + `X-Forwarded-For: 152.55.181.249` | 403 |
+
+Two conditions apply: the origin requires `Referer: https://www.vidy.st/`, and
+the `?s=` token is bound to the source IP that requested the sources (the
+Railway worker). It checks the TCP source IP, not `X-Forwarded-For`, so spoofing
+does not help. The player runs on the user's device, whose IP differs from the
+signing IP, so playback fails with 403.
+
+The Referer does reach the player: the provider attaches `P_HEADERS`
+(`User-Agent`, `Referer: https://www.vidy.st/`, `Origin: https://www.vidy.st`),
+`mapStreams` forwards them as `behaviorHints.proxyHeaders.request`, and the
+gateway preserves them for direct streams. The live response for a Rynara
+stream includes:
+
+```json
+"proxyHeaders": { "request": { "User-Agent": "Mozilla/5.0 ...", "Referer": "https://www.vidy.st/", "Origin": "https://www.vidy.st" } }
+```
+
+So the header requirement is satisfied; the IP binding is the blocker and cannot
+be fixed by header injection at the gateway.
+
+Options: proxy the playlist and segments through the worker/gateway so media
+requests originate from the signing IP (heavy: bandwidth, no-cache rules,
+possibly multiple Railway egress IPs), or disable `rynara` since it cannot play
+client-side as-is. Status: unresolved.
+
 ## Gateway filtering and deduplication
 
 ### Absolute episode numbering for long-running anime (2026-11-22)

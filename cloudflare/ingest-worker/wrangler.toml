@@ -5,7 +5,7 @@ compatibility_date = "2024-11-12"
 [[d1_databases]]
 binding = "DB"
 database_name = "unified_streams_logs"
-database_id = "your-database-id"
+database_id = "96c176f8-a8c2-48fe-9b20-2982138f2de8"
 
 [[r2_buckets]]
 binding = "LOG_BUCKET"

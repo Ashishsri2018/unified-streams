@@ -9,8 +9,8 @@ coverage/
 docs/bugs.md
 docs/nuvio-provider-mapping.md
 docs/provider-compatibility.md
-docs/provider-policy-simplification.md
 config/provider-audit.csv
 bugs.md
 memory-improvement.md
 cloudflare/proxy-worker/
+
