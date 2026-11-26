@@ -148,6 +148,61 @@ export function deriveMalResolveBudgetMs(env: AppEnv): number {
   return deriveResolveBudgetMs(env, MAL_RESOLVE_MIN_MS, MAL_RESOLVE_MAX_MS);
 }
 
+export function normalizeGramCinemaToken(raw: string | undefined): string {
+  let token = (raw ?? '').trim();
+  if (token.startsWith('gc_session=')) {
+    token = token.slice('gc_session='.length).trim();
+  }
+  if (token.toLowerCase().startsWith('bearer ')) {
+    token = token.slice(7).trim();
+  }
+  return token;
+}
+
+function gramCinemaTokenFromSettings(raw: string | undefined): string {
+  if (!raw) return '';
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return '';
+    const candidates: unknown[] = [];
+    const nuvio = parsed.nuvio;
+    if (nuvio && typeof nuvio === 'object' && !Array.isArray(nuvio)) {
+      const fjoral = (nuvio as Record<string, unknown>).fjoral;
+      if (fjoral && typeof fjoral === 'object' && !Array.isArray(fjoral)) {
+        candidates.push((fjoral as Record<string, unknown>).cinemaTvToken);
+      }
+    }
+    const fjoral = parsed.fjoral;
+    if (fjoral && typeof fjoral === 'object' && !Array.isArray(fjoral)) {
+      candidates.push((fjoral as Record<string, unknown>).cinemaTvToken);
+    }
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        const token = normalizeGramCinemaToken(candidate);
+        if (token) return token;
+      }
+    }
+  } catch {
+    // ignore malformed settings; the worker will report its own error
+  }
+  return '';
+}
+
+/**
+ * The gateway needs the same GramCinema token as the Nuvio worker to refresh
+ * expiring LinkerX CDN links. `GRAMCINEMA_TOKEN` wins over provider settings.
+ */
+export function resolveGramCinemaToken(
+  env: Pick<AppEnv, 'GRAMCINEMA_TOKEN' | 'SCRAPER_SETTINGS_JSON' | 'PROVIDER_SETTINGS_JSON'>,
+): string {
+  const direct = normalizeGramCinemaToken(env.GRAMCINEMA_TOKEN);
+  if (direct) return direct;
+  return (
+    gramCinemaTokenFromSettings(env.SCRAPER_SETTINGS_JSON) ||
+    gramCinemaTokenFromSettings(env.PROVIDER_SETTINGS_JSON)
+  );
+}
+
 export function deriveFleetEnv(
   env: AppEnv,
   fleet: Fleet,
@@ -266,23 +321,15 @@ export function deriveFleetEnv(
         // ignore
       }
     }
-    if (env.GRAMCINEMA_TOKEN) {
-      let rawToken = env.GRAMCINEMA_TOKEN.trim();
-      if (rawToken.startsWith('gc_session=')) {
-        rawToken = rawToken.slice('gc_session='.length).trim();
-      }
-      if (rawToken.toLowerCase().startsWith('bearer ')) {
-        rawToken = rawToken.slice(7).trim();
-      }
-      if (rawToken) {
-        scraperSettings.fjoral = {
-          enable720p: true,
-          enable1080p: true,
-          enable2160p: true,
-          ...(scraperSettings.fjoral || {}),
-          cinemaTvToken: rawToken,
-        };
-      }
+    const gramCinemaToken = resolveGramCinemaToken(env);
+    if (gramCinemaToken) {
+      scraperSettings.fjoral = {
+        enable720p: true,
+        enable1080p: true,
+        enable2160p: true,
+        ...(scraperSettings.fjoral || {}),
+        cinemaTvToken: gramCinemaToken,
+      };
     }
     if (Object.keys(scraperSettings).length > 0) {
       outEnv.SCRAPER_SETTINGS_JSON = JSON.stringify(scraperSettings);

@@ -206,3 +206,17 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Env/docs:** added `MANIFEST_PROXY_SECRET` / `MANIFEST_PROXY_TOKEN_TTL_MS` (6h default) to `.env.example`, `config/defaults.env`, and `scripts/apply-env.mjs`. Updated `architecture.md`, `docs/provider-policy-simplification.md`, `manifest-proxy-plan.md`, and `known-issues.md` (sun2 cross-host Referer remains unverified).
 - **Hardening:** IPv6 SSRF checks cover IPv4-mapped/compatible hex forms and multicast; the manifest proxy rejects disabled entries immediately and re-validates redirects. Vega health state ignores upstream-disabled/policy-denied providers so they do not show as pending.
 - **Verification:** `npm run policy:check`, `npm run lint`, `npm run typecheck`, and `npm run test:feature` (333 tests) pass. No build, deploy, commit, or push.
+
+## Production stream-link availability check (Nov 26 2026)
+- Queried the Railway gateway (`/stream/movie|series/…`) for 5 titles (Shawshank, Dark Knight, Inception, Oppenheimer, Breaking Bad S1E1): 361 streams returned, 355 unique URLs.
+- Probed each link with HEAD, falling back to `GET Range: bytes=0-0` with the body cancelled immediately (no full downloads), sending provider `proxyHeaders`; retried all 50 failures sequentially to rule out parallel-probe rate-limit artifacts. Result unchanged.
+- Outcome: 305/355 working (86%). 50 dead: 22x 404, 19x 429, 5x 500, 3x 403, 1 network error. Worst providers: Dahmermovies 0/12, Dahmermovies-TV 0/3, Quinox 6/19, MoviesMod 17/22, Rynara 31/37.
+- Saved `stream-link-check.json` (full per-link data) and `stream-link-check.md` (readable report) in the repo root. Scripts live in `/tmp/opencode/`; not committed or deployed.
+
+## GramCinema link refresh (Nov 26 2026)
+- **Symptom:** Fjoral/GramCinema direct links (`cdn*.apranet.eu.org/dl/...?t=...&s=...`) stop working with HTTP 410 "Link Expired - LinkerX CDN"; a user-provided VisionQuest S1E3 link (`t=1795663210`) returned 410 at the origin while Cloudflare's cached copy still returned 206.
+- **Cause:** `t` is the link issue time and LinkerX enforces a short TTL. Fresh production links worked, but stream lists cached by clients can outlive the signature.
+- **Fix:** added `src/addon/gramCinemaRefresh.ts` and `GET/HEAD /proxy/gramcinema/<file-id>.<ext>?t=<HMAC token>`. The gateway rewrites matching `cdn*.apranet.eu.org/dl/<id>/...` URLs after merge, calls `genLink` with the server-side `GRAMCINEMA_TOKEN`, and 302s to a fresh URL. Refresh tokens use the manifest-proxy secret with domain separation and a 7-day TTL; fresh URLs are cached per file for 5 minutes.
+- **Env:** extracted `normalizeGramCinemaToken` / `resolveGramCinemaToken` in `src/core/env.ts`; the gateway and Nuvio worker now share the same `GRAMCINEMA_TOKEN` / settings precedence.
+- **Docs:** updated `architecture.md` and `known-issues.md`.
+- **Verification:** `npm run lint`, `npm run typecheck`, `tests/features/gramCinemaRefresh.test.ts` (9 tests), and `npm run test:feature` (342/342; an earlier full-suite run had the pre-existing `vegaTelemetry` deadline test flake under load, and it passed alone). A background HEAD monitor is still measuring the exact LinkerX TTL (`/tmp/opencode/linkerx-ttl.log`); the link was still 200 at 30 minutes, and a 47-minute-old link returned 410. No build, deploy, commit, or push.

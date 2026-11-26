@@ -9,6 +9,7 @@ import {
   deriveMetadataResolveBudgetMs,
   loadAppEnv,
   deriveFleetEnv,
+  resolveGramCinemaToken,
   type AppEnv,
 } from './core/env.js';
 import { ensureFleetDirs } from './core/fleetBootstrap.js';
@@ -180,6 +181,15 @@ async function main(): Promise<void> {
     });
   }
 
+  const gramCinemaToken = resolveGramCinemaToken(env);
+  const gramCinemaRefresh = gramCinemaToken
+    ? {
+        token: gramCinemaToken,
+        secret: manifestProxySecret,
+        cache: new Map<string, { url: string; expiresAt: number }>(),
+      }
+    : undefined;
+
   const remoteSettings = new RemoteSettingsClient({
     endpoint: env.CLOUDFLARE_SETTINGS_ENDPOINT,
     token: env.CLOUDFLARE_SETTINGS_TOKEN,
@@ -235,6 +245,7 @@ async function main(): Promise<void> {
       ttlMs: env.MANIFEST_PROXY_TOKEN_TTL_MS,
       store: manifestProxyStore,
     },
+    gramCinemaRefresh,
     adminSettings: {
       instanceProfile: env.INSTANCE_PROFILE,
       backendTimeoutMs: env.BACKEND_TIMEOUT_MS,

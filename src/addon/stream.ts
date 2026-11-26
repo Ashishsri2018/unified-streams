@@ -7,6 +7,11 @@ import { mergeAndFilterStreams, FleetStreamsInput } from './merge.js';
 import { StremioStream } from './filters.js';
 import { getPublicBaseUrl } from './configure.js';
 import type { ManifestProxyRuntime } from './manifestProxy.js';
+import {
+  GRAMCINEMA_REFRESH_TOKEN_TTL_MS,
+  rewriteGramCinemaStreamUrl,
+  type GramCinemaRefreshRuntime,
+} from './gramCinemaRefresh.js';
 import { logger } from '../core/logger.js';
 import type { WorkerSnapshot } from '../core/telemetry.js';
 import type { MetadataResolver } from '../core/metadata.js';
@@ -46,6 +51,7 @@ export interface StreamHandlerContext {
   remoteSettings?: RemoteSettingsClient;
   adminSettings?: AdminRuntimeSettings;
   manifestProxy?: ManifestProxyRuntime;
+  gramCinemaRefresh?: GramCinemaRefreshRuntime;
 }
 
 function sanitizeRequestId(value: unknown): string {
@@ -172,12 +178,15 @@ export async function handleStreamRoute(
       ? `tmdb:${forwardedMeta.tmdbId}${idSuffix}`
       : rawId;
   const policyVersion = ctx.getPolicyVersion?.() ?? ctx.policyVersion;
-  const proxyBaseUrl = ctx.manifestProxy
-    ? getPublicBaseUrl(req, ctx.publicBaseUrl)
-    : undefined;
+  const proxyBaseUrl =
+    ctx.manifestProxy || ctx.gramCinemaRefresh
+      ? getPublicBaseUrl(req, ctx.publicBaseUrl)
+      : undefined;
   const proxyCachePart = ctx.manifestProxy
     ? `:${proxyBaseUrl}:${ctx.manifestProxy.store.getVersion()}`
-    : '';
+    : ctx.gramCinemaRefresh
+      ? `:${proxyBaseUrl}:gc`
+      : '';
   const cacheKey = `${rawConfig}:${rawType}:${canonicalId}:${policyVersion}:${ctx.addonVersion}${proxyCachePart}`;
 
   try {
@@ -217,10 +226,22 @@ export async function handleStreamRoute(
             }
           : undefined,
       );
+      const gramCinemaRefresh = ctx.gramCinemaRefresh;
+      const streams =
+        gramCinemaRefresh && proxyBaseUrl
+          ? merged.map((stream) =>
+              rewriteGramCinemaStreamUrl(stream, {
+                baseUrl: proxyBaseUrl,
+                secret: gramCinemaRefresh.secret,
+                ttlMs: GRAMCINEMA_REFRESH_TOKEN_TTL_MS,
+                now: gramCinemaRefresh.now?.(),
+              }),
+            )
+          : merged;
 
       return {
-        value: { streams: merged },
-        isPartial: isAnyPartial && merged.length > 0,
+        value: { streams },
+        isPartial: isAnyPartial && streams.length > 0,
       };
     });
 

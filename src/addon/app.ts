@@ -7,6 +7,7 @@ import { handleProvidersPage } from './providers.js';
 import { createAdminRouter } from './admin.js';
 import { handleConfigure, getPublicBaseUrl } from './configure.js';
 import { handleManifestProxyRoute } from './manifestProxy.js';
+import { handleGramCinemaRefreshRoute } from './gramCinemaRefresh.js';
 import { buildManifest } from './manifest.js';
 import { handleLogoPng, handleLogoSvg, handleFavicon } from './logo.js';
 import { logger } from '../core/logger.js';
@@ -94,6 +95,17 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
     );
     app.get('/proxy/manifest', proxyRoute);
     app.head('/proxy/manifest', proxyRoute);
+  }
+
+  // GramCinema/LinkerX CDN links are short-lived. This route re-signs the
+  // requested file on demand and redirects to the fresh CDN URL.
+  const gramCinemaRefresh = ctx.gramCinemaRefresh;
+  if (gramCinemaRefresh) {
+    const refreshRoute = asyncRoute((req, res) =>
+      handleGramCinemaRefreshRoute(req, res, gramCinemaRefresh),
+    );
+    app.get(['/proxy/gramcinema', '/proxy/gramcinema/:file'], refreshRoute);
+    app.head(['/proxy/gramcinema', '/proxy/gramcinema/:file'], refreshRoute);
   }
 
   // Stream routes

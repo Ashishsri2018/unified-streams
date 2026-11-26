@@ -132,6 +132,21 @@ Caveats:
 
 Status: manifest-only proxy implemented; live sun2 validation pending.
 
+### GramCinema/LinkerX CDN links expire quickly (2026-11-26)
+
+`genLink` returns `https://cdn*.apranet.eu.org/dl/<file-id>/...?t=<issue-time>&s=<signature>` URLs. The `t` value is the issue time, not a long-lived expiry; uncached requests return **HTTP 410 Gone** ("Link Expired - LinkerX CDN") after a short TTL (observed under one hour; Cloudflare-cached copies can still answer 200 after that). Clients that cache stream lists can therefore hold dead links even though the addon fetched them successfully.
+
+Mitigation: when `GRAMCINEMA_TOKEN` is configured, the gateway rewrites matching `cdn*.apranet.eu.org/dl/...` stream URLs to `GET/HEAD /proxy/gramcinema/<file-id>.<ext>?t=<HMAC token>`. The route calls `genLink` again with the server-side token and returns a 302 to a fresh CDN URL. Tokens live for 7 days and are domain-separated from manifest proxy tokens; fresh URLs are cached in-process for 5 minutes per file id. Without `GRAMCINEMA_TOKEN` the direct links are left unchanged.
+
+Caveats:
+
+- `genLink` calls count against the GramCinema account's daily limit; the provider already spends one call per returned file per stream query.
+- The 302 depends on the player following redirects and preserving Range headers.
+- The proxy cannot refresh after the GramCinema token itself expires; streams must be queried again.
+- Multiple replicas need a shared `MANIFEST_PROXY_SECRET` (same as the manifest proxy), otherwise refresh tokens only verify on the instance that issued them.
+
+Status: implemented; live validation pending.
+
 ## Gateway filtering and deduplication
 
 ### Absolute episode numbering for long-running anime (2026-11-22)
