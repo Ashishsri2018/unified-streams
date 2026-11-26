@@ -228,3 +228,12 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Testability:** `LoadScraperOptions.fetchImpl` and `createProviderFetch` now accept an optional fetch implementation/interceptor; added loader, interceptor, and lazy-placeholder rewrite tests.
 - **Docs:** updated `known-issues.md` with the 100/day quota and the remaining 302/ISP caveat.
 - **Verification:** `npm run lint`, `npm run typecheck`, and `npm run test:feature` (346/346) pass. Not built, deployed, committed, or pushed.
+
+## Dual-gateway comparison: Railway vs Beamup (Nov 26 2026)
+- Queried both public gateways (Railway production, Beamup Docker) for the same 6 titles: 872 streams / 829 unique URLs total. Manifests are identical apart from the logo; provider sets differ by profile as configured.
+- Railway: 65/64/83/88/85/146 streams, 21-34s per query, 513 unique URLs. Beamup: 52/53/84/71/63/18 streams, 8-12s per query, 336 unique URLs. Only 30 URLs overlap.
+- Beamup `/health`: 46 providers, 11 half-open circuits (HTTP 401/429/403), `deadlineHits: 14/14` because `BACKEND_TIMEOUT_MS=12000` / `GLOBAL_DEADLINE_MS=13000`; many providers respond 200 with zero streams. Railway health showed 64 providers and 0 open circuits.
+- Ranged-GET link probe with provider `proxyHeaders`: Railway 438/531 (82.5%), Beamup 259/341 (76.0%). HEAD alone misses 45-49 working links (403/405 on HEAD but 206 on ranged GET), so any future health check must use GET with `Range: bytes=0-0`.
+- Definite defect: 30 URLs contain unencoded spaces (22x Beamup 4khdHub, 6x Railway MoviezWap, 2x Beamup Movies4U) and strict clients reject them. Percent-encoding them recovers 15 links (10 Beamup, 5 Railway).
+- Persistent failures (retry unchanged): 429 x26 and 500 x6 on Railway; 403 x12 NetMirror on Beamup ignore Referer/UA changes; 404 clusters are `asrmo/wetki` (Railway 25) and `gpdl.rohitkiskk.workers.dev` (Beamup 31). Worst Railway providers: Dahmermovies 0/15, CNCVerse Bridge 0/6, MoviezWap 0/6, Quinox 12/29.
+- Findings only; no code, config, or deployment changes were made. Raw data in `/tmp/opencode/our_{addons,probe}.json`.
