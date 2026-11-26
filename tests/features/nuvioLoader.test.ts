@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { loadScraper } from '../../src/fleets/nuvio/nuvio/loader.js';
 import type { NuvioScraperEntry } from '../../src/fleets/nuvio/types.js';
 
@@ -70,5 +70,37 @@ describe('nuvio scraper loading', () => {
     expect(await loaded.getStreams(1, 'movie')).toEqual([
       { name: 'false:override', url: 'http://example.com/v' },
     ]);
+  });
+
+  it('defers GramCinema genLink calls until playback', async () => {
+    const fileId = 'AgADrwsAAsZloEc';
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('genLink should not run while listing streams');
+    });
+    const gramCinemaCode = `
+      async function getStreams() {
+        const res = await fetch('https://tga-hd.api.hashhackers.com/genLink?type=mix_media&id=${fileId}');
+        const data = await res.json();
+        return [{ name: 'GramCinema', url: data.url }];
+      }
+      module.exports = { getStreams };
+    `;
+
+    const loaded = await loadScraper({
+      entry: { ...entry, id: 'fjoral', name: 'GramCinema' },
+      code: gramCinemaCode,
+      tmdbApiKey: null,
+      envSettings: {},
+      fetchTimeoutMs: 1000,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(await loaded.getStreams(1, 'tv', 1, 3)).toEqual([
+      {
+        name: 'GramCinema',
+        url: `https://cdn1.apranet.eu.org/dl/${fileId}/lazy.mkv`,
+      },
+    ]);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

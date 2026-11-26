@@ -5,6 +5,7 @@ import type { LoadedScraper, LoggerLike, NuvioScraperEntry } from "../types.js";
 import type { NetworkTracker } from "../../../core/networkClassifier.js";
 import { withTimeout } from "../util/concurrency.js";
 import { nativeFetch } from "../util/nativeFetch.js";
+import { gramCinemaLazyFetch } from "./gramCinemaLazy.js";
 
 const ON_SETTINGS_TIMEOUT_MS = 3000;
 
@@ -23,7 +24,13 @@ export interface LoadScraperOptions {
   tmdbApiKey: string | null;
   envSettings: Record<string, unknown>;
   fetchTimeoutMs: number;
+  fetchImpl?: typeof fetch;
 }
+
+export type ProviderFetchInterceptor = (
+  input: Parameters<typeof fetch>[0],
+  init?: Parameters<typeof fetch>[1],
+) => Response | null;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -157,8 +164,12 @@ export function guardProviderResponse(
 export function createProviderFetch(
   timeoutMs: number,
   fetchImpl: typeof fetch = nativeFetch,
+  intercept?: ProviderFetchInterceptor,
 ): typeof fetch {
   return (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const intercepted = intercept?.(input, init);
+    if (intercepted) return intercepted;
+
     const context = scraperNetworkStorage.getStore();
     const tracker = context?.tracker;
     const startedAt = Date.now();
@@ -233,6 +244,8 @@ function evaluateModule(options: {
   tmdbApiKey: string | null;
   fetchTimeoutMs: number;
   filename: string;
+  providerId: string;
+  fetchImpl: typeof fetch;
 }): EvaluatedModule {
   const moduleObject: { exports: Record<string, unknown> } = { exports: {} };
   const fn = new Function(
@@ -247,11 +260,13 @@ function evaluateModule(options: {
     `"use strict";\n${options.code}`,
   ) as (...args: unknown[]) => void;
 
+  const intercept =
+    options.providerId.toLowerCase() === "fjoral" ? gramCinemaLazyFetch : undefined;
   fn(
     moduleObject,
     moduleObject.exports,
     providerRequire,
-    createProviderFetch(options.fetchTimeoutMs),
+    createProviderFetch(options.fetchTimeoutMs, options.fetchImpl, intercept),
     options.tmdbApiKey ?? undefined,
     options.settings,
     options.filename,
@@ -295,6 +310,8 @@ export async function loadScraper(options: LoadScraperOptions): Promise<LoadedSc
     tmdbApiKey: options.tmdbApiKey,
     fetchTimeoutMs: options.fetchTimeoutMs,
     filename: options.entry.filename,
+    providerId: options.entry.id,
+    fetchImpl: options.fetchImpl ?? nativeFetch,
   };
 
   const evaluated = evaluateModule({ ...base, settings });

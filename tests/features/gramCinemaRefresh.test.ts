@@ -108,6 +108,23 @@ describe('GramCinema refresh tokens and URLs', () => {
     expect(rewriteGramCinemaStreamUrl(external, { baseUrl: BASE, secret: SECRET })).toBe(external);
   });
 
+  it('rewrites lazy GramCinema placeholders to proxy URLs', () => {
+    const lazy: StremioStream = {
+      name: 'Fjoral.',
+      url: `https://cdn1.apranet.eu.org/dl/${FILE_ID}/lazy.mkv`,
+    };
+    const rewritten = rewriteGramCinemaStreamUrl(lazy, {
+      baseUrl: BASE,
+      secret: SECRET,
+      now: 1_700_000_000_000,
+    });
+    expect(rewritten.url).toMatch(
+      new RegExp(`^https://gateway\\.example/proxy/gramcinema/${FILE_ID}\\.mkv\\?t=`),
+    );
+    const token = new URL(rewritten.url ?? '').searchParams.get('t') ?? '';
+    expect(verifyGramCinemaRefreshToken(token, SECRET, 1_700_000_000_000)?.fileId).toBe(FILE_ID);
+  });
+
   it('normalizes tokens from env and provider settings', () => {
     expect(normalizeGramCinemaToken('gc_session=abc')).toBe('abc');
     expect(normalizeGramCinemaToken('Bearer abc')).toBe('abc');

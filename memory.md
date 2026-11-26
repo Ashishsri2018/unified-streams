@@ -220,3 +220,11 @@ Chronological summary of sessions and outcomes. Full technical detail lives in t
 - **Env:** extracted `normalizeGramCinemaToken` / `resolveGramCinemaToken` in `src/core/env.ts`; the gateway and Nuvio worker now share the same `GRAMCINEMA_TOKEN` / settings precedence.
 - **Docs:** updated `architecture.md` and `known-issues.md`.
 - **Verification:** `npm run lint`, `npm run typecheck`, `tests/features/gramCinemaRefresh.test.ts` (9 tests), and `npm run test:feature` (342/342; an earlier full-suite run had the pre-existing `vegaTelemetry` deadline test flake under load, and it passed alone). A background HEAD monitor is still measuring the exact LinkerX TTL (`/tmp/opencode/linkerx-ttl.log`); the link was still 200 at 30 minutes, and a 47-minute-old link returned 410. No build, deploy, commit, or push.
+
+## GramCinema daily genLink quota (Nov 26 2026)
+- **Symptom:** Nuvio showed the GramCinema stream but playback timed out. Retesting the deployed `/proxy/gramcinema/...` links returned `502 {"error":"upstream failed"}` in ~0.4s; a fresh stream query returned 0 GramCinema links. `/health` showed the Nuvio `fjoral` provider at `lastError: HTTP 429`.
+- **Cause:** direct call to `https://tga-hd.api.hashhackers.com/genLink?type=mix_media&id=...` with the account token returned HTTP 429 `Daily link limit reached (100/day). Try again tomorrow.` The provider spends up to 6 `genLink` calls per stream query, so repeated queries exhausted the 100/day account quota; the refresh route then had no quota left for playback.
+- **Fix:** added `src/fleets/nuvio/nuvio/gramCinemaLazy.ts` and wired it into `loadScraper` for the `fjoral` provider. List-time `genLink` calls now return a synthetic `https://cdn1.apranet.eu.org/dl/<file-id>/lazy.mkv` URL without network access; the gateway's existing GramCinema rewrite turns that into `/proxy/gramcinema/<file-id>.<ext>?t=...`, so `genLink` runs only on playback.
+- **Testability:** `LoadScraperOptions.fetchImpl` and `createProviderFetch` now accept an optional fetch implementation/interceptor; added loader, interceptor, and lazy-placeholder rewrite tests.
+- **Docs:** updated `known-issues.md` with the 100/day quota and the remaining 302/ISP caveat.
+- **Verification:** `npm run lint`, `npm run typecheck`, and `npm run test:feature` (346/346) pass. Not built, deployed, committed, or pushed.

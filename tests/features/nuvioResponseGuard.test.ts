@@ -6,6 +6,7 @@ import {
   MAX_PROVIDER_RESPONSE_BYTES,
   scraperNetworkStorage,
 } from '../../src/fleets/nuvio/nuvio/loader.js';
+import { gramCinemaLazyFetch } from '../../src/fleets/nuvio/nuvio/gramCinemaLazy.js';
 
 function makeResponse(
   url: string,
@@ -136,5 +137,39 @@ describe('Nuvio provider response guard', () => {
 
   it('uses a 16 MiB safety ceiling', () => {
     expect(MAX_PROVIDER_RESPONSE_BYTES).toBe(16 * 1024 * 1024);
+  });
+
+  it('intercepts GramCinema genLink calls with a synthetic URL', async () => {
+    const fileId = 'AgADrwsAAsZloEc';
+    const fakeFetch = vi.fn();
+    const providerFetch = createProviderFetch(
+      5000,
+      fakeFetch as unknown as typeof fetch,
+      gramCinemaLazyFetch,
+    );
+
+    const response = await providerFetch(
+      `https://tga-hd.api.hashhackers.com/genLink?type=mix_media&id=${fileId}`,
+    );
+
+    expect(await response.json()).toEqual({
+      success: true,
+      url: `https://cdn1.apranet.eu.org/dl/${fileId}/lazy.mkv`,
+    });
+    expect(fakeFetch).not.toHaveBeenCalled();
+  });
+
+  it('leaves non-GramCinema requests to the network', async () => {
+    const fakeFetch = vi.fn(async () => new Response('ok'));
+    const providerFetch = createProviderFetch(
+      5000,
+      fakeFetch as unknown as typeof fetch,
+      gramCinemaLazyFetch,
+    );
+
+    const response = await providerFetch('https://example.test/genLink?type=mix_media&id=abc');
+
+    expect(await response.text()).toBe('ok');
+    expect(fakeFetch).toHaveBeenCalledTimes(1);
   });
 });

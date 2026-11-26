@@ -138,14 +138,16 @@ Status: manifest-only proxy implemented; live sun2 validation pending.
 
 Mitigation: when `GRAMCINEMA_TOKEN` is configured, the gateway rewrites matching `cdn*.apranet.eu.org/dl/...` stream URLs to `GET/HEAD /proxy/gramcinema/<file-id>.<ext>?t=<HMAC token>`. The route calls `genLink` again with the server-side token and returns a 302 to a fresh CDN URL. Tokens live for 7 days and are domain-separated from manifest proxy tokens; fresh URLs are cached in-process for 5 minutes per file id. Without `GRAMCINEMA_TOKEN` the direct links are left unchanged.
 
+The Nuvio loader also intercepts GramCinema's list-time `genLink` calls and returns a synthetic `cdn1.apranet.eu.org/dl/<file-id>/lazy.mkv` URL. The gateway rewrites that placeholder to the proxy route, so `genLink` runs only when the user plays a link instead of once per file per stream query.
+
 Caveats:
 
-- `genLink` calls count against the GramCinema account's daily limit; the provider already spends one call per returned file per stream query.
-- The 302 depends on the player following redirects and preserving Range headers.
+- `genLink` is limited to **100 calls/day per GramCinema account**. The provider used to spend up to 6 calls per stream query; the lazy-link interceptor removes that cost, but each playback still spends one call (reused for 5 minutes per file id). Once the limit is hit, `genLink` returns HTTP 429 `Daily link limit reached (100/day)` and the proxy route returns 502 until the daily reset.
+- The 302 depends on the player following redirects and preserving Range headers. The gateway does not proxy media bytes, so the player must be able to reach `cdn*.apranet.eu.org`; an ISP/region block on that host will still fail even when the gateway can refresh the link.
 - The proxy cannot refresh after the GramCinema token itself expires; streams must be queried again.
 - Multiple replicas need a shared `MANIFEST_PROXY_SECRET` (same as the manifest proxy), otherwise refresh tokens only verify on the instance that issued them.
 
-Status: implemented; live validation pending.
+Status: implemented; live validation pending. The 100/day quota was exhausted during 2026-11-26 testing, so fresh playback validation must wait for the daily reset or use another GramCinema account.
 
 ## Gateway filtering and deduplication
 
