@@ -30,7 +30,7 @@ describe('SA7 missing provider warning', () => {
     config.apply({
       PROVIDER_MANIFEST: path.join(root, 'manifest.json'),
       PROVIDER_DIR: path.join(root, 'providers'),
-      DISABLED_PROVIDERS: 'sylphera',
+      PROVIDER_POLICY_JSON: JSON.stringify({ disabled: ['sylphera'] }),
     });
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

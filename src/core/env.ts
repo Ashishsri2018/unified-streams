@@ -1,8 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import {
+  buildProviderPolicyPayload,
+  loadProviderPolicy,
+  resolvePolicyProfileName,
+  type FleetName,
+} from './providerPolicy.js';
 
-type Fleet = 'sa7' | 'nuvio' | 'vega';
+type Fleet = FleetName;
 
 export const DEFAULT_ANIMEAPI_URL = 'https://animeapi.my.id';
 export const DEFAULT_KITSU_URL = 'https://kitsu.io/api/edge';
@@ -65,12 +71,6 @@ export const EnvSchema = z.object({
   FEBBOX_UI_COOKIE: z.string().optional(),
   GRAMCINEMA_TOKEN: z.string().optional(),
   KARTOONS_TOKEN: z.string().optional(),
-  SA7_ENABLED_PROVIDERS: z.string().optional(),
-  SA7_DISABLED_PROVIDERS: z.string().optional(),
-  NUVIO_ENABLED_SCRAPERS: z.string().optional(),
-  NUVIO_DISABLED_SCRAPERS: z.string().optional(),
-  VEGA_ENABLED_PROVIDERS: z.string().optional(),
-  VEGA_DISABLED_PROVIDERS: z.string().optional(),
   COOKIES_FILE: z.string().optional(),
   GITHUB_TOKEN: z.string().optional(),
   INTERNAL_TOKEN: z.string().optional(),
@@ -78,6 +78,8 @@ export const EnvSchema = z.object({
   CLOUDFLARE_LOG_TOKEN: z.string().optional(),
   CLOUDFLARE_SETTINGS_ENDPOINT: OptionalUrl,
   CLOUDFLARE_SETTINGS_TOKEN: z.string().optional(),
+  MANIFEST_PROXY_SECRET: z.string().optional(),
+  MANIFEST_PROXY_TOKEN_TTL_MS: z.coerce.number().int().min(60000).default(21600000),
   ADDON_VERSION: z.string().default('1.0.0'),
   GIT_COMMIT: z.string().default('development'),
 });
@@ -146,158 +148,6 @@ export function deriveMalResolveBudgetMs(env: AppEnv): number {
   return deriveResolveBudgetMs(env, MAL_RESOLVE_MIN_MS, MAL_RESOLVE_MAX_MS);
 }
 
-// These classes are disabled for every fleet and every instance regardless of
-// the selected provider policy. Only an explicit policy change to this list
-// can re-enable them.
-export const HARD_DISABLED_PROVIDERS = [
-  'torrentio',
-  'internetarchive',
-  'youtube',
-  'brellor',
-  'durbinlive',
-  'livetgtv',
-  'bdix-cf',
-  'bdix-df',
-  'bdix-fh',
-  'jyniq',
-  'mxplayer',
-];
-
-export interface FleetPolicy {
-  mode: 'allow' | 'deny';
-  ids: string[];
-}
-
-interface PolicyFile {
-  sa7?: FleetPolicy;
-  nuvio?: FleetPolicy;
-  vega?: FleetPolicy;
-  instances?: Record<string, Partial<Record<Fleet, FleetPolicy>>>;
-}
-
-interface EffectivePolicy {
-  enabled: string[] | null;
-  disabled: string[];
-}
-
-function cleanEnvList(raw?: string): string[] {
-  if (!raw) return [];
-  return raw
-    .replace(/^['"]|['"]$/g, '')
-    .split(',')
-    .map((s) => s.replace(/['"]/g, '').trim())
-    .filter(Boolean);
-}
-
-function dedupeList(values: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const raw of values) {
-    const value = raw.trim();
-    if (!value) continue;
-    const key = value === '*' ? '*' : value.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(value);
-  }
-  return result;
-}
-
-function loadPolicyFile(): PolicyFile {
-  const policyPath = path.resolve(process.cwd(), 'config', 'providers.json');
-  if (!fs.existsSync(policyPath)) return {};
-  try {
-    return JSON.parse(fs.readFileSync(policyPath, 'utf-8')) as PolicyFile;
-  } catch {
-    return {};
-  }
-}
-
-function resolveFleetPolicy(policy: PolicyFile, profile: string, fleet: Fleet): FleetPolicy {
-  const instancePolicy = policy.instances?.[profile]?.[fleet];
-  if (
-    instancePolicy &&
-    (instancePolicy.mode === 'allow' || instancePolicy.mode === 'deny') &&
-    Array.isArray(instancePolicy.ids)
-  ) {
-    return instancePolicy;
-  }
-  const base = policy[fleet];
-  if (base && (base.mode === 'allow' || base.mode === 'deny') && Array.isArray(base.ids)) {
-    return base;
-  }
-  return { mode: 'deny', ids: [] };
-}
-
-function resolveEffectivePolicy(
-  base: FleetPolicy,
-  enabledOverride: string[],
-  disabledOverride: string[],
-): EffectivePolicy {
-  const hardDisabled = HARD_DISABLED_PROVIDERS;
-  const disableSet = new Set(disabledOverride.map((id) => id.toLowerCase()));
-
-  if (base.mode === 'allow' || enabledOverride.length > 0) {
-    if (enabledOverride.includes('*')) {
-      return {
-        enabled: null,
-        disabled: dedupeList([...hardDisabled, ...disabledOverride]),
-      };
-    }
-    const allowed = enabledOverride.length > 0 ? enabledOverride : base.ids;
-    const enabled = dedupeList(
-      allowed.filter((id) => {
-        if (id === '*') return false;
-        const lower = id.toLowerCase();
-        return !hardDisabled.includes(lower) && !disableSet.has(lower);
-      }),
-    );
-    const disabled = dedupeList([...hardDisabled, ...disabledOverride, ...(enabled.length === 0 ? ['*'] : [])]);
-    return { enabled, disabled };
-  }
-
-  return {
-    enabled: null,
-    disabled: dedupeList([...base.ids, ...hardDisabled, ...disabledOverride]),
-  };
-}
-
-function applyPolicyEnv(
-  outEnv: Record<string, string>,
-  prefix: 'SA7' | 'NUVIO' | 'VEGA',
-  enabledVar: 'ENABLED_PROVIDERS' | 'ENABLED_SCRAPERS',
-  disabledVar: 'DISABLED_PROVIDERS' | 'DISABLED_SCRAPERS',
-  policy: EffectivePolicy,
-  options: { lowercase: boolean },
-): void {
-  const normalize = (value: string) => (options.lowercase ? value.toLowerCase() : value);
-  const disabled = dedupeList(policy.disabled.map(normalize));
-  if (disabled.length > 0) {
-    const list = disabled.join(',');
-    outEnv[disabledVar] = list;
-    outEnv[`${prefix}_${disabledVar}`] = list;
-  }
-  if (policy.enabled && policy.enabled.length > 0) {
-    const list = dedupeList(policy.enabled.map(normalize)).join(',');
-    outEnv[enabledVar] = list;
-    outEnv[`${prefix}_${enabledVar}`] = list;
-  }
-}
-
-function aliasVegaDisabled(list: string[]): string[] {
-  const mapped: string[] = [];
-  for (const item of list) {
-    mapped.push(item);
-    const lower = item.toLowerCase();
-    if (lower === 'rogmovies' || lower === 'rogmovie') {
-      mapped.push('luxMovies');
-    } else if (lower === 'luxmovies') {
-      mapped.push('rogmovies');
-    }
-  }
-  return mapped;
-}
-
 export function deriveFleetEnv(
   env: AppEnv,
   fleet: Fleet,
@@ -325,8 +175,15 @@ export function deriveFleetEnv(
   }
 
   const fleetDataDir = path.join(env.DATA_DIR, fleet);
-  const policy = loadPolicyFile();
-  const basePolicy = resolveFleetPolicy(policy, env.INSTANCE_PROFILE, fleet);
+  const policyConfig = loadProviderPolicy();
+  const profileName = resolvePolicyProfileName(policyConfig, env.INSTANCE_PROFILE);
+  const policyPayload = buildProviderPolicyPayload(
+    policyConfig,
+    profileName,
+    fleet,
+    runtimeOverrides,
+    selectionVersion,
+  );
 
   const outEnv: Record<string, string> = {
     NODE_ENV: 'production',
@@ -346,9 +203,7 @@ export function deriveFleetEnv(
     BREAKER_COOLDOWN_MS: String(env.CIRCUIT_COOLDOWN_MS),
     INTERNAL_TOKEN: env.INTERNAL_TOKEN || '',
     PROVIDER_SETTINGS_JSON: fleetSettings,
-    RUNTIME_OVERRIDES_JSON: JSON.stringify(runtimeOverrides),
-    HARD_DISABLED_PROVIDERS: JSON.stringify(HARD_DISABLED_PROVIDERS),
-    SELECTION_VERSION: String(selectionVersion),
+    PROVIDER_POLICY_JSON: JSON.stringify(policyPayload),
   };
 
   if (env.TMDB_API_KEY) {
@@ -367,14 +222,6 @@ export function deriveFleetEnv(
   }
 
   if (fleet === 'sa7') {
-    const effective = resolveEffectivePolicy(
-      basePolicy,
-      cleanEnvList(env.SA7_ENABLED_PROVIDERS),
-      cleanEnvList(env.SA7_DISABLED_PROVIDERS),
-    );
-    applyPolicyEnv(outEnv, 'SA7', 'ENABLED_PROVIDERS', 'DISABLED_PROVIDERS', effective, {
-      lowercase: true,
-    });
     outEnv.ADDON_DEADLINE_MS = String(workerDeadlineMs);
     outEnv.MAX_PER_PROVIDER_STREAMS = String(env.MAX_STREAMS_PER_PROVIDER);
     outEnv.MAX_TOTAL_STREAMS = String(env.MAX_STREAMS);
@@ -390,14 +237,6 @@ export function deriveFleetEnv(
       outEnv.SA7_SNAPSHOT_FILE = path.join(sa7Root, 'UPSTREAM_COMMIT');
     }
   } else if (fleet === 'nuvio') {
-    const effective = resolveEffectivePolicy(
-      basePolicy,
-      cleanEnvList(env.NUVIO_ENABLED_SCRAPERS),
-      cleanEnvList(env.NUVIO_DISABLED_SCRAPERS),
-    );
-    applyPolicyEnv(outEnv, 'NUVIO', 'ENABLED_SCRAPERS', 'DISABLED_SCRAPERS', effective, {
-      lowercase: true,
-    });
     const distBundled = path.resolve(process.cwd(), 'dist/fleets/nuvio/snapshot');
     const srcBundled = path.resolve(process.cwd(), 'src/fleets/nuvio/snapshot');
     outEnv.NUVIO_BUNDLED_DIR = fs.existsSync(distBundled) ? distBundled : srcBundled;
@@ -449,18 +288,6 @@ export function deriveFleetEnv(
       outEnv.SCRAPER_SETTINGS_JSON = JSON.stringify(scraperSettings);
     }
   } else if (fleet === 'vega') {
-    const vegaBasePolicy: FleetPolicy = {
-      ...basePolicy,
-      ids: aliasVegaDisabled([...basePolicy.ids]),
-    };
-    const effective = resolveEffectivePolicy(
-      vegaBasePolicy,
-      aliasVegaDisabled(cleanEnvList(env.VEGA_ENABLED_PROVIDERS)),
-      aliasVegaDisabled(cleanEnvList(env.VEGA_DISABLED_PROVIDERS)),
-    );
-    applyPolicyEnv(outEnv, 'VEGA', 'ENABLED_PROVIDERS', 'DISABLED_PROVIDERS', effective, {
-      lowercase: false,
-    });
     outEnv.SEARCH_CONCURRENCY = String(env.SEARCH_CONCURRENCY);
     outEnv.SEARCH_TIMEOUT_MS = String(Math.min(env.SEARCH_TIMEOUT_MS, workerDeadlineMs));
     outEnv.META_TIMEOUT_MS = String(Math.min(15000, workerDeadlineMs));

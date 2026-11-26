@@ -73,7 +73,7 @@ Those headers are not enough: Cloudflare requires a `cf_clearance` cookie from a
 solved challenge. Playback needs a WebView/resolver that produces and reuses
 those cookies, or a different source. Status: unresolved.
 
-### Rynara/Vidy signed playlists are IP-bound and return HTTP 403 (2026-11-24)
+### Rynara/Vidy signed manifests are IP-bound; playlist-only proxy (2026-11-25)
 
 Rynara (`rynara`, Vidy, e.g. `moon.goldenkite.top` / `sun2.warmsquare.top`)
 emits HLS URLs with a signed `?s=s1.<epoch>.4.<hash>` token. Fetching such a URL
@@ -91,29 +91,46 @@ from a different local IP, same URL and headers:
 | Local IP | `Referer` + `Origin` + browser UA | 403 |
 | Local IP | `Referer` + `X-Forwarded-For: 152.55.181.249` | 403 |
 
-Two conditions apply: the origin requires `Referer: https://www.vidy.st/`, and
-the `?s=` token is bound to the source IP that requested the sources (the
-Railway worker). It checks the TCP source IP, not `X-Forwarded-For`, so spoofing
-does not help. The player runs on the user's device, whose IP differs from the
-signing IP, so playback fails with 403.
+The origin requires `Referer: https://www.vidy.st/`, and the `?s=` token is bound
+to the source IP that requested the sources (the Railway worker). It checks the
+TCP source IP, not `X-Forwarded-For`, so spoofing does not help. Media segments
+are not IP-bound: moon segments are public CDN URLs, and sun2 segments work only
+with the Vidy Referer.
 
-The Referer does reach the player: the provider attaches `P_HEADERS`
-(`User-Agent`, `Referer: https://www.vidy.st/`, `Origin: https://www.vidy.st`),
-`mapStreams` forwards them as `behaviorHints.proxyHeaders.request`, and the
-gateway preserves them for direct streams. The live response for a Rynara
-stream includes:
+The gateway now rewrites matching stream URLs to `GET/HEAD /proxy/manifest?t=...`
+**after** dedupe/filter/sort. The token is `base64url(JSON({u,e}))` plus an
+HMAC-SHA256 signature over the body, with a 6h TTL. Every request re-checks the
+decoded URL against the current enabled allowlist, so removing or disabling an
+entry rejects old tokens immediately. The route fetches the playlist from the
+Railway egress with the entry's server-side Referer/Origin/UA, rewrites only
+`.m3u8`/`.m3u` child URIs to fresh proxy tokens, and leaves media segments,
+`#EXT-X-MAP` init maps, keys, and parts as absolute upstream URLs. Manifest
+responses are `Cache-Control: no-store` with permissive CORS.
 
-```json
-"proxyHeaders": { "request": { "User-Agent": "Mozilla/5.0 ...", "Referer": "https://www.vidy.st/", "Origin": "https://www.vidy.st" } }
-```
+Defaults are `moon.goldenkite.top` and `sun2.warmsquare.top` with the Vidy
+headers. `/admin` can add, toggle, and remove entries; changes persist to
+`DATA_DIR/manifest-proxy.json` and the existing Cloudflare D1 settings blob
+(`manifestProxy` section). Set a shared `MANIFEST_PROXY_SECRET` on every replica;
+if unset the gateway falls back to `INTERNAL_TOKEN`, then `ADMIN_TOKEN`, then a
+per-process random secret (old proxy URLs stop working after a restart).
 
-So the header requirement is satisfied; the IP binding is the blocker and cannot
-be fixed by header injection at the gateway.
+Caveats:
 
-Options: proxy the playlist and segments through the worker/gateway so media
-requests originate from the signing IP (heavy: bandwidth, no-cache rules,
-possibly multiple Railway egress IPs), or disable `rynara` since it cannot play
-client-side as-is. Status: unresolved.
+- **Sun2 cross-host Referer is unverified.** Nuvio honors
+  `behaviorHints.proxyHeaders` for same-host segments, but after the stream URL
+  is rewritten to the gateway the segment host is still `sun2.warmsquare.top`.
+  If segments 403 in Nuvio, disable the sun2 entry (moon still works) or add the
+  future full media proxy.
+- The proxy cannot refresh an expired upstream signature; the player must request
+  streams again.
+- Railway egress IP rotation could still cause intermittent manifest 403s.
+- SSRF is bounded by https-only entries, public-host checks, redirect
+  allowlisting, 2 MB/8 s caps, and server-side headers only. A DNS TOCTOU window
+  remains between the lookup check and fetch.
+- Multiple replicas reload remote proxy config only at startup, same as provider
+  overrides.
+
+Status: manifest-only proxy implemented; live sun2 validation pending.
 
 ## Gateway filtering and deduplication
 
@@ -368,7 +385,7 @@ Status: accepted; apply the migration and use one writer.
 ## Runtime provider admin limitations (Nov 23 2026)
 
 - **Enablement requires `ADMIN_TOKEN`.** An empty or unset token keeps `/admin*` at 404. The panel is not rate limited per `AGENTS.md`; the token must still be long and random, and the login cookie is an HMAC-derived session (`HttpOnly`, `SameSite=Strict`) rather than the raw token.
-- **Manifest-disabled providers stay disabled.** SA7/Nuvio/Vega treat upstream `enabled: false` as unavailable, so a runtime override cannot load a provider whose manifest entry is disabled.
+- **Upstream-disabled providers require adoption.** SA7/Nuvio/Vega keep upstream `enabled: false` entries in the catalog but do not load them. Add the ID to `adoptUpstreamDisabled` in `config/providers.json` and redeploy; an ordinary admin toggle cannot force-enable a non-adopted provider. `locked`, profile denies, and duplicate allocation still apply after adoption.
 - **Lazy load is best effort.** Enabling a provider loads its bundle from the active snapshot; a load failure is reported in the catalog (`lastError`) and does not fail the toggle. Disabling drops the bundle from the active snapshot but the underlying module cache for that snapshot is only fully released when the snapshot is replaced or the worker restarts.
 - **Gateway fan-out failures still return HTTP 200 with empty streams.** Admin catalog/selection endpoints can return 502/503 when a worker or its catalog is unavailable.
 - **Timeouts remain deploy-time.** The panel shows the effective values but does not change them. Runtime timeout edits would need the same versioned push/persist flow plus bounded Zod validation.

@@ -154,6 +154,8 @@ export interface AppConfig {
   enabledScrapers: string[];
   disabledScrapers: string[];
   runtimeOverrides: Record<string, boolean>;
+  hardDisabledProviders: string[];
+  adoptUpstreamDisabled: string[];
   selectionVersion: number;
   proxyEnabled: boolean;
   cinemetaUrl: string;

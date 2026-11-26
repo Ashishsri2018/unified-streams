@@ -1,7 +1,8 @@
 # Manifest-Only Proxy Plan (local planning doc, gitignored)
 
-Status: planning only. Nothing in this document is implemented yet.
-Last updated: 2026-11-24
+Status: implemented (manifest-only, 2026-11-25). Live sun2 cross-host Referer
+validation is still pending; see section 6.
+Last updated: 2026-11-25
 
 ## 1. Why
 

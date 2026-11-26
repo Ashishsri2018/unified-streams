@@ -8,7 +8,6 @@ import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { applyForwardedImdb, parseStreamId } from './addon/parseId.js';
 import { isProviderEnabledWithOverrides } from '../../core/policy.js';
-import { HARD_DISABLED_PROVIDERS } from '../../core/env.js';
 import { ProviderSelectionController } from './providers/selection.js';
 import { sendJson, type FleetInstance } from '../../core/internalServer.js';
 import type { StremioStream } from './types.js';
@@ -133,7 +132,7 @@ export async function createVegaHandlers(fleetEnv: NodeJS.ProcessEnv): Promise<F
         bundle.entry.value,
         { enabled: config.enabledProviders, disabled: config.disabledProviders },
         config.runtimeOverrides,
-        HARD_DISABLED_PROVIDERS,
+        config.hardDisabledProviders,
       ),
     );
 

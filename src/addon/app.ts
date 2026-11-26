@@ -6,6 +6,7 @@ import { handleStatusPage } from './status.js';
 import { handleProvidersPage } from './providers.js';
 import { createAdminRouter } from './admin.js';
 import { handleConfigure, getPublicBaseUrl } from './configure.js';
+import { handleManifestProxyRoute } from './manifestProxy.js';
 import { buildManifest } from './manifest.js';
 import { handleLogoPng, handleLogoSvg, handleFavicon } from './logo.js';
 import { logger } from '../core/logger.js';
@@ -79,6 +80,21 @@ export function createGatewayApp(ctx: StreamHandlerContext, startedAt: number): 
   // Configure routes
   app.get(['/configure', '/:config/configure'], (req, res) => handleConfigure(req, res, ctx.publicBaseUrl));
   app.head(['/configure', '/:config/configure'], (req, res) => handleConfigure(req, res, ctx.publicBaseUrl));
+
+  // Manifest-only HLS proxy. Media segments stay on the upstream CDN.
+  const manifestProxy = ctx.manifestProxy;
+  if (manifestProxy) {
+    const proxyRoute = asyncRoute((req, res) =>
+      handleManifestProxyRoute(
+        req,
+        res,
+        manifestProxy,
+        getPublicBaseUrl(req, ctx.publicBaseUrl),
+      ),
+    );
+    app.get('/proxy/manifest', proxyRoute);
+    app.head('/proxy/manifest', proxyRoute);
+  }
 
   // Stream routes
   const streamRoute = asyncRoute((req, res) => handleStreamRoute(req, res, ctx));

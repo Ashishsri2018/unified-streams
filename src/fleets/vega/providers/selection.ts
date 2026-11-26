@@ -1,10 +1,10 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { HARD_DISABLED_PROVIDERS } from "../../../core/env.js";
 import {
   isProviderEnabledWithOverrides,
   normalizeProviderOverrides,
 } from "../../../core/policy.js";
+import { isAdoptedUpstreamDisabled } from "../../../core/providerPolicy.js";
 import type { ProviderCatalogResponse } from "../../../core/contract.js";
 import type { AppConfig } from "../config.js";
 import type {
@@ -15,8 +15,6 @@ import type {
 } from "../types.js";
 import { loadProviderBundle } from "./loader.js";
 import { parseManifest } from "./updater.js";
-
-const HARD_DISABLED = new Set(HARD_DISABLED_PROVIDERS.map((id) => id.toLowerCase()));
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -43,8 +41,18 @@ export class ProviderSelectionController {
         disabled: this.config.disabledProviders,
       },
       this.config.runtimeOverrides,
-      HARD_DISABLED_PROVIDERS,
+      this.config.hardDisabledProviders,
     );
+  }
+
+  private isAdopted(id: string): boolean {
+    return isAdoptedUpstreamDisabled(id, {
+      adoptUpstreamDisabled: this.config.adoptUpstreamDisabled,
+    });
+  }
+
+  private isActive(entry: UpstreamProviderEntry): boolean {
+    return (!entry.disabled || this.isAdopted(entry.value)) && this.isEnabled(entry.value);
   }
 
   getCatalog(snapshot: ProviderSnapshot | null): ProviderCatalogResponse {
@@ -60,9 +68,13 @@ export class ProviderSelectionController {
         id: entry.value,
         name: entry.display_name || entry.value,
         types: entry.type ? [entry.type] : ["movie", "tv"],
-        enabled: this.isEnabled(entry.value),
+        enabled: this.isActive(entry),
+        upstreamEnabled: !entry.disabled,
+        adopted: this.isAdopted(entry.value),
         loaded: loaded.has(key),
-        locked: HARD_DISABLED.has(key),
+        locked: this.config.hardDisabledProviders.some(
+          (id) => id.toLowerCase() === key,
+        ),
         missing: false,
         lastError: this.loadErrors.get(key) ?? null,
         version: entry.version || "",
@@ -80,8 +92,12 @@ export class ProviderSelectionController {
         name: rawId,
         types: ["movie", "tv"],
         enabled: false,
+        upstreamEnabled: false,
+        adopted: false,
         loaded: false,
-        locked: HARD_DISABLED.has(key),
+        locked: this.config.hardDisabledProviders.some(
+          (id) => id.toLowerCase() === key,
+        ),
         missing: true,
         lastError: "provider not present in snapshot",
         version: "",
@@ -94,6 +110,7 @@ export class ProviderSelectionController {
       fleet: "vega",
       version: this.config.selectionVersion,
       providers,
+      reconciliation: snapshot?.reconciliation,
     };
   }
 
@@ -106,7 +123,7 @@ export class ProviderSelectionController {
     this.config.selectionVersion = version;
 
     const entries = snapshot.entries ?? (await this.readEntries(snapshot.rootDir));
-    const desired = entries.filter((entry) => this.isEnabled(entry.value));
+    const desired = entries.filter((entry) => this.isActive(entry));
     const bundles = new Map<string, ProviderBundle>();
 
     for (const entry of desired) {

@@ -1,102 +1,137 @@
 {
-  "sa7": {
-    "mode": "deny",
-    "ids": [
-      "moviesdrive",
-      "4khdhub",
-      "vegamovies",
-      "moviebox",
-      "moviesmod",
-      "torrentio",
-      "reanime",
-      "animeworld",
-      "anikage",
-      "vidrock"
-    ]
+  "defaultProfile": "railway",
+  "duplicatePriority": ["nuvio", "vega", "sa7"],
+  "locked": [
+    "torrentio",
+    "internetArchive",
+    "youtube",
+    "brellor",
+    "durbinLive",
+    "liveTgTv",
+    "bdix-cf",
+    "bdix-df",
+    "bdix-fh",
+    "jyniq",
+    "mxplayer"
+  ],
+  "adoptUpstreamDisabled": [],
+  "duplicates": {
+    "4khdhub": {
+      "nuvio": ["hexion"],
+      "vega": ["4khdhub"],
+      "sa7": ["4khdhub"]
+    },
+    "anikoto": {
+      "nuvio": ["zyrvael"],
+      "vega": ["anikoto"]
+    },
+    "animesalt": {
+      "vega": ["animesalt"],
+      "sa7": ["animesalt"]
+    },
+    "anizone": {
+      "nuvio": ["lenyr"],
+      "sa7": ["anizone"]
+    },
+    "castle": {
+      "nuvio": ["karnis"],
+      "vega": ["castle"],
+      "sa7": ["castle"]
+    },
+    "hdhub4u": {
+      "nuvio": ["qyrvaen"],
+      "vega": ["hdhub4u"],
+      "sa7": ["hdhub4u"]
+    },
+    "kisskh": {
+      "nuvio": ["fyron"],
+      "vega": ["kissKh"]
+    },
+    "multimovies": {
+      "nuvio": ["fastrion"],
+      "vega": ["multi"],
+      "sa7": ["multimovies"]
+    },
+    "netmirror": {
+      "nuvio": ["soryn"],
+      "sa7": ["netmirror"]
+    },
+    "moviebox": {
+      "nuvio": ["mavonyx"],
+      "vega": ["movieBox", "movieBoxWeb"],
+      "sa7": ["moviebox"]
+    },
+    "showbox": {
+      "nuvio": ["pynvix"],
+      "vega": ["showbox"]
+    },
+    "animeworld": {
+      "nuvio": ["gravix"],
+      "vega": ["animeworld"],
+      "sa7": ["animeworld"]
+    }
   },
-  "nuvio": {
-    "mode": "deny",
-    "ids": [
-      "bdix-cf",
-      "bdix-df",
-      "bdix-fh",
-      "brellor",
-      "fastrion",
-      "fyron",
-      "gravix",
-      "karnis",
-      "kethrax",
-      "lenyr",
-      "mavonyx",
-      "pynvix",
-      "qyrvaen",
-      "soryn",
-      "sylphera",
-      "zyrvael"
-    ]
-  },
-  "vega": {
-    "mode": "deny",
-    "ids": [
-      "torrentio",
-      "internetArchive",
-      "youtube",
-      "movies4u",
-      "1cinevood",
-      "disneyMirror",
-      "netflixMirror",
-      "primeMirror",
-      "luxMovies",
-      "mxplayer",
-      "durbinLive",
-      "liveTgTv",
-      "4khdhub",
-      "anikoto",
-      "castle",
-      "hdhub4u",
-      "katmovies",
-      "drive",
-      "movieBox",
-      "animesalt",
-      "multi"
-    ]
-  },
-  "instances": {
-    "beamup": {
+  "profiles": {
+    "railway": {
+      "duplicateMode": "primary",
       "sa7": {
-        "mode": "deny",
-        "ids": [
-          "animesalt",
+        "deny": [
+          "anikage",
+          "kurage",
+          "moviesdrive",
+          "moviesmod",
+          "puretoons",
+          "reanime",
+          "toonstream",
+          "vegamovies",
+          "vidrock"
+        ]
+      },
+      "nuvio": {
+        "deny": ["kethrax", "lyrin", "novus", "vyranel", "zevran"]
+      },
+      "vega": {
+        "deny": [
+          "disneyMirror",
+          "dramacool",
+          "drive",
+          "eonMovies",
+          "gokuHD",
+          "katmovies",
+          "kickAssAnime",
+          "movielinkdb",
+          "netflixMirror",
+          "primeMirror",
+          "rareanimes"
+        ]
+      }
+    },
+    "beamup": {
+      "duplicateMode": "backup",
+      "sa7": {
+        "deny": [
           "anizen",
-          "castle",
           "dahmermovies",
           "dahmermovies-tv",
           "desiflix",
           "einthusan",
-          "hdhub4u",
           "movix-vf",
-          "multimovies",
-          "netmirror",
           "playimdb",
           "redflix",
           "topcartoons"
         ]
       },
       "nuvio": {
-        "mode": "deny",
-        "ids": [
+        "deny": [
           "durnel",
           "esvyl",
           "evyrith",
           "fendrix",
           "fjoral",
           "haylox",
-          "hexion",
           "ilvyrel",
           "jhaeros",
-          "jyniq",
           "kryxalia",
-          "lenyr",
           "maelith",
           "nyxora",
           "onyxia",
@@ -118,13 +153,11 @@
         ]
       },
       "vega": {
-        "mode": "deny",
-        "ids": [
+        "deny": [
           "1flex",
           "a111477",
           "animesub",
           "animetsu",
-          "animeworld",
           "autoEmbed",
           "cinefreak",
           "cinemaLuxe",
@@ -138,12 +171,9 @@
           "Joya9tv",
           "kartoons",
           "katMovieFix",
-          "kissKh",
           "kmMovies",
           "mkvDrama",
           "mod",
-          "movieBox",
-          "movieBoxWeb",
           "moviesApi",
           "moviezwap",
           "ogomovies",
@@ -152,7 +182,6 @@
           "protonMovies",
           "ridoMovies",
           "ringz",
-          "showbox",
           "skyMovieHD",
           "tokyoInsider",
           "topmovies",
@@ -162,69 +191,6 @@
           "vega",
           "world4u",
           "zeefliz"
-        ]
-      }
-    },
-    "railway": {
-      "sa7": {
-        "mode": "deny",
-        "ids": [
-          "4khdhub",
-          "anikage",
-          "animeworld",
-          "anizone",
-          "kurage",
-          "moviebox",
-          "moviesdrive",
-          "moviesmod",
-          "puretoons",
-          "reanime",
-          "toonstream",
-          "torrentio",
-          "vegamovies",
-          "vidrock"
-        ]
-      },
-      "nuvio": {
-        "mode": "deny",
-        "ids": [
-          "fastrion",
-          "fyron",
-          "gravix",
-          "karnis",
-          "kethrax",
-          "lyrin",
-          "mavonyx",
-          "novus",
-          "pynvix",
-          "qyrvaen",
-          "soryn",
-          "vyranel",
-          "zevran",
-          "zyrvael"
-        ]
-      },
-      "vega": {
-        "mode": "deny",
-        "ids": [
-          "4khdhub",
-          "anikoto",
-          "animesalt",
-          "castle",
-          "disneyMirror",
-          "dramacool",
-          "drive",
-          "eonMovies",
-          "gokuHD",
-          "hdhub4u",
-          "internetArchive",
-          "katmovies",
-          "kickAssAnime",
-          "movielinkdb",
-          "multi",
-          "netflixMirror",
-          "primeMirror",
-          "rareanimes"
         ]
       }
     }

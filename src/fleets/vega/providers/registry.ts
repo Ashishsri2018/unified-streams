@@ -1,5 +1,6 @@
 import {
   computeProviderChanges,
+  reconcileProviderStates,
   type ProviderChangeMap,
   type ProviderVersion,
 } from "../../../core/providerChanges.js";
@@ -102,6 +103,26 @@ export class ProviderRegistry implements ProviderRegistryApi {
 
     this.updateProviderChanges(snapshot.entries ?? []);
     snapshot.changes = this.providerChanges;
+    const toStates = (entries: UpstreamProviderEntry[] | undefined) =>
+      (entries ?? []).map((entry) => ({
+        id: entry.value,
+        upstreamEnabled: !entry.disabled,
+      }));
+    snapshot.reconciliation = reconcileProviderStates(
+      oldActive ? toStates(oldActive.entries) : null,
+      toStates(snapshot.entries),
+    );
+    const { added, removed, stateChanged } = snapshot.reconciliation;
+    if (added.length > 0 || removed.length > 0 || stateChanged.length > 0) {
+      this.logger.info("providers_reconciled", {
+        added: added.length,
+        addedProviders: added,
+        removed: removed.length,
+        removedProviders: removed,
+        stateChanged: stateChanged.length,
+        stateChanges: stateChanged,
+      });
+    }
 
     this.active = snapshot;
     this.previous = oldActive;

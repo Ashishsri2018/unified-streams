@@ -5,6 +5,8 @@ import { GatewayStreamCache } from '../core/cache.js';
 import { WorkerClient } from '../core/workerClient.js';
 import { mergeAndFilterStreams, FleetStreamsInput } from './merge.js';
 import { StremioStream } from './filters.js';
+import { getPublicBaseUrl } from './configure.js';
+import type { ManifestProxyRuntime } from './manifestProxy.js';
 import { logger } from '../core/logger.js';
 import type { WorkerSnapshot } from '../core/telemetry.js';
 import type { MetadataResolver } from '../core/metadata.js';
@@ -43,6 +45,7 @@ export interface StreamHandlerContext {
   overridesStore?: ProviderOverridesStore;
   remoteSettings?: RemoteSettingsClient;
   adminSettings?: AdminRuntimeSettings;
+  manifestProxy?: ManifestProxyRuntime;
 }
 
 function sanitizeRequestId(value: unknown): string {
@@ -169,7 +172,13 @@ export async function handleStreamRoute(
       ? `tmdb:${forwardedMeta.tmdbId}${idSuffix}`
       : rawId;
   const policyVersion = ctx.getPolicyVersion?.() ?? ctx.policyVersion;
-  const cacheKey = `${rawConfig}:${rawType}:${canonicalId}:${policyVersion}:${ctx.addonVersion}`;
+  const proxyBaseUrl = ctx.manifestProxy
+    ? getPublicBaseUrl(req, ctx.publicBaseUrl)
+    : undefined;
+  const proxyCachePart = ctx.manifestProxy
+    ? `:${proxyBaseUrl}:${ctx.manifestProxy.store.getVersion()}`
+    : '';
+  const cacheKey = `${rawConfig}:${rawType}:${canonicalId}:${policyVersion}:${ctx.addonVersion}${proxyCachePart}`;
 
   try {
     const { value, hit } = await ctx.cache.coalesce(cacheKey, async () => {
@@ -194,7 +203,20 @@ export async function handleStreamRoute(
       const isAnyPartial = results.some((r) => r.outcome === 'timeout' || r.outcome === 'error');
 
       const inputs: FleetStreamsInput[] = results.map((r) => ({ fleet: r.fleet, streams: r.streams }));
-      const merged = mergeAndFilterStreams(inputs, filterConfig, ctx.maxStreams);
+      const merged = mergeAndFilterStreams(
+        inputs,
+        filterConfig,
+        ctx.maxStreams,
+        ctx.manifestProxy && proxyBaseUrl
+          ? {
+              baseUrl: proxyBaseUrl,
+              secret: ctx.manifestProxy.secret,
+              ttlMs: ctx.manifestProxy.ttlMs,
+              store: ctx.manifestProxy.store,
+              now: ctx.manifestProxy.now,
+            }
+          : undefined,
+      );
 
       return {
         value: { streams: merged },

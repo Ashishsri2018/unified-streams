@@ -2,6 +2,10 @@ import { StremioStream, StreamFilterConfig, filterStream, inferResolution } from
 import { isBlockerUrl, isArchiveUrl, isExternalUrl, canonicalizeStreamKey } from './classifier.js';
 import { normalizeDrm } from '../core/drm.js';
 import { getContainerRank } from '../core/streamQuality.js';
+import {
+  rewriteManifestStreamUrl,
+  type ManifestProxyMergeOptions,
+} from './manifestProxy.js';
 
 export interface FleetStreamsInput {
   fleet: string;
@@ -136,6 +140,7 @@ export function mergeAndFilterStreams(
   fleetInputs: FleetStreamsInput[],
   filterConfig: StreamFilterConfig,
   maxStreams = 1000,
+  manifestProxy?: ManifestProxyMergeOptions,
 ): StremioStream[] {
   const normalizedList: Array<{ stream: StremioStream; fleet: string }> = [];
 
@@ -190,5 +195,6 @@ export function mergeAndFilterStreams(
     }
   }
 
-  return finalStreams;
+  if (!manifestProxy) return finalStreams;
+  return finalStreams.map((stream) => rewriteManifestStreamUrl(stream, manifestProxy));
 }

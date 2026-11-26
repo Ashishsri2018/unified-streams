@@ -1,5 +1,10 @@
 import { z } from 'zod';
+import type { ManifestProxyConfigFile } from './manifestProxyConfig.js';
 import type { ProviderOverridesFile } from './providerOverrides.js';
+
+export interface RemoteSettingsBlob extends ProviderOverridesFile {
+  manifestProxy?: ManifestProxyConfigFile;
+}
 
 const RemoteSettingsResponseSchema = z.object({
   settings: z.unknown().nullable().optional(),
@@ -45,7 +50,7 @@ export class RemoteSettingsClient {
     return data.settings ?? null;
   }
 
-  async save(settings: ProviderOverridesFile): Promise<RemoteSaveResult> {
+  async save(settings: RemoteSettingsBlob): Promise<RemoteSaveResult> {
     const endpoint = this.requireEndpoint();
     const data = await this.requestJson(
       endpoint,

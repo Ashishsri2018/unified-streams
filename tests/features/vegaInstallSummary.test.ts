@@ -22,4 +22,13 @@ describe('vega install failure summary', () => {
       installFailureSummary(entries, { enabled: [], disabled: ['off'] }, 1),
     ).toBe('1/2 provider(s) failed to install');
   });
+
+  it('ignores upstream-disabled providers unless adopted', () => {
+    const entries = [entry('a'), entry('broken', true)];
+
+    expect(installFailureSummary(entries, { enabled: [], disabled: [] }, 1)).toBeNull();
+    expect(
+      installFailureSummary(entries, { enabled: [], disabled: [] }, 1, {}, [], ['broken']),
+    ).toBe('1/2 provider(s) failed to install');
+  });
 });

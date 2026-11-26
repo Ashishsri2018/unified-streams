@@ -9,6 +9,7 @@ export interface AdminPageOptions {
   settings: AdminRuntimeSettings | undefined;
   version: number;
   remoteBackupEnabled: boolean;
+  manifestProxyEnabled?: boolean;
 }
 
 export interface AdminLoginOptions {
@@ -166,6 +167,9 @@ function providerBadges(provider) {
     const detail = from && to ? " " + from + " \u2192 " + to : to ? " " + to : from ? " from " + from : "";
     badges.push(pill("updated", "updated" + detail));
   }
+  if (provider.upstreamEnabled === false) {
+    badges.push(pill(provider.adopted ? "updated" : "locked", provider.adopted ? "upstream disabled (adopted)" : "upstream disabled"));
+  }
   return badges.join(" ");
 }
 
@@ -264,6 +268,18 @@ function render(fleets, version, stats) {
   const duplicates = Array.from(enabledCopies.entries()).filter(([, count]) => count > 1).map(([id]) => id).sort();
   duplicatesLine.textContent = duplicates.length ? "Enabled in multiple fleets: " + duplicates.join(", ") : "";
 
+  let added = 0;
+  let removed = 0;
+  let stateChanged = 0;
+  for (const fleet of fleets) {
+    const diff = fleet.reconciliation;
+    if (!diff) continue;
+    added += Array.isArray(diff.added) ? diff.added.length : 0;
+    removed += Array.isArray(diff.removed) ? diff.removed.length : 0;
+    stateChanged += Array.isArray(diff.stateChanged) ? diff.stateChanged.length : 0;
+  }
+  setText("reconcile", "Last upstream sync: +" + added + " added, -" + removed + " removed, " + stateChanged + " state changes");
+
   const rows = [];
   let total = 0;
   for (const fleet of fleets) {
@@ -284,7 +300,9 @@ function render(fleets, version, stats) {
       const locked = provider.locked ? ' <span class="pill locked" title="Hard-disabled by policy">&#128274;</span>' : "";
       const missing = provider.missing ? " " + pill("locked", "missing") : "";
       const error = provider.lastError ? '<div class="warn">' + esc(provider.lastError) + '</div>' : '';
-      const disabled = provider.locked ? " disabled" : "";
+      const enableBlocked = provider.upstreamEnabled === false && !provider.adopted;
+      const actionDisabled = provider.locked || (!provider.enabled && enableBlocked) ? " disabled" : "";
+      const resetDisabled = provider.locked ? " disabled" : "";
       const nameMatchesId = String(provider.name || "").toLowerCase() === String(provider.id || "").toLowerCase();
       const badges = providerBadges(provider);
       const meta = [];
@@ -295,9 +313,9 @@ function render(fleets, version, stats) {
       const stateClass = state === "open" ? "error" : state === "half-open" ? "degraded" : "ok";
       const stateCell = stat ? '<td class="' + stateClass + '">' + esc(state) + '</td>' : '<td class="muted">—</td>';
       const action = provider.enabled
-        ? '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="false"' + disabled + '>Disable</button>'
-        : '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="true"' + disabled + '>Enable</button>';
-      const reset = '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="reset"' + disabled + '>Reset</button>';
+        ? '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="false"' + actionDisabled + '>Disable</button>'
+        : '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="true"' + actionDisabled + '>Enable</button>';
+      const reset = '<button type="button" data-fleet="' + esc(fleet.fleet) + '" data-id="' + esc(provider.id) + '" data-enabled="reset"' + resetDisabled + '>Reset</button>';
       rows.push('<tr data-search="' + esc((fleet.fleet + " " + provider.id + " " + provider.name).toLowerCase()) + '">'
         + '<td class="mono">' + esc(fleet.fleet) + '</td>'
         + '<td class="provider-cell"><div class="provider-name">' + esc(provider.name) + (badges ? " " + badges : "") + '</div>' + metaLine + error + '</td>'
@@ -398,6 +416,104 @@ document.getElementById("logout").addEventListener("click", async () => {
   window.location.href = "/admin";
 });
 
+const proxyRows = document.getElementById("proxy-rows");
+const proxyMatch = document.getElementById("proxy-match");
+const proxyReferer = document.getElementById("proxy-referer");
+const proxyOrigin = document.getElementById("proxy-origin");
+const proxyUserAgent = document.getElementById("proxy-ua");
+
+function renderProxy(data) {
+  if (!proxyRows) return;
+  const entries = data && Array.isArray(data.entries) ? data.entries : [];
+  setText("proxy-version", data && data.version !== undefined ? "config v" + data.version : "");
+  if (entries.length === 0) {
+    proxyRows.innerHTML = '<tr><td colspan="5" class="muted">No manifest proxy entries.</td></tr>';
+    return;
+  }
+  proxyRows.innerHTML = entries.map((entry) => {
+    const headers = Object.entries(entry.headers || {}).map(([key, value]) => key + ": " + value).join(" · ");
+    const state = entry.enabled ? pill("on", "on") : pill("off", "off");
+    return '<tr>'
+      + '<td class="mono">' + esc(entry.match) + '</td>'
+      + '<td>' + esc(entry.mode) + '</td>'
+      + '<td class="muted">' + esc(headers || "—") + '</td>'
+      + '<td>' + state + '</td>'
+      + '<td class="row-actions">'
+      + '<button type="button" data-proxy-toggle="' + esc(entry.id) + '" data-enabled="' + (entry.enabled ? "false" : "true") + '">' + (entry.enabled ? "Disable" : "Enable") + '</button>'
+      + '<button type="button" data-proxy-remove="' + esc(entry.id) + '">Remove</button>'
+      + '</td></tr>';
+  }).join("");
+}
+
+async function loadProxy() {
+  if (!proxyRows) return;
+  try {
+    const response = await fetch("/admin/api/manifest-proxy", { cache: "no-store" });
+    if (response.status === 401) { window.location.href = "/admin"; return; }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data && data.error ? data.error : "HTTP " + response.status);
+    renderProxy(data);
+  } catch (error) {
+    proxyRows.innerHTML = '<tr><td colspan="5" class="muted">' + esc(error && error.message ? error.message : String(error)) + '</td></tr>';
+  }
+}
+
+async function proxyAction(path, body) {
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (response.status === 401) { window.location.href = "/admin"; return; }
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data && data.error ? data.error : "HTTP " + response.status);
+    renderProxy(data);
+    setStatus("Manifest proxy updated.");
+  } catch (error) {
+    setStatus("Manifest proxy update failed: " + (error && error.message ? error.message : String(error)), true);
+  }
+}
+
+if (proxyRows) {
+  proxyRows.addEventListener("click", (event) => {
+    const toggleButton = event.target.closest("button[data-proxy-toggle]");
+    if (toggleButton) {
+      void proxyAction("/admin/api/manifest-proxy/toggle", {
+        id: toggleButton.dataset.proxyToggle,
+        enabled: toggleButton.dataset.enabled === "true"
+      });
+      return;
+    }
+    const removeButton = event.target.closest("button[data-proxy-remove]");
+    if (removeButton) {
+      void proxyAction("/admin/api/manifest-proxy/remove", { id: removeButton.dataset.proxyRemove });
+    }
+  });
+}
+
+const proxyAddButton = document.getElementById("proxy-add");
+if (proxyAddButton) {
+  proxyAddButton.addEventListener("click", () => {
+    const match = (proxyMatch.value || "").trim();
+    if (!match) { setStatus("Manifest proxy URL is required.", true); return; }
+    const headers = {};
+    const referer = (proxyReferer.value || "").trim();
+    const origin = (proxyOrigin.value || "").trim();
+    const userAgent = (proxyUserAgent.value || "").trim();
+    if (referer) headers.Referer = referer;
+    if (origin) headers.Origin = origin;
+    if (userAgent) headers["User-Agent"] = userAgent;
+    void proxyAction("/admin/api/manifest-proxy/add", { match, headers });
+    proxyMatch.value = "";
+    proxyReferer.value = "";
+    proxyOrigin.value = "";
+    proxyUserAgent.value = "";
+  });
+}
+
+loadProxy();
+
 load();
 setInterval(load, 30000);`;
 
@@ -431,6 +547,7 @@ setInterval(load, 30000);`;
     <input id="search" class="search-input" type="search" placeholder="Filter providers (e.g. vega, anime, movie)..." aria-label="Filter providers" />
     <span class="status" id="status"></span>
     <span class="status" id="duplicates"></span>
+    <span class="status" id="reconcile"></span>
   </div>
   <div class="table-wrap">
     <table>
@@ -441,6 +558,23 @@ setInterval(load, 30000);`;
     </table>
   </div>
 </section>
+${options.manifestProxyEnabled ? `<section class="section">
+  <div class="section-head"><h2>Manifest proxy</h2><span class="muted" id="proxy-version"></span></div>
+  <p class="muted">Manifest mode proxies only .m3u8 playlists. Media segments load directly from the upstream CDN.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>URL prefix</th><th>Mode</th><th>Headers</th><th>State</th><th>Actions</th></tr></thead>
+      <tbody id="proxy-rows"><tr><td colspan="5" class="muted">Loading manifest proxy entries...</td></tr></tbody>
+    </table>
+  </div>
+  <div class="search-bar">
+    <input id="proxy-match" class="search-input" type="url" placeholder="https://moon.goldenkite.top/" aria-label="Manifest proxy URL prefix" />
+    <input id="proxy-referer" class="search-input" type="text" placeholder="Referer (optional)" aria-label="Referer header" />
+    <input id="proxy-origin" class="search-input" type="text" placeholder="Origin (optional)" aria-label="Origin header" />
+    <input id="proxy-ua" class="search-input" type="text" placeholder="User-Agent (optional)" aria-label="User-Agent header" />
+    <button type="button" id="proxy-add">Add</button>
+  </div>
+</section>` : ''}
 <section class="section">
   <div class="section-head"><h2>Runtime settings</h2><span class="muted">read-only</span></div>
   ${settingsHtml}
@@ -459,7 +593,7 @@ setInterval(load, 30000);`;
     <div class="setting"><span>System available</span><strong id="mem-sys-available">—</strong></div>
   </div>
 </section>
-<p class="footer">Locked providers are hard-disabled by policy. Overrides are stored in DATA_DIR/provider-overrides.json. Use Save to Cloudflare to restore them after a deploy on hosts without a persistent disk; remote settings take precedence when present at startup.</p>`,
+<p class="footer">Locked providers are hard-disabled by policy. Providers disabled upstream stay inactive unless listed in <code>adoptUpstreamDisabled</code>. Overrides are stored in DATA_DIR/provider-overrides.json. Use Save to Cloudflare to restore them after a deploy on hosts without a persistent disk; remote settings take precedence when present at startup.</p>`,
     scripts,
   });
 }

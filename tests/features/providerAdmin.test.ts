@@ -41,6 +41,8 @@ function catalog(fleet: 'sa7' | 'nuvio' | 'vega', version: number) {
               name: 'Torrentio',
               types: ['movie'],
               enabled: false,
+              upstreamEnabled: true,
+              adopted: false,
               loaded: false,
               locked: true,
               missing: false,
@@ -48,6 +50,18 @@ function catalog(fleet: 'sa7' | 'nuvio' | 'vega', version: number) {
             },
           ]
         : []),
+      {
+        id: 'adoptme',
+        name: 'Adopt Me',
+        types: ['movie'],
+        enabled: false,
+        upstreamEnabled: false,
+        adopted: false,
+        loaded: false,
+        locked: false,
+        missing: false,
+        lastError: null,
+      },
     ],
   };
 }
@@ -221,6 +235,14 @@ describe('provider admin gateway', () => {
       .send({ fleet: 'sa7', id: 'torrentio', enabled: true });
     expect(locked.status).toBe(409);
     expect(workers.sa7.setProviderSelection).not.toHaveBeenCalled();
+
+    workers.nuvio.setProviderSelection.mockClear();
+    const blocked = await request(app)
+      .post('/admin/api/providers/toggle')
+      .set('Cookie', cookie)
+      .send({ fleet: 'nuvio', id: 'adoptme', enabled: true });
+    expect(blocked.status).toBe(409);
+    expect(workers.nuvio.setProviderSelection).not.toHaveBeenCalled();
 
     const unknown = await request(app)
       .post('/admin/api/providers/toggle')

@@ -19,6 +19,10 @@ export interface ProviderCatalogEntry {
   name: string;
   types: string[];
   enabled: boolean;
+  /** False when the upstream manifest marks the provider disabled. */
+  upstreamEnabled: boolean;
+  /** True when an upstream-disabled provider is explicitly adopted by policy. */
+  adopted?: boolean;
   loaded: boolean;
   locked: boolean;
   missing: boolean;
@@ -29,10 +33,23 @@ export interface ProviderCatalogEntry {
   previousVersion: string | null;
 }
 
+export interface ProviderStateChange {
+  id: string;
+  from: 'enabled' | 'disabled';
+  to: 'enabled' | 'disabled';
+}
+
+export interface ProviderReconciliation {
+  added: Array<{ id: string; upstreamEnabled: boolean }>;
+  removed: string[];
+  stateChanged: ProviderStateChange[];
+}
+
 export interface ProviderCatalogResponse {
   fleet: string;
   version: number;
   providers: ProviderCatalogEntry[];
+  reconciliation?: ProviderReconciliation;
 }
 
 export interface ProviderSelectionResponse {

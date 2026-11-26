@@ -1,8 +1,11 @@
 import crypto from 'node:crypto';
 import express, { Request, Response, Router } from 'express';
 import { z } from 'zod';
-import { HARD_DISABLED_PROVIDERS } from '../core/env.js';
 import { isProviderLocked } from '../core/policy.js';
+import {
+  isAdoptedUpstreamDisabled,
+  loadProviderPolicy,
+} from '../core/providerPolicy.js';
 import { FLEETS, type FleetName } from '../core/providerOverrides.js';
 import type { ProviderCatalogResponse } from '../core/contract.js';
 import type { StreamHandlerContext } from './stream.js';
@@ -26,6 +29,20 @@ const ToggleSchema = z.object({
     .max(128)
     .regex(/^[A-Za-z0-9_.*-]+$/),
   enabled: z.boolean().nullable(),
+});
+
+const ProxyAddSchema = z.object({
+  match: z.string().trim().min(1).max(2048),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+
+const ProxyToggleSchema = z.object({
+  id: z.string().trim().min(1).max(128),
+  enabled: z.boolean(),
+});
+
+const ProxyIdSchema = z.object({
+  id: z.string().trim().min(1).max(128),
 });
 
 interface FleetCatalog {
@@ -64,6 +81,7 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
     throw new Error('admin router requires token and overrides store');
   }
   const overrides = store;
+  const policy = loadProviderPolicy();
 
   let toggleQueue: Promise<unknown> = Promise.resolve();
   function serialize<T>(task: () => Promise<T>): Promise<T> {
@@ -166,6 +184,7 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
         settings: ctx.adminSettings,
         version: overrides.getVersion(),
         remoteBackupEnabled: Boolean(ctx.remoteSettings?.isConfigured()),
+        manifestProxyEnabled: Boolean(ctx.manifestProxy?.store),
       }),
     );
   });
@@ -199,8 +218,8 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
       }
       const { fleet, id, enabled } = parsed.data;
       const key = id.toLowerCase();
-      if (enabled !== null && isProviderLocked(key, HARD_DISABLED_PROVIDERS)) {
-        res.status(409).json({ error: `${id} is hard-disabled by policy` });
+      if (isProviderLocked(key, policy.locked)) {
+        res.status(409).json({ error: `${id} is locked by policy` });
         return;
       }
 
@@ -212,9 +231,22 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
             res.status(503).json({ error: target?.error ?? `${fleet} catalog unavailable` });
             return;
           }
-          const known = target.providers.some((provider) => provider.id.toLowerCase() === key);
-          if (!known && enabled !== null) {
+          const catalogEntry = target.providers.find(
+            (provider) => provider.id.toLowerCase() === key,
+          );
+          if (!catalogEntry && enabled !== null) {
             res.status(404).json({ error: `${id} is not present in the ${fleet} catalog` });
+            return;
+          }
+          if (
+            enabled === true &&
+            catalogEntry &&
+            catalogEntry.upstreamEnabled === false &&
+            !isAdoptedUpstreamDisabled(id, policy)
+          ) {
+            res.status(409).json({
+              error: `${id} is disabled upstream; add it to adoptUpstreamDisabled and redeploy`,
+            });
             return;
           }
 
@@ -274,6 +306,155 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
     },
   );
 
+  router.get('/api/manifest-proxy', (_req, res) => {
+    const proxyStore = ctx.manifestProxy?.store;
+    if (!proxyStore) {
+      res.status(503).json({ error: 'manifest proxy is not configured' });
+      return;
+    }
+    res.status(200).json({ version: proxyStore.getVersion(), entries: proxyStore.getEntries() });
+  });
+
+  router.post(
+    '/api/manifest-proxy/add',
+    express.json({ limit: '32kb' }),
+    async (req, res) => {
+      if (!sameOrigin(req)) {
+        logger.warn('admin.origin_rejected', {
+          origin: req.header('origin')?.slice(0, 200),
+          host: req.header('host'),
+          forwardedHost: req.header('x-forwarded-host'),
+          route: 'manifest_proxy_add',
+        });
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+      const proxyStore = ctx.manifestProxy?.store;
+      if (!proxyStore) {
+        res.status(503).json({ error: 'manifest proxy is not configured' });
+        return;
+      }
+      const parsed = ProxyAddSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid manifest proxy entry' });
+        return;
+      }
+      await serialize(async () => {
+        try {
+          const entry = proxyStore.add(parsed.data);
+          ctx.cache.clear();
+          logger.info('admin.manifest_proxy_added', {
+            id: entry.id,
+            host: new URL(entry.match).hostname,
+            version: proxyStore.getVersion(),
+          });
+          res.status(200).json({
+            ok: true,
+            version: proxyStore.getVersion(),
+            entry,
+            entries: proxyStore.getEntries(),
+          });
+        } catch (error) {
+          res.status(400).json({
+            error: error instanceof Error ? error.message : 'Failed to add manifest proxy entry',
+          });
+        }
+      });
+    },
+  );
+
+  router.post(
+    '/api/manifest-proxy/toggle',
+    express.json({ limit: '8kb' }),
+    async (req, res) => {
+      if (!sameOrigin(req)) {
+        logger.warn('admin.origin_rejected', {
+          origin: req.header('origin')?.slice(0, 200),
+          host: req.header('host'),
+          forwardedHost: req.header('x-forwarded-host'),
+          route: 'manifest_proxy_toggle',
+        });
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+      const proxyStore = ctx.manifestProxy?.store;
+      if (!proxyStore) {
+        res.status(503).json({ error: 'manifest proxy is not configured' });
+        return;
+      }
+      const parsed = ProxyToggleSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid manifest proxy toggle' });
+        return;
+      }
+      await serialize(async () => {
+        try {
+          const entry = proxyStore.toggle(parsed.data.id, parsed.data.enabled);
+          ctx.cache.clear();
+          logger.info('admin.manifest_proxy_toggled', {
+            id: entry.id,
+            enabled: entry.enabled,
+            version: proxyStore.getVersion(),
+          });
+          res.status(200).json({
+            ok: true,
+            version: proxyStore.getVersion(),
+            entries: proxyStore.getEntries(),
+          });
+        } catch (error) {
+          res.status(404).json({
+            error: error instanceof Error ? error.message : 'Manifest proxy entry not found',
+          });
+        }
+      });
+    },
+  );
+
+  router.post(
+    '/api/manifest-proxy/remove',
+    express.json({ limit: '8kb' }),
+    async (req, res) => {
+      if (!sameOrigin(req)) {
+        logger.warn('admin.origin_rejected', {
+          origin: req.header('origin')?.slice(0, 200),
+          host: req.header('host'),
+          forwardedHost: req.header('x-forwarded-host'),
+          route: 'manifest_proxy_remove',
+        });
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+      const proxyStore = ctx.manifestProxy?.store;
+      if (!proxyStore) {
+        res.status(503).json({ error: 'manifest proxy is not configured' });
+        return;
+      }
+      const parsed = ProxyIdSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'Invalid manifest proxy remove request' });
+        return;
+      }
+      await serialize(async () => {
+        const removed = proxyStore.remove(parsed.data.id);
+        if (!removed) {
+          res.status(404).json({ error: 'Manifest proxy entry not found' });
+          return;
+        }
+        ctx.cache.clear();
+        logger.info('admin.manifest_proxy_removed', {
+          id: removed.id,
+          enabled: removed.enabled,
+          version: proxyStore.getVersion(),
+        });
+        res.status(200).json({
+          ok: true,
+          version: proxyStore.getVersion(),
+          entries: proxyStore.getEntries(),
+        });
+      });
+    },
+  );
+
   router.post('/api/providers/save', async (req, res) => {
     if (!sameOrigin(req)) {
       logger.warn('admin.origin_rejected', {
@@ -293,9 +474,14 @@ export function createAdminRouter(ctx: StreamHandlerContext): Router {
 
     await serialize(async () => {
       try {
-        const saved = await remote.save(overrides.get());
+        const proxyStore = ctx.manifestProxy?.store;
+        const saved = await remote.save({
+          ...overrides.get(),
+          ...(proxyStore ? { manifestProxy: proxyStore.get() } : {}),
+        });
         logger.info('admin.provider_overrides_saved', {
           version: overrides.getVersion(),
+          manifestProxyVersion: proxyStore?.getVersion() ?? 0,
           remoteVersion: saved.version,
         });
         res.status(200).json({

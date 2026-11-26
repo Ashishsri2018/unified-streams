@@ -20,7 +20,7 @@ import type {
 import { contentIdOf, requestLogFields } from "../addon/parseId.js";
 import { IMDB_ID_PATTERN } from "../../../core/contentId.js";
 import { isProviderEnabledWithOverrides } from "../../../core/policy.js";
-import { HARD_DISABLED_PROVIDERS } from "../../../core/env.js";
+
 import { ProviderTelemetry } from "../../../core/providerTelemetry.js";
 import { TtlCache } from "../util/cache.js";
 import {
@@ -848,7 +848,7 @@ export class StreamPipeline implements StreamHandlerApi {
             disabled: this.config.disabledProviders,
           },
           this.config.runtimeOverrides,
-          HARD_DISABLED_PROVIDERS,
+          this.config.hardDisabledProviders,
         )
       ) {
         return false;

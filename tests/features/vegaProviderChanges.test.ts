@@ -42,6 +42,8 @@ function controllerConfig(): AppConfig {
     enabledProviders: [],
     disabledProviders: [],
     runtimeOverrides: {},
+    hardDisabledProviders: [],
+    adoptUpstreamDisabled: [],
     selectionVersion: 0,
   } as unknown as AppConfig;
 }

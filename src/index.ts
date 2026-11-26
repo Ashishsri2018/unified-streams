@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import v8 from 'node:v8';
 import { createRequire } from 'node:module';
 import {
@@ -13,6 +14,7 @@ import {
 import { ensureFleetDirs } from './core/fleetBootstrap.js';
 import { GatewayStreamCache } from './core/cache.js';
 import { createProviderOverridesStore, parseProviderOverrides } from './core/providerOverrides.js';
+import { createManifestProxyStore } from './core/manifestProxyConfig.js';
 import { RemoteSettingsClient } from './core/remoteSettings.js';
 import { WorkerClient } from './core/workerClient.js';
 import { MetadataResolver } from './core/metadata.js';
@@ -164,6 +166,20 @@ async function main(): Promise<void> {
   });
   overridesStore.load();
 
+  const manifestProxyStore = createManifestProxyStore({
+    dataDir: env.DATA_DIR,
+    onWarning: (message) => logger.warn('manifest_proxy_config_invalid', { error: message }),
+  });
+  manifestProxyStore.load();
+
+  let manifestProxySecret = env.MANIFEST_PROXY_SECRET || env.INTERNAL_TOKEN || env.ADMIN_TOKEN;
+  if (!manifestProxySecret) {
+    manifestProxySecret = crypto.randomBytes(32).toString('hex');
+    logger.warn('manifest_proxy.secret_fallback', {
+      message: 'MANIFEST_PROXY_SECRET is unset; using a per-process random secret',
+    });
+  }
+
   const remoteSettings = new RemoteSettingsClient({
     endpoint: env.CLOUDFLARE_SETTINGS_ENDPOINT,
     token: env.CLOUDFLARE_SETTINGS_TOKEN,
@@ -175,6 +191,14 @@ async function main(): Promise<void> {
         const remoteOverrides = parseProviderOverrides(remote);
         overridesStore.replace(remoteOverrides);
         logger.info('provider_overrides.remote_loaded', { version: remoteOverrides.version });
+        const proxySection =
+          remote && typeof remote === 'object' && !Array.isArray(remote)
+            ? (remote as Record<string, unknown>).manifestProxy
+            : undefined;
+        if (proxySection) {
+          const proxyConfig = manifestProxyStore.replace(proxySection);
+          logger.info('manifest_proxy_config.remote_loaded', { version: proxyConfig.version });
+        }
       }
     } catch (error) {
       logger.warn('provider_overrides.remote_load_failed', {
@@ -206,6 +230,11 @@ async function main(): Promise<void> {
     adminToken: env.ADMIN_TOKEN,
     overridesStore,
     remoteSettings,
+    manifestProxy: {
+      secret: manifestProxySecret,
+      ttlMs: env.MANIFEST_PROXY_TOKEN_TTL_MS,
+      store: manifestProxyStore,
+    },
     adminSettings: {
       instanceProfile: env.INSTANCE_PROFILE,
       backendTimeoutMs: env.BACKEND_TIMEOUT_MS,

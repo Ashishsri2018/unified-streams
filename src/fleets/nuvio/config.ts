@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
+import { parseProviderPolicyPayload } from "../../core/providerPolicy.js";
 import type { AppConfig } from "./types.js";
 
 const envBool = (def: boolean) =>
@@ -43,21 +44,6 @@ const optionalString = z
   .optional()
   .transform((value) => (value === undefined || value === "" ? null : value));
 
-const envList = z.preprocess(
-  (value) => {
-    if (value === undefined || value === "") return [];
-    if (Array.isArray(value)) return value;
-    if (typeof value === "string") {
-      return value
-        .split(",")
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
-    }
-    return value;
-  },
-  z.array(z.string().regex(/^[A-Za-z0-9_.*-]+$/, "must be a scraper id or *")),
-);
-
 const schema = z.object({
   PORT: envInt(7000, 1, 65535),
   NUVIO_SOURCE: z
@@ -85,10 +71,7 @@ const schema = z.object({
   BREAKER_COOLDOWN_MS: envInt(300000, 0, 3600000),
   TMDB_API_KEY: optionalString,
   SCRAPER_SETTINGS_JSON: optionalString,
-  ENABLED_SCRAPERS: envList,
-  DISABLED_SCRAPERS: envList,
-  RUNTIME_OVERRIDES_JSON: optionalString,
-  SELECTION_VERSION: envInt(0, 0, Number.MAX_SAFE_INTEGER),
+  PROVIDER_POLICY_JSON: optionalString,
   PROXY_ENABLED: envBool(true),
   CINEMETA_URL: z.string().url().default("https://v3-cinemeta.strem.io"),
   TMDB_URL: z.string().url().default("https://api.themoviedb.org/3"),
@@ -130,21 +113,6 @@ function parseScraperSettings(
   return result;
 }
 
-function parseOverrides(raw: string | null): Record<string, boolean> {
-  if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) return {};
-    const result: Record<string, boolean> = {};
-    for (const [id, enabled] of Object.entries(parsed)) {
-      if (typeof enabled === "boolean") result[id] = enabled;
-    }
-    return result;
-  } catch {
-    return {};
-  }
-}
-
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -159,6 +127,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   const value = parsed.data;
+  const policy = parseProviderPolicyPayload(value.PROVIDER_POLICY_JSON ?? undefined);
   return {
     port: value.PORT,
     source: value.NUVIO_SOURCE,
@@ -178,10 +147,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     breakerCooldownMs: value.BREAKER_COOLDOWN_MS,
     tmdbApiKey: value.TMDB_API_KEY,
     scraperSettings: parseScraperSettings(value.SCRAPER_SETTINGS_JSON),
-    enabledScrapers: Array.from(new Set(value.ENABLED_SCRAPERS.map((id) => id.toLowerCase()))),
-    disabledScrapers: Array.from(new Set(value.DISABLED_SCRAPERS.map((id) => id.toLowerCase()))),
-    runtimeOverrides: parseOverrides(value.RUNTIME_OVERRIDES_JSON),
-    selectionVersion: value.SELECTION_VERSION,
+    enabledScrapers: [],
+    disabledScrapers: policy.disabled.map((id) => id.toLowerCase()),
+    runtimeOverrides: policy.overrides,
+    hardDisabledProviders: policy.locked,
+    adoptUpstreamDisabled: policy.adoptUpstreamDisabled,
+    selectionVersion: policy.version,
     proxyEnabled: value.PROXY_ENABLED,
     cinemetaUrl: trimTrailingSlash(value.CINEMETA_URL),
     tmdbUrl: trimTrailingSlash(value.TMDB_URL),

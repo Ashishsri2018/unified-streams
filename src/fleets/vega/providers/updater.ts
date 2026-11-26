@@ -7,7 +7,7 @@ import {
   type ProviderOverrides,
   type ProviderSelection,
 } from "../../../core/policy.js";
-import { HARD_DISABLED_PROVIDERS } from "../../../core/env.js";
+import { isAdoptedUpstreamDisabled } from "../../../core/providerPolicy.js";
 import type {
   HealthProviderStatus,
   HealthReport,
@@ -113,8 +113,14 @@ export function installFailureSummary(
   loadedCount: number,
   overrides: ProviderOverrides = {},
   hardDisabled: readonly string[] = [],
+  adoptUpstreamDisabled: readonly string[] = [],
 ): string | null {
-  const enabledCount = entries.filter((entry) =>
+  const activeEntries = entries.filter(
+    (entry) =>
+      !entry.disabled ||
+      isAdoptedUpstreamDisabled(entry.value, { adoptUpstreamDisabled }),
+  );
+  const enabledCount = activeEntries.filter((entry) =>
     isProviderEnabledWithOverrides(entry.value, selection, overrides, hardDisabled),
   ).length;
   if (enabledCount <= loadedCount) return null;
@@ -159,10 +165,9 @@ export function parseManifest(bytes: Buffer): UpstreamProviderEntry[] {
     if (!isRecord(raw)) {
       throw new Error("manifest.json contains a non-object entry");
     }
-    if (raw.disabled !== false) continue;
 
     if (typeof raw.value !== "string" || !/^[A-Za-z0-9_.-]+$/.test(raw.value)) {
-      throw new Error("manifest.json contains an enabled provider with an invalid value");
+      throw new Error("manifest.json contains a provider with an invalid value");
     }
     if (typeof raw.version !== "string" || raw.version.length === 0) {
       throw new Error(`manifest.json entry ${raw.value} has an invalid version`);
@@ -182,7 +187,7 @@ export function parseManifest(bytes: Buffer): UpstreamProviderEntry[] {
         typeof raw.display_name === "string" ? raw.display_name : raw.value,
       value: raw.value,
       version: raw.version,
-      disabled: false,
+      disabled: raw.disabled === true,
     };
     if (typeof raw.icon === "string") entry.icon = raw.icon;
     if (typeof raw.type === "string") entry.type = raw.type;
@@ -266,6 +271,16 @@ export class Updater {
     this.lockPath = path.join(this.providerRoot, "update.lock");
   }
 
+  private isAdopted(id: string): boolean {
+    return isAdoptedUpstreamDisabled(id, {
+      adoptUpstreamDisabled: this.config.adoptUpstreamDisabled,
+    });
+  }
+
+  private isActive(entry: UpstreamProviderEntry): boolean {
+    return (!entry.disabled || this.isAdopted(entry.value)) && this.isEnabled(entry.value);
+  }
+
   private isEnabled(id: string): boolean {
     return isProviderEnabledWithOverrides(
       id,
@@ -274,7 +289,7 @@ export class Updater {
         disabled: this.config.disabledProviders,
       },
       this.config.runtimeOverrides,
-      HARD_DISABLED_PROVIDERS,
+      this.config.hardDisabledProviders,
     );
   }
 
@@ -772,9 +787,9 @@ export class Updater {
     const previousActive = this.registry.getActiveSnapshot();
     const data = await this.fetchSnapshotData(target);
     if (data.entries.length === 0) {
-      throw new Error("manifest.json has no enabled providers");
+      throw new Error("manifest.json has no providers");
     }
-    const enabledCount = data.entries.filter((entry) => this.isEnabled(entry.value)).length;
+    const enabledCount = data.entries.filter((entry) => this.isActive(entry)).length;
 
     let previousProviderIds = await this.readManifestProviderIds(
       previousActive?.rootDir,
@@ -829,7 +844,7 @@ export class Updater {
       const loaded = new Map<string, ProviderBundle>();
       const loadFailures = new Map<string, string>();
       for (const result of successes) {
-        if (!this.isEnabled(result.entry.value)) continue;
+        if (!this.isActive(result.entry)) continue;
         try {
           const bundle = await loadProviderBundle(
             result.entry,
@@ -851,7 +866,7 @@ export class Updater {
           continue;
         }
         const old = previousBundles.get(entry.value);
-        if (old && this.isEnabled(entry.value)) bundles.set(entry.value, old);
+        if (old && this.isActive(entry)) bundles.set(entry.value, old);
       }
       const retired = uniqueSorted(
         Array.from(previousBundles.keys()).filter((value) => !enabledValues.has(value)),
@@ -922,6 +937,9 @@ export class Updater {
       const now = nowIso();
       const providerState: Record<string, ProviderStateEntry> = {};
       for (const entry of data.entries) {
+        // Upstream-disabled and policy-denied providers are intentionally not
+        // loaded; do not report them as pending/failed in health state.
+        if (!this.isActive(entry)) continue;
         if (loaded.has(entry.value)) {
           providerState[entry.value] = {
             sha: target.sha,
@@ -956,7 +974,8 @@ export class Updater {
           selection,
           loaded.size,
           this.config.runtimeOverrides,
-          HARD_DISABLED_PROVIDERS,
+          this.config.hardDisabledProviders,
+          this.config.adoptUpstreamDisabled,
         );
         draft.nextCheck = isoAfter(this.computeNextCheckMs());
       });
@@ -1137,7 +1156,7 @@ export class Updater {
       if (entries.length === 0) return null;
 
       const bundles = new Map<string, ProviderBundle>();
-      const enabledEntries = entries.filter((entry) => this.isEnabled(entry.value));
+      const enabledEntries = entries.filter((entry) => this.isActive(entry));
       for (const entry of enabledEntries) {
         const bundle = await loadProviderBundle(
           entry,
@@ -1177,6 +1196,7 @@ export class Updater {
         : state.previousSha;
     const providers: Record<string, ProviderStateEntry> = {};
     for (const entry of entries) {
+      if (!this.isActive(entry)) continue;
       const previous = state.providers[entry.value];
       providers[entry.value] = {
         sha: snapshot.sha,

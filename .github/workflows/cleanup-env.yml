@@ -44,9 +44,9 @@ jobs:
           APP="${APP//\//-}"
 
           # Beamup's deploy key permits config:set but rejects config:unset and
-          # config:show. Empty values are treated as "no override" by
-          # src/core/env.ts, so this neutralizes the legacy lists and restarts
-          # the app onto config/instances/beamup.env + instances.beamup policy.
+          # config:show. src/core/env.ts no longer reads these variables; the
+          # workflow remains as optional cleanup for deployments that still
+          # carry stale Dokku config from the pre-profile setup.
           ssh "dokku@$BEAMUP_HOST" \
             "config:set $APP SA7_ENABLED_PROVIDERS= SA7_DISABLED_PROVIDERS= NUVIO_ENABLED_SCRAPERS= NUVIO_DISABLED_SCRAPERS= VEGA_ENABLED_PROVIDERS= VEGA_DISABLED_PROVIDERS="
           echo "Done. Beamup now uses config/instances/beamup.env and instances.beamup policy."

@@ -19,45 +19,45 @@ function envInt(env, name, fallback, min) {
   return floored >= min ? floored : fallback;
 }
 
-function envList(env, primary, secondary) {
-  return String(env[primary] || env[secondary] || '')
-    .split(',')
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function envJsonObject(env, name) {
-  const raw = env[name];
-  if (!raw) return {};
+function parsePolicy(raw) {
+  const empty = {
+    version: 0,
+    locked: [],
+    disabled: [],
+    overrides: {},
+    adoptUpstreamDisabled: [],
+  };
+  if (!raw) return empty;
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    const result = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === 'boolean') result[key] = value;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return empty;
+    const stringList = (value) =>
+      Array.isArray(value)
+        ? value
+            .filter((item) => typeof item === 'string')
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
+    const overrides = {};
+    if (parsed.overrides && typeof parsed.overrides === 'object' && !Array.isArray(parsed.overrides)) {
+      for (const [key, value] of Object.entries(parsed.overrides)) {
+        if (typeof value === 'boolean') overrides[String(key).trim().toLowerCase()] = value;
+      }
     }
-    return result;
+    return {
+      version: Number.isFinite(parsed.version) ? Math.max(0, Math.trunc(parsed.version)) : 0,
+      locked: stringList(parsed.locked),
+      disabled: stringList(parsed.disabled),
+      overrides,
+      adoptUpstreamDisabled: stringList(parsed.adoptUpstreamDisabled),
+    };
   } catch {
-    return {};
-  }
-}
-
-function envJsonList(env, name) {
-  const raw = env[name];
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((value) => typeof value === 'string')
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean);
-  } catch {
-    return [];
+    return empty;
   }
 }
 
 function createConfig(env = process.env) {
+  const policy = parsePolicy(env.PROVIDER_POLICY_JSON);
   return {
     host: env.HOST || '0.0.0.0',
     port: Number(env.PORT || 7000),
@@ -82,11 +82,12 @@ function createConfig(env = process.env) {
     maxPerProviderStreams: envInt(env, 'MAX_PER_PROVIDER_STREAMS', 100, 1),
     maxTotalStreams: envInt(env, 'MAX_TOTAL_STREAMS', 1000, 1),
     providerConcurrency: envInt(env, 'PROVIDER_CONCURRENCY', 30, 1),
-    enabledProviders: envList(env, 'ENABLED_PROVIDERS', 'SA7_ENABLED_PROVIDERS'),
-    disabledProviders: envList(env, 'DISABLED_PROVIDERS', 'SA7_DISABLED_PROVIDERS'),
-    runtimeOverrides: envJsonObject(env, 'RUNTIME_OVERRIDES_JSON'),
-    hardDisabledProviders: envJsonList(env, 'HARD_DISABLED_PROVIDERS'),
-    selectionVersion: Number(env.SELECTION_VERSION || 0) || 0,
+    enabledProviders: [],
+    disabledProviders: policy.disabled,
+    runtimeOverrides: policy.overrides,
+    hardDisabledProviders: policy.locked,
+    adoptUpstreamDisabled: policy.adoptUpstreamDisabled,
+    selectionVersion: policy.version,
     cinemetaUrl: (env.CINEMETA_URL || 'https://v3-cinemeta.strem.io').replace(/\/$/, ''),
     tmdbUrl: (env.TMDB_URL || 'https://api.themoviedb.org/3').replace(/\/$/, ''),
     tmdbApiKey: env.TMDB_API_KEY || '',

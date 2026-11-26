@@ -14,11 +14,13 @@ import {
   isProviderEnabledWithOverrides,
   normalizeProviderOverrides,
 } from "../../../core/policy.js";
-import { HARD_DISABLED_PROVIDERS } from "../../../core/env.js";
+import { isAdoptedUpstreamDisabled } from "../../../core/providerPolicy.js";
 import type { ProviderCatalogResponse } from "../../../core/contract.js";
 import {
   computeProviderChanges,
+  reconcileProviderStates,
   type ProviderChangeMap,
+  type ProviderReconciliationResult,
   type ProviderVersion,
 } from "../../../core/providerChanges.js";
 import { computeSnapshotSha, CodebergClient } from "../source/codeberg.js";
@@ -79,6 +81,11 @@ export class SnapshotManager {
   private readonly loadErrors = new Map<string, string>();
   private baselineVersions: ProviderVersion[] | null = null;
   private providerChanges: ProviderChangeMap = {};
+  private reconciliation: ProviderReconciliationResult = {
+    added: [],
+    removed: [],
+    stateChanged: [],
+  };
 
   constructor(
     private readonly config: AppConfig,
@@ -96,12 +103,20 @@ export class SnapshotManager {
         disabled: this.config.disabledScrapers,
       },
       this.config.runtimeOverrides,
-      HARD_DISABLED_PROVIDERS,
+      this.config.hardDisabledProviders,
     );
   }
 
+  private isAdopted(id: string): boolean {
+    return isAdoptedUpstreamDisabled(id, {
+      adoptUpstreamDisabled: this.config.adoptUpstreamDisabled,
+    });
+  }
+
   private enabledEntries(entries: NuvioScraperEntry[]): NuvioScraperEntry[] {
-    return entries.filter((entry) => entry.enabled && this.isEnabled(entry.id));
+    return entries.filter(
+      (entry) => (entry.enabled || this.isAdopted(entry.id)) && this.isEnabled(entry.id),
+    );
   }
 
   getCatalog(): ProviderCatalogResponse {
@@ -111,7 +126,7 @@ export class SnapshotManager {
     );
     const entries = snapshot?.entries ?? [];
     const known = new Set(entries.map((entry) => entry.id.toLowerCase()));
-    const hard = new Set(HARD_DISABLED_PROVIDERS.map((id) => id.toLowerCase()));
+    const hard = new Set(this.config.hardDisabledProviders.map((id) => id.toLowerCase()));
     const providers = entries.map((entry) => {
       const key = entry.id.toLowerCase();
       const change = this.providerChanges[key];
@@ -119,7 +134,9 @@ export class SnapshotManager {
         id: entry.id,
         name: entry.name || entry.id,
         types: entry.supportedTypes,
-        enabled: entry.enabled && this.isEnabled(entry.id),
+        enabled: (entry.enabled || this.isAdopted(entry.id)) && this.isEnabled(entry.id),
+        upstreamEnabled: entry.enabled,
+        adopted: this.isAdopted(entry.id),
         loaded: loaded.has(key),
         locked: hard.has(key),
         missing: false,
@@ -139,6 +156,8 @@ export class SnapshotManager {
         name: rawId,
         types: ["movie", "tv"],
         enabled: false,
+        upstreamEnabled: false,
+        adopted: false,
         loaded: false,
         locked: hard.has(key),
         missing: true,
@@ -153,6 +172,7 @@ export class SnapshotManager {
       fleet: "nuvio",
       version: this.selectionVersion,
       providers,
+      reconciliation: this.reconciliation,
     };
   }
 
@@ -372,6 +392,26 @@ export class SnapshotManager {
   ): NuvioSnapshot {
     this.warnDepartedProviders(this.snapshot, snapshot, source);
     this.updateProviderChanges(snapshot.entries ?? []);
+    const toStates = (entries: NuvioScraperEntry[] | undefined) =>
+      (entries ?? []).map((entry) => ({
+        id: entry.id,
+        upstreamEnabled: entry.enabled,
+      }));
+    this.reconciliation = reconcileProviderStates(
+      this.snapshot ? toStates(this.snapshot.entries) : null,
+      toStates(snapshot.entries),
+    );
+    const { added, removed, stateChanged } = this.reconciliation;
+    if (added.length > 0 || removed.length > 0 || stateChanged.length > 0) {
+      this.logger.info("nuvio_providers_reconciled", {
+        added: added.length,
+        addedProviders: added,
+        removed: removed.length,
+        removedProviders: removed,
+        stateChanged: stateChanged.length,
+        stateChanges: stateChanged,
+      });
+    }
     this.snapshot = snapshot;
     this.lastError = null;
     this.logger.info("nuvio_snapshot_activated", {

@@ -1,9 +1,11 @@
 # Provider Policy Simplification and Remote Settings
 
-Status: remote settings storage (section 6) and in-memory new/updated provider
-badges (section 5) are implemented. The policy schema migration in sections 2-4,
-upstream-disabled adoption, and update reconciliation logging are proposed and
-not applied yet.
+Status: implemented (2026-11-25). The policy schema migration in sections 2-4,
+upstream-disabled adoption, and update reconciliation logging are applied. All
+three fleets consume one `PROVIDER_POLICY_JSON` payload and the admin panel
+enforces `locked` plus adoption gating. Section 6 remote storage predates this
+change; the same D1 blob now also carries an optional `manifestProxy` section
+(see `manifest-proxy-plan.md`).
 
 ## 1. Goals
 
@@ -30,7 +32,7 @@ effective policy. `locked` is absolute and cannot be overridden by `/admin` or
 environment variables.
 
 `INSTANCE_PROFILE` selects the profile. Unknown values and `generic` fall back to
-the `defaultProfile`, which will be `railway`.
+the `defaultProfile`, which is `railway`.
 
 ## 3. Target `config/providers.json` shape
 
@@ -39,16 +41,19 @@ the `defaultProfile`, which will be `railway`.
   "defaultProfile": "railway",
   "duplicatePriority": ["nuvio", "vega", "sa7"],
   "locked": ["torrentio"],
+  "adoptUpstreamDisabled": [],
   "duplicates": {
     "4khdhub": { "nuvio": ["hexion"], "vega": ["4khdhub"], "sa7": ["4khdhub"] }
   },
   "profiles": {
     "railway": {
+      "duplicateMode": "primary",
       "sa7": { "deny": [] },
       "nuvio": { "deny": [] },
       "vega": { "deny": [] }
     },
     "beamup": {
+      "duplicateMode": "backup",
       "sa7": { "deny": [] },
       "nuvio": { "deny": [] },
       "vega": { "deny": [] }
@@ -88,14 +93,18 @@ Beamup:
 - The Railway primary is denied.
 - Non-duplicate providers keep the existing Beamup selection.
 
-Groups whose current Railway primary must be corrected when this schema lands:
+Profiles carry `duplicateMode: "primary" | "backup"` so the allocation rule is
+explicit: `railway` is `primary`, `beamup` is `backup`. When omitted, the
+default profile falls back to `primary` and every other profile to `backup`.
+
+Groups whose Railway primary was corrected during this migration:
 `anikoto`, `animesalt`, `anizone`, `castle`, `hdhub4u`, `kisskh`,
 `multimovies`, `netmirror`, `moviebox`, `showbox`, `animeworld`.
 
 Worker contract:
 
 - Derive one `PROVIDER_POLICY_JSON` per fleet with
-  `{ "version", "locked", "disabled", "overrides" }`.
+  `{ "version", "locked", "disabled", "overrides", "adoptUpstreamDisabled" }`.
 - Workers apply `locked` first, then admin overrides, then `disabled`.
 - Remove the separate enabled/disabled fleet environment variables after all
   three worker loaders consume the consolidated payload.
@@ -115,24 +124,24 @@ Upstream refresh timing differs by fleet:
 - Nuvio: the snapshot manager downloads and activates the new snapshot in-process.
 - Vega: the updater installs and activates the new provider snapshot in-process.
 
-### Current gap: upstream-disabled providers
+### Resolved gap: upstream-disabled providers
 
-Providers marked disabled by upstream are filtered out before runtime policy is
-applied, so `/admin` cannot reliably enable them today:
+Before this migration, providers marked disabled by upstream were filtered out
+before runtime policy was applied, so `/admin` could not reliably enable them:
 
-- Nuvio keeps them in the catalog but `enabledEntries()` requires
-  `entry.enabled`; an admin `true` override persists but the scraper is not
+- Nuvio kept them in the catalog but `enabledEntries()` required
+  `entry.enabled`; an admin `true` override persisted but the scraper was not
   loaded.
-- SA7 shows them in the catalog but `buildRegistry()` filters
-  `entry.enabled === false`; an admin `true` override has no effect.
-- Vega's `parseManifest()` drops `disabled: true` entries entirely, so they do
-  not appear in `/admin` and a toggle returns "not present".
+- SA7 showed them in the catalog but `buildRegistry()` filtered
+  `entry.enabled === false`; an admin `true` override had no effect.
+- Vega's `parseManifest()` dropped `disabled: true` entries entirely, so they
+  did not appear in `/admin` and a toggle returned "not present".
 
 That is not the same as a newly added provider. A new provider that upstream
 ships enabled is already adopted; a provider upstream deliberately disables is a
 separate decision.
 
-### Recommended behavior
+### Implemented behavior
 
 Keep upstream-disabled providers visible but inactive by default. Add one
 explicit deploy-time adoption list:
@@ -244,8 +253,10 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 ```
 
-The only key currently used is `provider_overrides`. The value is the same JSON
-document as `DATA_DIR/provider-overrides.json`.
+The only provider key currently used is `provider_overrides`. The value is the same JSON
+document as `DATA_DIR/provider-overrides.json`. The same blob can carry an optional
+`manifestProxy` section for the manifest-only proxy (see `manifest-proxy-plan.md`);
+the Worker treats the document as opaque JSON, so no D1 migration change is needed.
 
 ### Worker API
 
@@ -300,6 +311,8 @@ Operational caveats:
   writable instances means the last Save wins.
 
 ## 7. Implementation order
+
+Completed 2026-11-25 (steps 1-2 were already in place before this migration).
 
 1. Add the D1 table and Worker settings endpoints.
 2. Add the gateway remote client, startup load, admin save endpoint, and UI.

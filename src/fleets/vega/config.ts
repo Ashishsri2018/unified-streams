@@ -1,5 +1,6 @@
 import path from "node:path";
 import { z } from "zod";
+import { parseProviderPolicyPayload } from "../../core/providerPolicy.js";
 import { parseSettingsJson } from "./providers/settings.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -18,6 +19,8 @@ export interface AppConfig {
   enabledProviders: string[];
   disabledProviders: string[];
   runtimeOverrides: Record<string, boolean>;
+  hardDisabledProviders: string[];
+  adoptUpstreamDisabled: string[];
   selectionVersion: number;
   httpTimeoutMs: number;
   searchConcurrency: number;
@@ -85,21 +88,6 @@ const optionalString = z
   .optional()
   .transform((value) => (value === undefined || value === "" ? null : value));
 
-const envList = z.preprocess(
-  (value) => {
-    if (value === undefined || value === "") return [];
-    if (Array.isArray(value)) return value;
-    if (typeof value === "string") {
-      return value
-        .split(",")
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
-    }
-    return value;
-  },
-  z.array(z.string().regex(/^[A-Za-z0-9_.*-]+$/, "must be a provider value or *")),
-);
-
 const schema = z.object({
   PORT: envInt(7000, 1, 65535),
   DATA_DIR: z.string().trim().min(1).default("/data"),
@@ -119,10 +107,7 @@ const schema = z.object({
   UPDATE_INTERVAL_MIN_HOURS: envNumber(20, 0.05, 24),
   UPDATE_INTERVAL_MAX_HOURS: envNumber(24, 0.05, 24),
   UPDATE_CONCURRENCY: envInt(8, 1, 32),
-  ENABLED_PROVIDERS: envList,
-  DISABLED_PROVIDERS: envList,
-  RUNTIME_OVERRIDES_JSON: optionalString,
-  SELECTION_VERSION: envInt(0, 0, Number.MAX_SAFE_INTEGER),
+  PROVIDER_POLICY_JSON: optionalString,
   HTTP_TIMEOUT_MS: envInt(15000, 1000, 120000),
   SEARCH_CONCURRENCY: envInt(30, 1, 60),
   SEARCH_TIMEOUT_MS: envInt(10000, 1000, 120000),
@@ -156,21 +141,6 @@ export class ConfigError extends Error {
   }
 }
 
-function parseRuntimeOverrides(raw: string | null): Record<string, boolean> {
-  if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const result: Record<string, boolean> = {};
-    for (const [id, enabled] of Object.entries(parsed)) {
-      if (typeof enabled === "boolean") result[id] = enabled;
-    }
-    return result;
-  } catch {
-    return {};
-  }
-}
-
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = schema.safeParse(env);
   if (!parsed.success) {
@@ -181,6 +151,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   const value = parsed.data;
+  const policy = parseProviderPolicyPayload(value.PROVIDER_POLICY_JSON ?? undefined);
   if (value.UPDATE_INTERVAL_MIN_HOURS > value.UPDATE_INTERVAL_MAX_HOURS) {
     throw new ConfigError("UPDATE_INTERVAL_MIN_HOURS must be <= UPDATE_INTERVAL_MAX_HOURS");
   }
@@ -223,14 +194,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     updateIntervalMinHours: value.UPDATE_INTERVAL_MIN_HOURS,
     updateIntervalMaxHours: value.UPDATE_INTERVAL_MAX_HOURS,
     updateConcurrency: value.UPDATE_CONCURRENCY,
-    enabledProviders: Array.from(
-      new Set(value.ENABLED_PROVIDERS.map((provider) => provider.toLowerCase())),
-    ),
-    disabledProviders: Array.from(
-      new Set(value.DISABLED_PROVIDERS.map((provider) => provider.toLowerCase())),
-    ),
-    runtimeOverrides: parseRuntimeOverrides(value.RUNTIME_OVERRIDES_JSON),
-    selectionVersion: value.SELECTION_VERSION,
+    enabledProviders: [],
+    disabledProviders: policy.disabled.map((provider) => provider.toLowerCase()),
+    runtimeOverrides: policy.overrides,
+    hardDisabledProviders: policy.locked,
+    adoptUpstreamDisabled: policy.adoptUpstreamDisabled,
+    selectionVersion: policy.version,
     httpTimeoutMs: value.HTTP_TIMEOUT_MS,
     searchConcurrency: value.SEARCH_CONCURRENCY,
     searchTimeoutMs: value.SEARCH_TIMEOUT_MS,

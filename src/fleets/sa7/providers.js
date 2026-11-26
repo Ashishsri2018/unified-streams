@@ -81,11 +81,16 @@ let registry = null;
 let manifestProviderIds = null;
 let baselineVersions = null;
 let providerChanges = {};
+let previousProviderStates = null;
+let reconciliation = { added: [], removed: [], stateChanged: [] };
 const loadErrors = new Map();
 
-// Torrent providers stay vendored so the daily sync keeps them updated, but
-// they are never loaded or queried. The vendored manifest has no source-type field.
-const DISABLED_PROVIDER_IDS = new Set(['torrentio']);
+function isAdoptedUpstreamDisabled(id) {
+  const key = String(id).trim().toLowerCase();
+  return (config.adoptUpstreamDisabled || []).some(
+    (value) => String(value).trim().toLowerCase() === key
+  );
+}
 
 function normalizeOverrideMap(input) {
   const result = {};
@@ -99,7 +104,7 @@ function normalizeOverrideMap(input) {
 }
 
 function hardDisabledSet() {
-  const set = new Set(DISABLED_PROVIDER_IDS);
+  const set = new Set();
   for (const id of config.hardDisabledProviders || []) {
     set.add(String(id).trim().toLowerCase());
   }
@@ -108,8 +113,8 @@ function hardDisabledSet() {
 
 function baselineSelection() {
   return {
-    enabled: config.enabledProviders || [],
-    disabled: [...DISABLED_PROVIDER_IDS, ...(config.disabledProviders || [])],
+    enabled: [],
+    disabled: config.disabledProviders || [],
   };
 }
 
@@ -197,8 +202,42 @@ function buildRegistry() {
     providerChanges = computeProviderChanges(baselineVersions, versions);
   }
 
+  const states = providers.map((provider) => ({
+    id: String(provider && provider.id ? provider.id : '').toLowerCase(),
+    upstreamEnabled: provider && provider.enabled !== false,
+  }));
+  if (previousProviderStates) {
+    const previous = new Map(previousProviderStates.map((state) => [state.id, state]));
+    const current = new Map(states.map((state) => [state.id, state]));
+    const added = [];
+    const removed = [];
+    const stateChanged = [];
+    for (const [id, state] of current) {
+      const before = previous.get(id);
+      if (!before) {
+        added.push({ id, upstreamEnabled: state.upstreamEnabled });
+      } else if (before.upstreamEnabled !== state.upstreamEnabled) {
+        stateChanged.push({
+          id,
+          from: before.upstreamEnabled ? 'enabled' : 'disabled',
+          to: state.upstreamEnabled ? 'enabled' : 'disabled',
+        });
+      }
+    }
+    for (const id of previous.keys()) {
+      if (!current.has(id)) removed.push(id);
+    }
+    reconciliation = { added, removed, stateChanged };
+    if (added.length || removed.length || stateChanged.length) {
+      console.log(
+        `[providers] snapshot diff: added=${added.length} removed=${removed.length} state_changed=${stateChanged.length}`
+      );
+    }
+  }
+  previousProviderStates = states;
+
   const entries = providers.filter((p) => {
-    if (p.enabled === false) return false;
+    if (p.enabled === false && !isAdoptedUpstreamDisabled(p.id)) return false;
     return effectiveEnabled(p.id);
   });
 
@@ -252,7 +291,9 @@ function getCatalog() {
       id,
       name: entry.name || id,
       types: Array.isArray(entry.supportedTypes) ? entry.supportedTypes : ['movie', 'tv'],
-      enabled: available && effectiveEnabled(id),
+      enabled: (available || isAdoptedUpstreamDisabled(id)) && effectiveEnabled(id),
+      upstreamEnabled: available,
+      adopted: isAdoptedUpstreamDisabled(id),
       loaded: loaded.has(key),
       locked: hard.has(key),
       missing: false,
@@ -267,6 +308,7 @@ function getCatalog() {
     fleet: 'sa7',
     version: Number(config.selectionVersion || 0),
     providers,
+    reconciliation,
   };
 }
 
@@ -281,7 +323,6 @@ function applyRuntimeSelection(overrides, version) {
 }
 
 module.exports = {
-  DISABLED_PROVIDER_IDS,
   getRegistry,
   providersFor,
   reloadProviders,
